@@ -643,3 +643,43 @@ The database component will be considered complete when:
 * Backend integration has been completed and verified.
 * Database documentation is complete.
 * No critical database-related issues remain.
+
+
+## Implemented Database Structure
+
+### Users Collection
+
+Fields:
+
+- `_id` - MongoDB ObjectId
+- `name` - User's full name
+- `email` - User email address
+- `phone` - User phone number
+- `password_hash` - Hashed password value
+- `role` - CUSTOMER, RIDER, or ADMIN
+- `account_status` - Account status such as ACTIVE or SUSPENDED
+- `created_at` - Account creation date and time
+
+A unique index has been created on the `email` field to prevent duplicate user accounts.
+
+### Riders Collection
+
+Fields:
+
+- `_id` - MongoDB ObjectId
+- `user_id` - References the corresponding `_id` in the users collection
+- `availability_status` - AVAILABLE, UNAVAILABLE, or BUSY
+
+A unique index has been created on `user_id` so that one user cannot have multiple rider profiles.
+
+### User-Rider Relationship
+
+The `riders.user_id` field references `users._id`.
+
+The relationship was tested successfully using MongoDB `$lookup`.
+
+Current sample data includes:
+
+- One CUSTOMER user
+- One RIDER user
+- One Rider profile with availability status `AVAILABLE`
