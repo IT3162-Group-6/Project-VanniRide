@@ -3,12 +3,14 @@ const cors = require('cors');
 const AppError = require('./utils/appError');
 const errorHandler = require('./middlewares/errorMiddleware');
 const authRoutes = require('./routes/authRoutes');
+const rideRoutes = require('./routes/rideRoutes'); // Member B2 routes
 
 const app = express();
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Base Route
 app.get('/', (req, res) => {
@@ -18,12 +20,21 @@ app.get('/', (req, res) => {
   });
 });
 
+// Health Check Route
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Server is up and running!',
+  });
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/rides', rideRoutes); // Member B2 ride lifecycle
 
-// Handle 404 Routes
-app.all('/{0,}', (req, res, next) => {
-    next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+// Handle 404 Routes (Must remain below active routes)
+app.use((req, res, next) => {
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
 // Global Error Handler
