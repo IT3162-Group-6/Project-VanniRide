@@ -683,3 +683,80 @@ Current sample data includes:
 - One CUSTOMER user
 - One RIDER user
 - One Rider profile with availability status `AVAILABLE`
+
+## Rides Collection
+
+The `rides` collection stores transport and delivery requests created by customers.
+
+### Fields
+
+- `_id` - MongoDB ObjectId
+- `customer_id` - References the customer in the `users` collection
+- `rider_id` - References the accepted rider in the `users` collection; initially `null`
+- `request_type` - `TRANSPORT` or `DELIVERY`
+- `delivery_category` - `FOOD`, `WATER`, `PARCEL`, or `null`
+- `pickup_location` - Contains address, latitude, and longitude
+- `destination` - Contains address, latitude, and longitude
+- `distance_km` - Calculated distance of the request
+- `fare_amount` - Calculated fare for the request
+- `status` - Current ride status
+- `created_at` - Request creation date and time
+- `accepted_at` - Time the rider accepted the request
+- `arrived_at` - Time the rider arrived
+- `started_at` - Time the ride started
+- `completed_at` - Time the ride completed
+- `cancelled_at` - Time the ride was cancelled
+
+### Ride Status Flow
+
+The supported ride statuses are:
+
+- `REQUESTED`
+- `ACCEPTED`
+- `ARRIVED`
+- `STARTED`
+- `COMPLETED`
+- `CANCELLED`
+
+A sample ride was tested through the following lifecycle:
+
+`REQUESTED → ACCEPTED → ARRIVED → STARTED → COMPLETED`
+
+When a rider accepts a ride, the rider availability status changes from `AVAILABLE` to `BUSY`.
+
+After the ride is completed, the rider availability status returns to `AVAILABLE`.
+
+### Relationships
+
+`rides.customer_id` references `users._id`.
+
+`rides.rider_id` references `users._id`.
+
+Both customer and rider relationships were tested successfully using MongoDB `$lookup`.
+
+### Ride Indexes
+
+The following indexes were created:
+
+- `{ customer_id: 1, status: 1 }`
+- `{ rider_id: 1, status: 1 }`
+- `{ status: 1 }`
+
+These indexes support common queries such as finding customer rides, rider assignments, and rides by status.
+
+### Ride Validation
+
+MongoDB JSON Schema validation was added to the `rides` collection.
+
+Validation currently checks:
+
+- required ride fields
+- valid ObjectId fields
+- `request_type` values
+- delivery category values
+- pickup and destination structure
+- numeric distance and fare values
+- valid ride statuses
+- ride timestamp field types
+
+The validator was tested using intentionally invalid values (`request_type: "CAR"` and `status: "DONE"`), and MongoDB correctly rejected the document.
