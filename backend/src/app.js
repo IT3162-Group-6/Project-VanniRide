@@ -3,7 +3,7 @@ const cors = require('cors');
 const AppError = require('./utils/appError');
 const errorHandler = require('./middlewares/errorMiddleware');
 const authRoutes = require('./routes/authRoutes');
-const rideRoutes = require('./routes/rideRoutes'); // Member B2 routes
+const rideRoutes = require('./routes/rideRoutes');
 
 const app = express();
 
@@ -30,7 +30,9 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/rides', rideRoutes); // Member B2 ride lifecycle
+app.use('/api/rides', rideRoutes); 
+// Express App routes
+app.use('/api/auth', authRoutes);
 
 // Handle 404 Routes (Must remain below active routes)
 app.use((req, res, next) => {
