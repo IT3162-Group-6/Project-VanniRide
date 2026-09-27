@@ -824,3 +824,60 @@ Validation currently checks:
 - `confirmed_by` may contain a rider ObjectId or `null`
 
 The validator was tested using intentionally invalid values (`payment_method: "CARD"` and `payment_status: "SUCCESS"`), and MongoDB correctly rejected the document.
+
+
+## Messages Collection
+
+The `messages` collection stores text chat messages between the customer and the assigned rider for a ride.
+
+### Fields
+
+- `_id` - MongoDB ObjectId
+- `ride_id` - References the related ride in the `rides` collection
+- `sender_id` - References the user who sent the message
+- `message` - Text content of the message
+- `created_at` - Date and time the message was sent
+
+### Chat Flow
+
+Messages are linked to a specific ride.
+
+Both the customer and the assigned rider can send messages related to that ride.
+
+A sample two-way conversation was tested successfully:
+
+- Customer sent: `I am near the university gate.`
+- Rider replied: `Okay, I am coming to the gate now.`
+
+Messages were retrieved in chronological order using the `created_at` field.
+
+### Relationships
+
+`messages.ride_id` references `rides._id`.
+
+`messages.sender_id` references `users._id`.
+
+Both relationships were tested successfully using MongoDB `$lookup`.
+
+### Message Indexes
+
+The following indexes were created:
+
+- `{ ride_id: 1, created_at: 1 }`
+- `{ sender_id: 1 }`
+
+The ride and timestamp index helps retrieve chat messages for a ride in chronological order.
+
+### Message Validation
+
+MongoDB JSON Schema validation was added to the `messages` collection.
+
+Validation currently checks:
+
+- `ride_id` must be a valid ObjectId
+- `sender_id` must be a valid ObjectId
+- `message` must be a string
+- `message` cannot be empty
+- `created_at` must be a date
+
+The validator was tested using an empty message (`message: ""`), and MongoDB correctly rejected the document.
