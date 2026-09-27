@@ -760,3 +760,67 @@ Validation currently checks:
 - ride timestamp field types
 
 The validator was tested using intentionally invalid values (`request_type: "CAR"` and `status: "DONE"`), and MongoDB correctly rejected the document.
+
+
+## Payments Collection
+
+The `payments` collection stores payment information related to completed rides.
+
+### Fields
+
+- `_id` - MongoDB ObjectId
+- `ride_id` - References the related ride in the `rides` collection
+- `amount` - Payment amount
+- `payment_method` - Payment method used
+- `payment_status` - Current payment status
+- `confirmed_by` - References the rider user who confirmed receiving the cash
+- `created_at` - Date and time the payment record was created
+- `paid_at` - Date and time the payment was confirmed as paid
+
+### Payment Flow
+
+The current implementation uses cash payments.
+
+The supported payment flow is:
+
+`PENDING → PAID`
+
+When a ride is completed, a payment record can be created with status `PENDING`.
+
+After the customer pays cash, the rider confirms the payment.
+
+The payment status is then updated to `PAID`, the rider ID is stored in `confirmed_by`, and the `paid_at` timestamp is recorded.
+
+### Relationships
+
+`payments.ride_id` references `rides._id`.
+
+`payments.confirmed_by` references `users._id`.
+
+Both relationships were tested successfully using MongoDB `$lookup`.
+
+### Payment Indexes
+
+The following indexes were created:
+
+- Unique index on `{ ride_id: 1 }`
+- Index on `{ payment_status: 1 }`
+- Index on `{ confirmed_by: 1 }`
+
+The unique `ride_id` index ensures that one ride cannot have more than one payment record.
+
+### Payment Validation
+
+MongoDB JSON Schema validation was added to the `payments` collection.
+
+Validation currently checks:
+
+- required payment fields
+- valid ObjectId values
+- non-negative payment amount
+- payment method must be `CASH`
+- payment status must be `PENDING` or `PAID`
+- valid date fields
+- `confirmed_by` may contain a rider ObjectId or `null`
+
+The validator was tested using intentionally invalid values (`payment_method: "CARD"` and `payment_status: "SUCCESS"`), and MongoDB correctly rejected the document.
