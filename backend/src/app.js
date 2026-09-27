@@ -4,6 +4,8 @@ const AppError = require('./utils/appError');
 const errorHandler = require('./middlewares/errorMiddleware');
 const authRoutes = require('./routes/authRoutes');
 const rideRoutes = require('./routes/rideRoutes'); // Member B2 routes
+const paymentRoutes = require('./routes/paymentRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
 
@@ -31,6 +33,8 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/rides', rideRoutes); // Member B2 ride lifecycle
+app.use('/api/rides', paymentRoutes); // Member B2 cash payment tracking
+app.use('/api/rides', chatRoutes); // Member B2 ride-scoped text chat
 
 // Handle 404 Routes (Must remain below active routes)
 app.use((req, res, next) => {

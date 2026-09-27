@@ -1,0 +1,115 @@
+{
+  "info": {
+    "name": "Vanni Ride - Backend Member 2",
+    "description": "Ride lifecycle, cash payment, and ride chat endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "customerToken", "value": "" },
+    { "key": "riderToken", "value": "" },
+    { "key": "rideId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Customer - Request Ride",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customerToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"rideType\": \"TRANSPORT\",\n  \"pickupLocation\": {\n    \"address\": \"University of Vavuniya\",\n    \"latitude\": 8.7581,\n    \"longitude\": 80.4982\n  },\n  \"destination\": {\n    \"address\": \"Vavuniya Town\",\n    \"latitude\": 8.7514,\n    \"longitude\": 80.4971\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/rides/request"
+      }
+    },
+    {
+      "name": "Rider - Available Rides",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{riderToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/rides/available"
+      }
+    },
+    {
+      "name": "Rider - Accept Ride",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{riderToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/rides/{{rideId}}/accept"
+      }
+    },
+    {
+      "name": "Rider - Update Status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{riderToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"ARRIVED\"\n}"
+        },
+        "url": "{{baseUrl}}/api/rides/{{rideId}}/status"
+      }
+    },
+    {
+      "name": "Customer - Cancel Ride",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customerToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Plans changed\"\n}"
+        },
+        "url": "{{baseUrl}}/api/rides/{{rideId}}/cancel"
+      }
+    },
+    {
+      "name": "Rider - Confirm Cash Payment",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{riderToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/rides/{{rideId}}/payment"
+      }
+    },
+    {
+      "name": "Customer - Send Message",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customerToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"messageText\": \"I am waiting near the main gate.\"\n}"
+        },
+        "url": "{{baseUrl}}/api/rides/{{rideId}}/messages"
+      }
+    },
+    {
+      "name": "Ride - Message History",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/rides/{{rideId}}/messages"
+      }
+    }
+  ]
+}
