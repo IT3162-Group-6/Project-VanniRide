@@ -1,30 +1,26 @@
-# Vanni Ride — Database Design
+# Vanni Ride - Database Design
 
 ## 1. Database Overview
 
 Vanni Ride is a transportation and delivery coordination platform for the University of Vavuniya community.
 
-The system uses MongoDB as its database for storing persistent application data, including user information, rider information, service requests, conversations, payments, cancellations, ratings, and other system data.
+The system uses MongoDB to store persistent application data including users, rider profiles, ride and delivery requests, payments, chat messages, cancellations, and ratings.
 
-The database must maintain data integrity, relationships between entities, validation rules, and information required for ride history and administrative monitoring.
+The frontend does not directly access MongoDB. Database operations are performed through the backend application.
 
 ---
 
 ## 2. Database Technology
 
-**Database:** MongoDB
-
-**Database Name:** `vanniRideDB`
-
-**Database Type:** NoSQL Document Database
-
-The application will communicate with MongoDB through the backend application. The frontend will not directly access the database.
+- Database: MongoDB
+- Database Name: `vanniRideDB`
+- Database Type: NoSQL Document Database
 
 ---
 
-## 3. Main Collections
+## 3. Final Main Collections
 
-The initial database design contains the following core collections:
+The Vanni Ride database currently contains seven main collections:
 
 1. `users`
 2. `riders`
@@ -32,235 +28,293 @@ The initial database design contains the following core collections:
 4. `payments`
 5. `messages`
 6. `cancellations`
+7. `ratings`
 
-The project proposal also identifies ratings/reviews as a system feature. A separate `ratings` collection will be finalized only after the team confirms the exact rating requirements.
+All seven collections have been created and tested.
 
 ---
 
-# 4. USERS Collection
+# 4. Users Collection
 
 The `users` collection stores common information about all registered users.
 
-A user can have one of the following roles:
-
-* CUSTOMER
-* RIDER
-* ADMIN
-
 ## Fields
 
-| Field            | Data Type | Required | Description                        |
-| ---------------- | --------- | -------- | ---------------------------------- |
-| `_id`            | ObjectId  | Yes      | Unique MongoDB document identifier |
-| `name`           | String    | Yes      | User's name                        |
-| `email`          | String    | Yes      | User's email address               |
-| `phone`          | String    | Yes      | User's phone number                |
-| `password_hash`  | String    | Yes      | Hashed user password               |
-| `role`           | String    | Yes      | User role                          |
-| `account_status` | String    | Yes      | Current account status             |
-| `created_at`     | Date      | Yes      | Account creation date/time         |
-
-## Validation Rules
-
-* Required fields cannot be empty.
-* Email must be valid.
-* Email must be unique.
-* Password must satisfy the agreed minimum requirements before hashing.
-* `role` must contain an approved role.
-* `account_status` must contain an approved account status.
+- `_id` - MongoDB ObjectId
+- `name` - User's full name
+- `email` - User email address
+- `phone` - User phone number
+- `password_hash` - Hashed password value
+- `role` - User role
+- `account_status` - Current account status
+- `created_at` - Account creation date and time
 
 ## Allowed Roles
 
+- `CUSTOMER`
+- `RIDER`
+- `ADMIN`
+
+## Account Status
+
+- `ACTIVE`
+- `SUSPENDED`
+
+## Indexes
+
+A unique index is created on:
+
 ```text
-CUSTOMER
-RIDER
-ADMIN
+email
 ```
 
-## Proposed Account Status
+This prevents multiple user accounts from using the same email address.
+
+## Validation
+
+MongoDB JSON Schema validation checks:
+
+- name must be a non-empty string
+- email must be a non-empty string
+- phone must be a non-empty string
+- password_hash must be a non-empty string
+- role must be `CUSTOMER`, `RIDER`, or `ADMIN`
+- account_status must be `ACTIVE` or `SUSPENDED`
+- created_at must be a date
+
+The validator was tested using an invalid role value:
 
 ```text
-ACTIVE
-INACTIVE
+DRIVER
 ```
+
+MongoDB correctly rejected the document.
 
 ---
 
-# 5. RIDERS Collection
+# 5. Riders Collection
 
-The `riders` collection stores information specific to users who provide transportation or delivery services.
+The `riders` collection stores information specific to users who provide transport or delivery services.
 
-A rider is linked to an existing user through `user_id`.
+A rider profile is connected to a user account through `user_id`.
 
 ## Fields
 
-| Field                 | Data Type | Required | Description                         |
-| --------------------- | --------- | -------- | ----------------------------------- |
-| `_id`                 | ObjectId  | Yes      | Unique rider document identifier    |
-| `user_id`             | ObjectId  | Yes      | Reference to the corresponding user |
-| `availability_status` | String    | Yes      | Current rider availability          |
+- `_id` - MongoDB ObjectId
+- `user_id` - References `users._id`
+- `availability_status` - Current rider availability
 
-## Allowed Availability Statuses
+## Rider Availability
+
+- `AVAILABLE`
+- `UNAVAILABLE`
+- `BUSY`
+
+## Relationship
 
 ```text
-AVAILABLE
-UNAVAILABLE
-BUSY
+riders.user_id
+       ->
+users._id
 ```
 
-## Rules
+The relationship was successfully tested using MongoDB `$lookup`.
 
-* A rider must be associated with a valid user.
-* Only available riders should be considered for available requests.
-* When a rider accepts a ride, their availability may become `BUSY`.
-* After completion or cancellation, the rider may become `AVAILABLE`, depending on the final team decision.
+## Indexes
+
+A unique index is created on:
+
+```text
+user_id
+```
+
+This prevents one user from having multiple rider profiles.
+
+## Validation
+
+MongoDB validation checks:
+
+- user_id must be an ObjectId
+- availability_status must be `AVAILABLE`, `UNAVAILABLE`, or `BUSY`
+
+The validator was tested with:
+
+```text
+FREE
+```
+
+MongoDB correctly rejected the invalid availability value.
 
 ---
 
-# 6. RIDES Collection
+# 6. Rides Collection
 
-The `rides` collection stores transportation and delivery service requests.
-
-A ride is created by a customer and may later be assigned to a rider.
+The `rides` collection stores transportation and delivery requests created by customers.
 
 ## Fields
 
-| Field             | Data Type | Required | Description                      |
-| ----------------- | --------- | -------- | -------------------------------- |
-| `_id`             | ObjectId  | Yes      | Unique ride document identifier  |
-| `customer_id`     | ObjectId  | Yes      | Customer who created the request |
-| `rider_id`        | ObjectId  | No       | Rider assigned to the request    |
-| `request_type`    | String    | Yes      | Type of requested service        |
-| `pickup_location` | Object    | Yes      | Pickup coordinates/location      |
-| `destination`     | Object    | Yes      | Destination coordinates/location |
-| `status`          | String    | Yes      | Current ride status              |
-| `requested_at`    | Date      | Yes      | Time the request was created     |
-| `accepted_at`     | Date      | No       | Time the request was accepted    |
-| `started_at`      | Date      | No       | Time the service started         |
-| `completed_at`    | Date      | No       | Time the service completed       |
-| `cancelled_at`    | Date      | No       | Time the request was cancelled   |
+- `_id` - MongoDB ObjectId
+- `customer_id` - References the customer in `users`
+- `rider_id` - References the accepted rider in `users`
+- `request_type` - `TRANSPORT` or `DELIVERY`
+- `delivery_category` - `FOOD`, `WATER`, `PARCEL`, or `null`
+- `pickup_location` - Pickup address and coordinates
+- `destination` - Destination address and coordinates
+- `distance_km` - Calculated distance
+- `fare_amount` - Calculated fare
+- `status` - Current ride status
+- `created_at` - Request creation time
+- `accepted_at` - Rider acceptance time
+- `arrived_at` - Rider arrival time
+- `started_at` - Ride start time
+- `completed_at` - Ride completion time
+- `cancelled_at` - Ride cancellation time
+
+## Request Types
+
+- `TRANSPORT`
+- `DELIVERY`
+
+For delivery requests, supported categories are:
+
+- `FOOD`
+- `WATER`
+- `PARCEL`
+
+For transport requests:
+
+```text
+delivery_category = null
+```
 
 ## Location Structure
 
-The initial location structure can contain:
+Example:
 
 ```text
 pickup_location
+    address
     latitude
     longitude
 
 destination
+    address
     latitude
     longitude
 ```
 
-The exact location representation must remain consistent with the agreed backend/API design.
+This structure supports later map and route integration.
 
----
+## Ride Statuses
 
-# 7. Request Types
+- `REQUESTED`
+- `ACCEPTED`
+- `ARRIVED`
+- `STARTED`
+- `COMPLETED`
+- `CANCELLED`
 
-The project supports transportation and delivery services.
-
-The proposed request types are:
-
-```text
-TRANSPORT
-DELIVERY
-```
-
-The team must finalize the exact information required for each request type before implementation.
-
-At minimum, every ride request contains:
-
-* Customer
-* Pickup location
-* Destination
-* Request type
-* Request time
-* Current status
-
-No additional delivery/item fields should be added unless they are part of the approved project scope.
-
----
-
-# 8. Ride Status
-
-The database, backend, and frontend must use the same ride status values.
-
-## Status Values
+## Normal Ride Flow
 
 ```text
 REQUESTED
+   ->
 ACCEPTED
+   ->
 ARRIVED
+   ->
 STARTED
-COMPLETED
-CANCELLED
-```
-
-## Standard Ride Flow
-
-```text
-REQUESTED
-     ↓
-ACCEPTED
-     ↓
-ARRIVED
-     ↓
-STARTED
-     ↓
+   ->
 COMPLETED
 ```
 
-Cancellation can result in:
+A sample ride was successfully tested through this complete lifecycle.
+
+## Rider Availability Flow
+
+When a rider accepts a ride:
 
 ```text
-REQUESTED → CANCELLED
+AVAILABLE -> BUSY
 ```
 
-and, if permitted by the final project rules:
+After the ride is completed:
 
 ```text
-ACCEPTED → CANCELLED
+BUSY -> AVAILABLE
 ```
+
+## Relationships
+
+```text
+rides.customer_id
+       ->
+users._id
+```
+
+```text
+rides.rider_id
+       ->
+users._id
+```
+
+Both relationships were successfully tested using MongoDB `$lookup`.
+
+## Indexes
+
+The following indexes were created:
+
+```text
+{ customer_id: 1, status: 1 }
+{ rider_id: 1, status: 1 }
+{ status: 1 }
+```
+
+These indexes support common ride queries.
+
+## Validation
+
+MongoDB validation checks:
+
+- required ride fields
+- customer_id ObjectId
+- rider_id ObjectId or null
+- valid request type
+- valid delivery category
+- pickup location structure
+- destination structure
+- numeric distance
+- numeric fare
+- valid ride status
+- valid timestamp fields
+
+The validator was tested using:
+
+```text
+request_type: CAR
+status: DONE
+```
+
+MongoDB correctly rejected the invalid document.
 
 ---
 
-# 9. Ride Acceptance Rules
+# 7. Payments Collection
 
-A rider can accept a ride only when:
+The `payments` collection stores payment information related to rides.
 
-1. The rider is available.
-2. The ride status is still `REQUESTED`.
-3. Another rider has not already been assigned.
-
-When a ride is accepted:
-
-```text
-ride.status = ACCEPTED
-ride.rider_id = selected rider
-```
-
-The corresponding acceptance time should also be recorded.
-
----
-
-# 10. PAYMENTS Collection
-
-Vanni Ride uses cash-only payments.
-
-The database records the payment status but does not process electronic payments.
+Vanni Ride currently uses cash payments.
 
 ## Fields
 
-| Field            | Data Type | Required | Description                        |
-| ---------------- | --------- | -------- | ---------------------------------- |
-| `_id`            | ObjectId  | Yes      | Unique payment document identifier |
-| `ride_id`        | ObjectId  | Yes      | Related ride                       |
-| `payment_method` | String    | Yes      | Payment method                     |
-| `payment_status` | String    | Yes      | Current payment status             |
-| `paid_at`        | Date      | No       | Time payment was confirmed         |
+- `_id` - MongoDB ObjectId
+- `ride_id` - References `rides._id`
+- `amount` - Payment amount
+- `payment_method` - Payment method
+- `payment_status` - Current payment status
+- `confirmed_by` - Rider user who confirmed the cash payment
+- `created_at` - Payment record creation time
+- `paid_at` - Payment confirmation time
 
 ## Payment Method
 
@@ -270,747 +324,692 @@ CASH
 
 ## Payment Status
 
-```text
-PENDING
-PAID
-```
+- `PENDING`
+- `PAID`
 
 ## Payment Flow
 
 ```text
-Ride Created
-     ↓
-Payment = PENDING
-     ↓
-Ride Completed
-     ↓
-Customer pays rider in cash
-     ↓
-Payment = PAID
+Ride completed
+      ->
+Payment PENDING
+      ->
+Customer pays cash
+      ->
+Rider confirms payment
+      ->
+Payment PAID
 ```
 
-The team must finalize who confirms that the cash payment was received.
+When payment is confirmed:
 
----
+- payment_status becomes `PAID`
+- confirmed_by stores the rider user ID
+- paid_at stores the confirmation time
 
-# 11. MESSAGES Collection
-
-The `messages` collection stores text messages exchanged between a customer and the rider assigned to a particular ride.
-
-## Fields
-
-| Field          | Data Type | Required | Description               |
-| -------------- | --------- | -------- | ------------------------- |
-| `_id`          | ObjectId  | Yes      | Unique message identifier |
-| `ride_id`      | ObjectId  | Yes      | Related ride              |
-| `sender_id`    | ObjectId  | Yes      | User who sent the message |
-| `message_text` | String    | Yes      | Text content              |
-| `sent_at`      | Date      | Yes      | Message timestamp         |
-
-## Rules
-
-* Sender must belong to the relevant ride.
-* Message cannot be empty.
-* Chat is restricted to the customer and assigned rider.
-* Messages are associated with a specific ride.
-* Conversation history should be retained.
-
-## Not Included
-
-The chat system does not include:
-
-* Images
-* Files
-* Voice messages
-* Video calls
-
----
-
-# 12. CANCELLATIONS Collection
-
-Cancelled rides should not be deleted from the database.
-
-A cancellation record is stored separately for tracking and history.
-
-## Fields
-
-| Field          | Data Type | Required               | Description                    |
-| -------------- | --------- | ---------------------- | ------------------------------ |
-| `_id`          | ObjectId  | Yes                    | Unique cancellation identifier |
-| `ride_id`      | ObjectId  | Yes                    | Cancelled ride                 |
-| `cancelled_by` | ObjectId  | Yes                    | User who cancelled             |
-| `reason`       | String    | Depends on final rules | Cancellation reason            |
-| `cancelled_at` | Date      | Yes                    | Cancellation time              |
-
-## Cancellation Rules
-
-Before acceptance:
+## Relationships
 
 ```text
-REQUESTED → CANCELLED
-```
-
-The team must decide whether cancellation after acceptance is allowed.
-
-After the ride has started, cancellation is normally not allowed unless the approved project requirements specify otherwise.
-
-Cancelled rides remain stored for:
-
-* Ride history
-* Administrative monitoring
-* Statistics
-* Cancellation records
-
----
-
-# 13. Relationships
-
-The main database relationships are:
-
-```text
-USER
- ├── Customer
- ├── Rider Profile
- └── Admin
-```
-
-Core ride relationship:
-
-```text
-Customer
-    ↓
-creates
-    ↓
-Ride
-    ↓
-assigned to
-    ↓
-Rider
-```
-
-Additional relationships:
-
-```text
-Ride → Payment
-
-Ride → Messages
-
-Ride → Cancellation
-```
-
-## Reference Fields
-
-```text
-riders.user_id
-        ↓
-users._id
-
-rides.customer_id
-        ↓
-users._id
-
-rides.rider_id
-        ↓
-riders._id
-
 payments.ride_id
-        ↓
+       ->
 rides._id
+```
 
-messages.ride_id
-        ↓
-rides._id
-
-messages.sender_id
-        ↓
-users._id
-
-cancellations.ride_id
-        ↓
-rides._id
-
-cancellations.cancelled_by
-        ↓
+```text
+payments.confirmed_by
+       ->
 users._id
 ```
 
----
+Both relationships were successfully tested.
 
-# 14. Data Integrity Rules
-
-The database design must maintain the following rules:
-
-### User
-
-* Email must be unique.
-* Required registration fields must be present.
-* User role must be valid.
-
-### Rider
-
-* Rider must reference a valid user.
-* Rider availability must use an approved status.
-
-### Ride
-
-* Customer must be identified.
-* Pickup location is required.
-* Destination is required.
-* Request type is required.
-* Ride status must be valid.
-* A ride can only be accepted when it is still `REQUESTED`.
-* A ride cannot have multiple riders assigned simultaneously.
-
-### Payment
-
-* Payment must reference a valid ride.
-* Payment method must be `CASH`.
-* Payment status must be valid.
-
-### Message
-
-* Message must reference a valid ride.
-* Sender must be authorized for the ride.
-* Message text cannot be empty.
-
-### Cancellation
-
-* Cancellation must reference a valid ride.
-* The user who cancelled must be recorded.
-* Cancellation time must be recorded.
-
----
-
-# 15. Database Naming Convention
-
-The database will use `snake_case` naming.
-
-Examples:
-
-```text
-customer_id
-rider_id
-request_type
-pickup_location
-ride_status
-created_at
-completed_at
-```
-
-The final API/frontend naming convention must be agreed upon by the development team and documented consistently.
-
----
-
-# 16. Proposed Indexes
-
-Indexes will be added based on the application's expected queries.
-
-Initial candidates include:
-
-```text
-users.email
-riders.user_id
-riders.availability_status
-rides.customer_id
-rides.rider_id
-rides.status
-payments.ride_id
-messages.ride_id
-cancellations.ride_id
-```
-
-The final index list will be confirmed after the required database queries are identified.
-
----
-
-# 17. Ratings
-
-The project proposal includes rating/review functionality.
-
-However, the Master Specification's suggested main database entities do not explicitly list a ratings collection.
-
-Therefore, ratings should not be implemented until the team confirms:
-
-* Whether ratings are required in the final scope.
-* Who can rate whom.
-* Whether a rating is associated with a completed ride.
-* Rating scale.
-* Whether written feedback is required.
-* Whether one rating is allowed per ride.
-
-If approved, a separate `ratings` collection can be designed.
-
----
-
-# 18. Database Decisions Pending Team Confirmation
-
-The following decisions must be finalized before the database design is considered completely frozen:
-
-1. Exact request types.
-2. Exact information required for transport and delivery requests.
-3. Whether customers can have multiple active requests.
-4. Rider matching/selection rules.
-5. Automatic rider availability changes.
-6. Whether customers can cancel after rider acceptance.
-7. Who confirms cash payment.
-8. How the payment/fare amount is stored.
-9. Chat retention rules.
-10. Final rating/review requirements.
-
-No major fields should be added without team agreement.
-
----
-
-# 19. Database Development Principle
-
-The database should be developed and integrated progressively.
-
-Initial integration stages:
-
-```text
-Registration/Login
-       ↓
-Users Database
-```
-
-Then:
-
-```text
-Customer Creates Request
-       ↓
-Backend
-       ↓
-Rides Database
-```
-
-Then:
-
-```text
-Rider Views Request
-       ↓
-Rider Accepts
-       ↓
-Ride Database Updated
-       ↓
-Customer Sees Assigned Rider
-```
-
-Further integrations will include:
-
-```text
-Payment
-Chat
-Cancellation
-Ratings
-Administration
-```
-
----
-
-# 20. Database Responsibility
-
-The database team is responsible for:
-
-* Database design
-* ER/data model
-* Collections
-* Relationships
-* Constraints
-* Validation rules
-* Queries
-* Database updates
-* Test/sample data
-* Database documentation
-* Supporting database integration
-* Database-related testing and fixes
-
-Backend API implementation remains the responsibility of the backend team.
-
----
-
-# 21. Definition of Database Completion
-
-The database component will be considered complete when:
-
-* Database design is finalized.
-* Required collections are implemented.
-* Relationships are implemented.
-* Validation rules are implemented.
-* Required indexes are implemented.
-* Sample/test data is available.
-* Required database queries work correctly.
-* Database operations have been tested.
-* Backend integration has been completed and verified.
-* Database documentation is complete.
-* No critical database-related issues remain.
-
-
-## Implemented Database Structure
-
-### Users Collection
-
-Fields:
-
-- `_id` - MongoDB ObjectId
-- `name` - User's full name
-- `email` - User email address
-- `phone` - User phone number
-- `password_hash` - Hashed password value
-- `role` - CUSTOMER, RIDER, or ADMIN
-- `account_status` - Account status such as ACTIVE or SUSPENDED
-- `created_at` - Account creation date and time
-
-A unique index has been created on the `email` field to prevent duplicate user accounts.
-
-### Riders Collection
-
-Fields:
-
-- `_id` - MongoDB ObjectId
-- `user_id` - References the corresponding `_id` in the users collection
-- `availability_status` - AVAILABLE, UNAVAILABLE, or BUSY
-
-A unique index has been created on `user_id` so that one user cannot have multiple rider profiles.
-
-### User-Rider Relationship
-
-The `riders.user_id` field references `users._id`.
-
-The relationship was tested successfully using MongoDB `$lookup`.
-
-Current sample data includes:
-
-- One CUSTOMER user
-- One RIDER user
-- One Rider profile with availability status `AVAILABLE`
-
-## Rides Collection
-
-The `rides` collection stores transport and delivery requests created by customers.
-
-### Fields
-
-- `_id` - MongoDB ObjectId
-- `customer_id` - References the customer in the `users` collection
-- `rider_id` - References the accepted rider in the `users` collection; initially `null`
-- `request_type` - `TRANSPORT` or `DELIVERY`
-- `delivery_category` - `FOOD`, `WATER`, `PARCEL`, or `null`
-- `pickup_location` - Contains address, latitude, and longitude
-- `destination` - Contains address, latitude, and longitude
-- `distance_km` - Calculated distance of the request
-- `fare_amount` - Calculated fare for the request
-- `status` - Current ride status
-- `created_at` - Request creation date and time
-- `accepted_at` - Time the rider accepted the request
-- `arrived_at` - Time the rider arrived
-- `started_at` - Time the ride started
-- `completed_at` - Time the ride completed
-- `cancelled_at` - Time the ride was cancelled
-
-### Ride Status Flow
-
-The supported ride statuses are:
-
-- `REQUESTED`
-- `ACCEPTED`
-- `ARRIVED`
-- `STARTED`
-- `COMPLETED`
-- `CANCELLED`
-
-A sample ride was tested through the following lifecycle:
-
-`REQUESTED → ACCEPTED → ARRIVED → STARTED → COMPLETED`
-
-When a rider accepts a ride, the rider availability status changes from `AVAILABLE` to `BUSY`.
-
-After the ride is completed, the rider availability status returns to `AVAILABLE`.
-
-### Relationships
-
-`rides.customer_id` references `users._id`.
-
-`rides.rider_id` references `users._id`.
-
-Both customer and rider relationships were tested successfully using MongoDB `$lookup`.
-
-### Ride Indexes
-
-The following indexes were created:
-
-- `{ customer_id: 1, status: 1 }`
-- `{ rider_id: 1, status: 1 }`
-- `{ status: 1 }`
-
-These indexes support common queries such as finding customer rides, rider assignments, and rides by status.
-
-### Ride Validation
-
-MongoDB JSON Schema validation was added to the `rides` collection.
-
-Validation currently checks:
-
-- required ride fields
-- valid ObjectId fields
-- `request_type` values
-- delivery category values
-- pickup and destination structure
-- numeric distance and fare values
-- valid ride statuses
-- ride timestamp field types
-
-The validator was tested using intentionally invalid values (`request_type: "CAR"` and `status: "DONE"`), and MongoDB correctly rejected the document.
-
-
-## Payments Collection
-
-The `payments` collection stores payment information related to completed rides.
-
-### Fields
-
-- `_id` - MongoDB ObjectId
-- `ride_id` - References the related ride in the `rides` collection
-- `amount` - Payment amount
-- `payment_method` - Payment method used
-- `payment_status` - Current payment status
-- `confirmed_by` - References the rider user who confirmed receiving the cash
-- `created_at` - Date and time the payment record was created
-- `paid_at` - Date and time the payment was confirmed as paid
-
-### Payment Flow
-
-The current implementation uses cash payments.
-
-The supported payment flow is:
-
-`PENDING → PAID`
-
-When a ride is completed, a payment record can be created with status `PENDING`.
-
-After the customer pays cash, the rider confirms the payment.
-
-The payment status is then updated to `PAID`, the rider ID is stored in `confirmed_by`, and the `paid_at` timestamp is recorded.
-
-### Relationships
-
-`payments.ride_id` references `rides._id`.
-
-`payments.confirmed_by` references `users._id`.
-
-Both relationships were tested successfully using MongoDB `$lookup`.
-
-### Payment Indexes
-
-The following indexes were created:
+## Indexes
 
 - Unique index on `{ ride_id: 1 }`
 - Index on `{ payment_status: 1 }`
 - Index on `{ confirmed_by: 1 }`
 
-The unique `ride_id` index ensures that one ride cannot have more than one payment record.
+The unique ride index ensures one ride currently has one payment record.
 
-### Payment Validation
+## Validation
 
-MongoDB JSON Schema validation was added to the `payments` collection.
+Validation checks:
 
-Validation currently checks:
+- ride_id must be an ObjectId
+- amount must be numeric and non-negative
+- payment_method must be `CASH`
+- payment_status must be `PENDING` or `PAID`
+- confirmed_by must be an ObjectId or null
+- created_at must be a date
+- paid_at must be a date or null
 
-- required payment fields
-- valid ObjectId values
-- non-negative payment amount
-- payment method must be `CASH`
-- payment status must be `PENDING` or `PAID`
-- valid date fields
-- `confirmed_by` may contain a rider ObjectId or `null`
+The validator was tested using:
 
-The validator was tested using intentionally invalid values (`payment_method: "CARD"` and `payment_status: "SUCCESS"`), and MongoDB correctly rejected the document.
+```text
+payment_method: CARD
+payment_status: SUCCESS
+```
 
+MongoDB correctly rejected the document.
 
-## Messages Collection
+---
 
-The `messages` collection stores text chat messages between the customer and the assigned rider for a ride.
+# 8. Messages Collection
 
-### Fields
+The `messages` collection stores text messages between the customer and assigned rider for a ride.
+
+## Fields
 
 - `_id` - MongoDB ObjectId
-- `ride_id` - References the related ride in the `rides` collection
+- `ride_id` - References the related ride
 - `sender_id` - References the user who sent the message
-- `message` - Text content of the message
-- `created_at` - Date and time the message was sent
+- `message` - Text content
+- `created_at` - Message timestamp
 
-### Chat Flow
+## Relationships
 
-Messages are linked to a specific ride.
+```text
+messages.ride_id
+       ->
+rides._id
+```
 
-Both the customer and the assigned rider can send messages related to that ride.
+```text
+messages.sender_id
+       ->
+users._id
+```
 
-A sample two-way conversation was tested successfully:
+Both relationships were tested using MongoDB `$lookup`.
 
-- Customer sent: `I am near the university gate.`
-- Rider replied: `Okay, I am coming to the gate now.`
+## Chat Rules
 
-Messages were retrieved in chronological order using the `created_at` field.
+- messages belong to a specific ride
+- chat is intended for the customer and assigned rider
+- messages must not be empty
+- text-only communication is currently supported
 
-### Relationships
+Images, files, voice messages, and video calls are not part of the current design.
 
-`messages.ride_id` references `rides._id`.
+## Sample Test
 
-`messages.sender_id` references `users._id`.
+Customer message:
 
-Both relationships were tested successfully using MongoDB `$lookup`.
+```text
+I am near the university gate.
+```
 
-### Message Indexes
+Rider reply:
 
-The following indexes were created:
+```text
+Okay, I am coming to the gate now.
+```
 
-- `{ ride_id: 1, created_at: 1 }`
-- `{ sender_id: 1 }`
+Messages were successfully retrieved in chronological order.
 
-The ride and timestamp index helps retrieve chat messages for a ride in chronological order.
+## Indexes
 
-### Message Validation
+```text
+{ ride_id: 1, created_at: 1 }
+{ sender_id: 1 }
+```
 
-MongoDB JSON Schema validation was added to the `messages` collection.
+## Validation
 
-Validation currently checks:
+Validation checks:
 
-- `ride_id` must be a valid ObjectId
-- `sender_id` must be a valid ObjectId
-- `message` must be a string
-- `message` cannot be empty
-- `created_at` must be a date
+- ride_id must be an ObjectId
+- sender_id must be an ObjectId
+- message must be a non-empty string
+- created_at must be a date
 
-The validator was tested using an empty message (`message: ""`), and MongoDB correctly rejected the document.
+An empty message was intentionally tested and MongoDB correctly rejected it.
 
+---
 
+# 9. Cancellations Collection
 
-## Cancellations Collection
+The `cancellations` collection stores cancellation history.
 
-The `cancellations` collection stores cancellation records for rides that have been cancelled.
+Cancelled rides are not deleted.
 
-### Fields
+Instead:
+
+```text
+ride.status = CANCELLED
+```
+
+and a cancellation document is stored separately.
+
+## Fields
 
 - `_id` - MongoDB ObjectId
-- `ride_id` - References the cancelled ride in the `rides` collection
-- `cancelled_by` - References the user who cancelled the ride
-- `reason` - Reason for cancellation
-- `cancelled_at` - Date and time the cancellation occurred
+- `ride_id` - References the cancelled ride
+- `cancelled_by` - References the user who cancelled
+- `reason` - Cancellation reason
+- `cancelled_at` - Cancellation time
 
-### Cancellation Flow
+## Cancellation Flow
 
-When a ride is cancelled, the ride itself is not deleted.
+A sample ride was tested using:
 
-Instead, the ride status is updated to `CANCELLED`, and a separate cancellation record is created.
+```text
+REQUESTED -> CANCELLED
+```
 
-A sample cancellation was tested using a ride in `REQUESTED` status.
+A cancellation record was then created.
 
-The ride was updated from:
+## Relationships
 
-`REQUESTED → CANCELLED`
+```text
+cancellations.ride_id
+       ->
+rides._id
+```
 
-A cancellation record was then created with the user who cancelled the ride, the cancellation reason, and the cancellation timestamp.
+```text
+cancellations.cancelled_by
+       ->
+users._id
+```
 
-### Relationships
+Both relationships were successfully tested.
 
-`cancellations.ride_id` references `rides._id`.
+## Cancellation Limit Support
 
-`cancellations.cancelled_by` references `users._id`.
+The database supports counting how many cancellations a user has made during the previous 7 days.
 
-Both relationships were tested successfully using MongoDB `$lookup`.
+The agreed rule is:
 
-### Cancellation Limit Support
+```text
+Maximum 5 cancellations within 7 days
+```
 
-The current design supports checking how many cancellations a user has made within the last 7 days.
+A 7-day count query was successfully tested.
 
-A query was tested successfully to count cancellations made by a user during the previous 7-day period.
+The exact application action after reaching the limit is not yet implemented in the database and will be handled according to final application rules.
 
-The project rule currently allows a maximum of 5 cancellations within a 7-day period.
-
-The database stores the required cancellation history, while the exact action taken after reaching the limit will be handled according to the final application rules.
-
-### Cancellation Indexes
-
-The following indexes were created:
+## Indexes
 
 - Unique index on `{ ride_id: 1 }`
 - Index on `{ cancelled_by: 1, cancelled_at: 1 }`
 
-The unique ride index prevents multiple cancellation records for the same ride.
+## Validation
 
-The cancelled user and timestamp index supports time-based cancellation checks such as the 7-day cancellation count.
+Validation checks:
 
-### Cancellation Validation
+- ride_id must be an ObjectId
+- cancelled_by must be an ObjectId
+- reason must be a non-empty string
+- cancelled_at must be a date
 
-MongoDB JSON Schema validation was added to the `cancellations` collection.
+An empty cancellation reason was intentionally tested and MongoDB correctly rejected it.
 
-Validation currently checks:
+---
 
-- `ride_id` must be a valid ObjectId
-- `cancelled_by` must be a valid ObjectId
-- `reason` must be a non-empty string
-- `cancelled_at` must be a valid date
-
-The validator was tested using an empty cancellation reason (`reason: ""`), and MongoDB correctly rejected the document.
-
-
-## Ratings Collection
+# 10. Ratings Collection
 
 The `ratings` collection stores customer ratings and reviews for completed rides.
 
-### Fields
+## Fields
 
 - `_id` - MongoDB ObjectId
-- `ride_id` - References the completed ride in the `rides` collection
-- `customer_id` - References the customer who submitted the rating
-- `rider_id` - References the rider who received the rating
-- `rating` - Numeric rating value from 1 to 5
-- `review` - Optional text review
-- `created_at` - Date and time the rating was submitted
+- `ride_id` - References the completed ride
+- `customer_id` - Customer who submitted the rating
+- `rider_id` - Rider who received the rating
+- `rating` - Numeric value from 1 to 5
+- `review` - Optional text feedback
+- `created_at` - Rating creation time
 
-### Rating Flow
+## Rating Flow
 
-After a ride is completed, the customer can provide a rating and optional review for the assigned rider.
+After a completed ride, a customer can provide a rating and optional review for the rider.
 
-A sample rating was tested using the completed test ride.
+A sample rating was successfully tested:
 
-The customer submitted:
+```text
+rating: 5
+review: Good service
+```
 
-- Rating: `5`
-- Review: `Good service`
+## Relationships
 
-### Relationships
+```text
+ratings.ride_id
+       ->
+rides._id
+```
 
-`ratings.ride_id` references `rides._id`.
+```text
+ratings.customer_id
+       ->
+users._id
+```
 
-`ratings.customer_id` references `users._id`.
+```text
+ratings.rider_id
+       ->
+users._id
+```
 
-`ratings.rider_id` references `users._id`.
+All three relationships were successfully tested using MongoDB `$lookup`.
 
-All three relationships were tested successfully using MongoDB `$lookup`.
-
-### Rating Indexes
-
-The following indexes were created:
+## Indexes
 
 - Unique index on `{ ride_id: 1 }`
 - Index on `{ rider_id: 1, created_at: -1 }`
 - Index on `{ customer_id: 1 }`
 
-The unique ride index prevents multiple rating records for the same ride.
+## Validation
 
-The rider and timestamp index supports retrieving a rider's ratings and reviews over time.
+Validation checks:
 
-### Rating Validation
+- ride_id must be an ObjectId
+- customer_id must be an ObjectId
+- rider_id must be an ObjectId
+- rating must be between 1 and 5
+- review must be a string or null
+- created_at must be a date
 
-MongoDB JSON Schema validation was added to the `ratings` collection.
+The validator was tested using:
 
-Validation currently checks:
+```text
+rating: 6
+```
 
-- `ride_id` must be a valid ObjectId
-- `customer_id` must be a valid ObjectId
-- `rider_id` must be a valid ObjectId
-- `rating` must be between 1 and 5
-- `review` must be a string or `null`
-- `created_at` must be a valid date
+MongoDB correctly rejected the document.
 
-The validator was tested using an invalid rating value (`rating: 6`), and MongoDB correctly rejected the document.
+---
+
+# 11. Main Database Relationships
+
+```text
+USERS
+  |
+  +--> RIDERS
+  |
+  +--> RIDES as customer
+  |
+  +--> RIDES as rider
+  |
+  +--> MESSAGES as sender
+  |
+  +--> CANCELLATIONS as cancelled_by
+  |
+  +--> RATINGS as customer/rider
+
+RIDES
+  |
+  +--> PAYMENTS
+  |
+  +--> MESSAGES
+  |
+  +--> CANCELLATIONS
+  |
+  +--> RATINGS
+```
+
+Important reference fields:
+
+```text
+riders.user_id -> users._id
+
+rides.customer_id -> users._id
+rides.rider_id -> users._id
+
+payments.ride_id -> rides._id
+payments.confirmed_by -> users._id
+
+messages.ride_id -> rides._id
+messages.sender_id -> users._id
+
+cancellations.ride_id -> rides._id
+cancellations.cancelled_by -> users._id
+
+ratings.ride_id -> rides._id
+ratings.customer_id -> users._id
+ratings.rider_id -> users._id
+```
+
+---
+
+# 12. Implemented Indexes
+
+## Users
+
+```text
+email - UNIQUE
+```
+
+## Riders
+
+```text
+user_id - UNIQUE
+```
+
+## Rides
+
+```text
+customer_id + status
+rider_id + status
+status
+```
+
+## Payments
+
+```text
+ride_id - UNIQUE
+payment_status
+confirmed_by
+```
+
+## Messages
+
+```text
+ride_id + created_at
+sender_id
+```
+
+## Cancellations
+
+```text
+ride_id - UNIQUE
+cancelled_by + cancelled_at
+```
+
+## Ratings
+
+```text
+ride_id - UNIQUE
+rider_id + created_at
+customer_id
+```
+
+---
+
+# 13. MongoDB Validation
+
+JSON Schema validation has been implemented for all seven collections:
+
+```text
+users
+riders
+rides
+payments
+messages
+cancellations
+ratings
+```
+
+Validation is configured using:
+
+```text
+validationLevel: strict
+validationAction: error
+```
+
+Invalid-data tests were performed successfully for all major collections.
+
+---
+
+# 14. Sample and Test Data
+
+The current local database contains sample records including:
+
+- Test Customer
+- Test Rider
+- Rider profile
+- Completed ride
+- Cancelled ride
+- Cash payment
+- Customer message
+- Rider message
+- Cancellation record
+- Rider rating
+
+These records were used to test relationships, lifecycle changes, validation, indexes, and queries.
+
+---
+
+# 15. Reusable Database Scripts
+
+Reusable MongoDB scripts are stored inside the project repository.
+
+```text
+database/
+├── setup/
+│   ├── create-collections.js
+│   ├── validators.js
+│   └── indexes.js
+│
+├── sample-data/
+│   └── seed-data.js
+│
+├── queries/
+│   └── common-queries.js
+│
+└── README.md
+```
+
+## create-collections.js
+
+Creates all required collections if they do not already exist.
+
+## validators.js
+
+Applies MongoDB JSON Schema validation.
+
+## indexes.js
+
+Creates required indexes.
+
+## seed-data.js
+
+Adds reusable sample data and prevents duplicate sample users.
+
+## common-queries.js
+
+Contains useful queries including:
+
+- available riders
+- requested rides
+- active customer rides
+- rider assigned rides
+- completed rides
+- pending payments
+- ride messages
+- 7-day cancellation count
+- rider ratings
+- ride/customer lookup
+- ride/rider lookup
+
+All reusable scripts have been executed and tested successfully.
+
+---
+
+# 16. Database Setup
+
+MongoDB must be running.
+
+From the project folder:
+
+```bat
+cd /d E:\Project-VanniRide
+```
+
+Run:
+
+```bat
+mongosh database\setup\create-collections.js
+```
+
+Then:
+
+```bat
+mongosh database\setup\validators.js
+```
+
+Then:
+
+```bat
+mongosh database\setup\indexes.js
+```
+
+Optional sample data:
+
+```bat
+mongosh database\sample-data\seed-data.js
+```
+
+Common query tests:
+
+```bat
+mongosh database\queries\common-queries.js
+```
+
+More setup information is available in:
+
+```text
+database/README.md
+```
+
+---
+
+# 17. Database Rules
+
+The implemented database supports the following important application rules:
+
+- user emails are unique
+- one user can have one rider profile
+- a customer cannot have more than one active request according to the application rule
+- only available riders should accept available requests
+- one rider accepts a request
+- rider becomes `BUSY` while handling an active ride
+- rider returns to `AVAILABLE` after completion according to application flow
+- cancelled rides remain stored
+- cash payment is confirmed by the rider
+- payment changes from `PENDING` to `PAID`
+- chat is linked to a ride
+- cancellation history supports the 5-per-7-day rule
+- rating values are restricted to 1 through 5
+
+Some of these higher-level business rules require backend enforcement in addition to database validation.
+
+---
+
+# 18. Database Testing Completed
+
+The following database-level tests have been performed:
+
+- user-rider relationship test
+- customer-ride relationship test
+- rider-ride relationship test
+- full ride lifecycle test
+- rider availability lifecycle test
+- payment relationship test
+- cash payment confirmation test
+- customer-rider message test
+- cancellation relationship test
+- 7-day cancellation count test
+- rating relationship test
+- invalid user role test
+- invalid rider availability test
+- invalid ride values test
+- invalid payment values test
+- empty message test
+- empty cancellation reason test
+- invalid rating value test
+- reusable setup script tests
+- reusable query script tests
+
+---
+
+# 19. GitHub Database Work
+
+Database development is maintained on the dedicated:
+
+```text
+database
+```
+
+branch.
+
+The database folder contains reproducible setup, validation, index, seed, and query scripts.
+
+Database documentation is stored in:
+
+```text
+documentation/database/database-design.md
+```
+
+The main branch is not used directly for unfinished database development.
+
+---
+
+# 20. Remaining Integration Work
+
+The core database design and implementation are complete for the current project stage.
+
+The following work requires coordination with other team members:
+
+- connect backend registration/login to `users`
+- connect rider management to `riders`
+- connect ride APIs to `rides`
+- connect cash payment confirmation to `payments`
+- connect chat functionality to `messages`
+- connect cancellation APIs to `cancellations`
+- connect rating functionality to `ratings`
+- verify authorization rules in the backend
+- perform integration testing
+- resolve database-related integration bugs
+- coordinate formal testing with the D2 member
+
+---
+
+# 21. Database Responsibility
+
+The D1 database responsibility includes:
+
+- database design
+- collections
+- relationships
+- validation
+- indexes
+- sample/test data
+- database queries
+- reusable database scripts
+- database documentation
+- database updates
+- database integration support
+
+Backend API implementation remains the responsibility of the backend team.
+
+Formal testing and integration testing are coordinated with the D2 testing member.
+
+---
+
+# 22. Current Completion Status
+
+The following D1 database work is complete:
+
+- database design
+- seven main collections
+- collection relationships
+- MongoDB validation
+- indexes
+- sample data
+- common queries
+- invalid-data testing
+- lifecycle testing
+- reusable setup scripts
+- database setup guide
+- database documentation
+
+Remaining work is mainly:
+
+- backend integration
+- integration verification
+- D2 formal testing
+- database-related fixes discovered during integration
+
+Therefore, the standalone database implementation is complete for the current development stage and ready for integration with the rest of the Vanni Ride system.
