@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const rideRoutes = require('./routes/rideRoutes'); // Member B2 routes
 const paymentRoutes = require('./routes/paymentRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const ratingRoutes = require('./routes/ratingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const userRoutes = require('./routes/userRoutes');
 
@@ -38,6 +39,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/rides', rideRoutes); // Member B2 ride lifecycle
 app.use('/api/rides', paymentRoutes); // Member B2 cash payment tracking
 app.use('/api/rides', chatRoutes); // Member B2 ride-scoped text chat
+app.use('/api', ratingRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Handle 404 Routes (Must remain below active routes)

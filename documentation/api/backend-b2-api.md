@@ -167,6 +167,25 @@ active, has the token's role, and has not logged out since the token was issued.
 The same checks run again for ride joins and message sends. Messages created
 through either HTTP or Socket.IO emit `new_message` to the ride room.
 
+## Rider rating endpoints
+
+- `POST /api/rides/:rideId/rating` - The ride customer submits one rating after
+  completion.
+- `GET /api/riders/:riderId/ratings` - Authenticated users retrieve the rider's
+  ratings plus the average and total count. Here `riderId` is the rider's user
+  ID.
+
+```json
+{
+  "rating": 5,
+  "review": "Safe and friendly service"
+}
+```
+
+The rating must be numeric and between 1 and 5. The review is optional text up
+to 1,000 characters. A completed ride can be rated only once, and the customer
+cannot rate a rider from somebody else's ride.
+
 ## Local setup
 
 Copy `.env.example` to `.env`, then run:

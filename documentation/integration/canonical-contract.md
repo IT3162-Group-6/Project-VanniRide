@@ -234,6 +234,9 @@ Required fields:
 - `created_at`: date
 
 Only the ride customer may create the rating, and only after `COMPLETED`.
+Each completed ride may be rated once. The rider ratings endpoint uses the
+rider's user ID and returns the individual ratings plus `averageRating` and
+`totalRatings`; the average is `null` when no ratings exist.
 
 ### `chat_access_requests`
 

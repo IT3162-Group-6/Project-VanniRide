@@ -10,6 +10,7 @@ const { io: createSocketClient } = require('socket.io-client');
 const rideController = require('../src/controllers/rideController');
 const paymentController = require('../src/controllers/paymentController');
 const chatController = require('../src/controllers/chatController');
+const ratingController = require('../src/controllers/ratingController');
 const Ride = require('../src/models/rideModel');
 const Rider = require('../src/models/riderModel');
 const User = require('../src/models/userModel');
@@ -18,6 +19,7 @@ const CancellationRequest = require('../src/models/cancellationRequestModel');
 const ChatAccessRequest = require('../src/models/chatAccessRequestModel');
 const Payment = require('../src/models/paymentModel');
 const Message = require('../src/models/messageModel');
+const Rating = require('../src/models/ratingModel');
 const initializeSocketHandler = require('../src/sockets/socketHandler');
 const { calculateFare } = require('../src/utils/fareCalculator');
 const {
@@ -75,6 +77,7 @@ test.beforeEach(async () => {
     ChatAccessRequest.deleteMany({}),
     Payment.deleteMany({}),
     Message.deleteMany({}),
+    Rating.deleteMany({}),
   ]);
 });
 
@@ -669,6 +672,148 @@ test('gates post-completion chat behind a customer request and active approval',
     })
   );
   assert.equal(history.body.results, 2);
+});
+
+test('allows one customer rating per completed ride and summarizes the rider', async () => {
+  const firstCustomerId = new mongoose.Types.ObjectId();
+  const secondCustomerId = new mongoose.Types.ObjectId();
+  const outsiderCustomerId = new mongoose.Types.ObjectId();
+  const riderUserId = new mongoose.Types.ObjectId();
+  await Rider.create({
+    user_id: riderUserId,
+    availability_status: 'AVAILABLE',
+  });
+
+  const rideData = (customerId) => ({
+    customer_id: customerId,
+    rider_id: riderUserId,
+    request_type: 'TRANSPORT',
+    pickup_location: {
+      address: 'Campus',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+    distance_km: 0.75,
+    fare_amount: 260,
+    status: 'COMPLETED',
+    accepted_at: new Date(),
+    arrived_at: new Date(),
+    started_at: new Date(),
+    completed_at: new Date(),
+  });
+  const [firstRide, secondRide] = await Ride.create([
+    rideData(firstCustomerId),
+    rideData(secondCustomerId),
+  ]);
+  const activeRide = await Ride.create({
+    ...rideData(firstCustomerId),
+    status: 'STARTED',
+    completed_at: null,
+  });
+
+  await assert.rejects(
+    invokeController(
+      ratingController.createRating,
+      makeRequest({
+        user: { id: outsiderCustomerId.toString(), role: 'CUSTOMER' },
+        params: { rideId: firstRide._id.toString() },
+        body: { rating: 5 },
+      })
+    ),
+    (error) => error.statusCode === 403
+  );
+  await assert.rejects(
+    invokeController(
+      ratingController.createRating,
+      makeRequest({
+        user: { id: firstCustomerId.toString(), role: 'CUSTOMER' },
+        params: { rideId: firstRide._id.toString() },
+        body: { rating: '5' },
+      })
+    ),
+    (error) => error.statusCode === 400
+  );
+  await assert.rejects(
+    invokeController(
+      ratingController.createRating,
+      makeRequest({
+        user: { id: firstCustomerId.toString(), role: 'CUSTOMER' },
+        params: { rideId: activeRide._id.toString() },
+        body: { rating: 5 },
+      })
+    ),
+    (error) => error.statusCode === 409
+  );
+  await assert.rejects(
+    invokeController(
+      ratingController.createRating,
+      makeRequest({
+        user: { id: riderUserId.toString(), role: 'RIDER' },
+        params: { rideId: firstRide._id.toString() },
+        body: { rating: 5 },
+      })
+    ),
+    (error) => error.statusCode === 403
+  );
+
+  const firstRating = await invokeController(
+    ratingController.createRating,
+    makeRequest({
+      user: { id: firstCustomerId.toString(), role: 'CUSTOMER' },
+      params: { rideId: firstRide._id.toString() },
+      body: { rating: 5, review: '  Safe and friendly service  ' },
+    })
+  );
+  assert.equal(firstRating.statusCode, 201);
+  assert.equal(firstRating.body.data.rating.rating, 5);
+  assert.equal(
+    firstRating.body.data.rating.review,
+    'Safe and friendly service'
+  );
+
+  await assert.rejects(
+    invokeController(
+      ratingController.createRating,
+      makeRequest({
+        user: { id: firstCustomerId.toString(), role: 'CUSTOMER' },
+        params: { rideId: firstRide._id.toString() },
+        body: { rating: 4 },
+      })
+    ),
+    (error) => error.statusCode === 409
+  );
+
+  const secondRating = await invokeController(
+    ratingController.createRating,
+    makeRequest({
+      user: { id: secondCustomerId.toString(), role: 'CUSTOMER' },
+      params: { rideId: secondRide._id.toString() },
+      body: { rating: 3 },
+    })
+  );
+  assert.equal(secondRating.body.data.rating.review, null);
+
+  const ratingsResult = await invokeController(
+    ratingController.getRiderRatings,
+    makeRequest({
+      user: { id: outsiderCustomerId.toString(), role: 'CUSTOMER' },
+      params: { riderId: riderUserId.toString() },
+    })
+  );
+  assert.equal(ratingsResult.body.results, 2);
+  assert.equal(ratingsResult.body.data.summary.totalRatings, 2);
+  assert.equal(ratingsResult.body.data.summary.averageRating, 4);
+  assert.deepEqual(
+    ratingsResult.body.data.ratings
+      .map((item) => item.rating)
+      .sort((left, right) => left - right),
+    [3, 5]
+  );
 });
 
 test('authenticates ride sockets and persists room-scoped messages', async () => {
