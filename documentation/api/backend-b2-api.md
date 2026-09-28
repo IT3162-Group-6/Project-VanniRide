@@ -118,7 +118,10 @@ payment_status = PENDING
 - `GET /api/rides/:rideId/payment` - Customer or assigned rider
 - `PATCH /api/rides/:rideId/payment` - Assigned rider after ride completion
 
-The PATCH endpoint changes `PENDING` to `PAID` and records `paidAt`.
+The PATCH endpoint atomically changes `PENDING` to `PAID` and records both the
+assigned rider in `confirmedBy` and the confirmation time in `paidAt`. The
+amount returned by the API is the authoritative amount stored on the payment
+record, initially copied from the ride estimate when the ride is created.
 
 ## Chat endpoints
 

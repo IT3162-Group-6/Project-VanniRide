@@ -7,7 +7,7 @@ const {
 const Payment = require('../models/paymentModel');
 const Ride = require('../models/rideModel');
 
-const serializePayment = (paymentDocument, ride) => {
+const serializePayment = (paymentDocument) => {
   const payment = paymentDocument.toObject
     ? paymentDocument.toObject()
     : paymentDocument;
@@ -17,7 +17,9 @@ const serializePayment = (paymentDocument, ride) => {
     rideId: payment.ride_id.toString(),
     paymentMethod: payment.payment_method,
     paymentStatus: payment.payment_status,
-    amount: ride.fare_amount,
+    amount: payment.amount,
+    confirmedBy: payment.confirmed_by?.toString() || null,
+    createdAt: payment.created_at,
     paidAt: payment.paid_at || null,
   };
 };
@@ -50,7 +52,7 @@ exports.getPayment = catchAsync(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    data: { payment: serializePayment(payment, ride) },
+    data: { payment: serializePayment(payment) },
   });
 });
 
@@ -62,9 +64,16 @@ exports.markPaymentPaid = catchAsync(async (req, res) => {
     throw new AppError('Payment can only be confirmed after ride completion', 409);
   }
 
+  const paidAt = new Date();
   const payment = await Payment.findOneAndUpdate(
     { ride_id: ride._id, payment_status: 'PENDING' },
-    { $set: { payment_status: 'PAID', paid_at: new Date() } },
+    {
+      $set: {
+        payment_status: 'PAID',
+        confirmed_by: userId,
+        paid_at: paidAt,
+      },
+    },
     { returnDocument: 'after', runValidators: true }
   );
 
@@ -79,6 +88,6 @@ exports.markPaymentPaid = catchAsync(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Cash payment confirmed successfully',
-    data: { payment: serializePayment(payment, ride) },
+    data: { payment: serializePayment(payment) },
   });
 });

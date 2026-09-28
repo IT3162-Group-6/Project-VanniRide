@@ -178,7 +178,9 @@ Required fields:
 
 One pending payment is created with each ride. Only the assigned rider may mark
 it paid after the ride is `COMPLETED`. An administrator may correct a documented
-payment dispute through an audited admin operation.
+payment dispute through an audited admin operation. Rider confirmation records
+the assigned rider in `confirmed_by`, records `paid_at`, and returns the amount
+stored on the payment rather than recalculating it.
 
 ### `messages`
 

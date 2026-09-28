@@ -245,6 +245,17 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
   assert.equal(paymentResult.body.data.payment.paymentMethod, 'CASH');
   assert.equal(paymentResult.body.data.payment.paymentStatus, 'PAID');
   assert.equal(paymentResult.body.data.payment.amount, 260);
+  assert.equal(
+    paymentResult.body.data.payment.confirmedBy,
+    riderUserId.toString()
+  );
+  assert.ok(paymentResult.body.data.payment.createdAt);
+  assert.ok(paymentResult.body.data.payment.paidAt);
+
+  const storedPayment = await Payment.findOne({ ride_id: rideId }).lean();
+  assert.equal(storedPayment.amount, 260);
+  assert.ok(storedPayment.confirmed_by.equals(riderUserId));
+  assert.ok(storedPayment.paid_at instanceof Date);
 
   await assert.rejects(
     invokeController(
@@ -265,6 +276,73 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
     })
   );
   assert.equal(customerPaymentResult.body.data.payment.paymentStatus, 'PAID');
+  assert.equal(customerPaymentResult.body.data.payment.amount, 260);
+  assert.equal(
+    customerPaymentResult.body.data.payment.confirmedBy,
+    riderUserId.toString()
+  );
+});
+
+test('prevents customers and unrelated riders from confirming cash payment', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const assignedRiderId = new mongoose.Types.ObjectId();
+  const unrelatedRiderId = new mongoose.Types.ObjectId();
+  const ride = await Ride.create({
+    customer_id: customerId,
+    rider_id: assignedRiderId,
+    request_type: 'TRANSPORT',
+    pickup_location: {
+      address: 'Campus',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+    distance_km: 0.75,
+    fare_amount: 260,
+    status: 'COMPLETED',
+    accepted_at: new Date(),
+    arrived_at: new Date(),
+    started_at: new Date(),
+    completed_at: new Date(),
+  });
+  await Payment.create({
+    ride_id: ride._id,
+    amount: 260,
+    payment_method: 'CASH',
+    payment_status: 'PENDING',
+    confirmed_by: null,
+    paid_at: null,
+  });
+
+  await assert.rejects(
+    invokeController(
+      paymentController.markPaymentPaid,
+      makeRequest({
+        user: { id: customerId.toString(), role: 'CUSTOMER' },
+        params: { rideId: ride._id.toString() },
+      })
+    ),
+    (error) => error.statusCode === 403
+  );
+  await assert.rejects(
+    invokeController(
+      paymentController.markPaymentPaid,
+      makeRequest({
+        user: { id: unrelatedRiderId.toString(), role: 'RIDER' },
+        params: { rideId: ride._id.toString() },
+      })
+    ),
+    (error) => error.statusCode === 403
+  );
+
+  const payment = await Payment.findOne({ ride_id: ride._id }).lean();
+  assert.equal(payment.payment_status, 'PENDING');
+  assert.equal(payment.confirmed_by, null);
+  assert.equal(payment.paid_at, null);
 });
 
 test('cancels a requested ride without deleting its history', async () => {
