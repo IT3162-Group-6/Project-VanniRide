@@ -291,8 +291,9 @@ an in-memory timer.
 ## 7. Routing and Fare Contract
 
 - The customer supplies pickup and destination addresses and coordinates.
-- The backend requests road-route distance from an OSRM-compatible routing
-  provider through a configurable adapter.
+- The backend requests alternative road routes from an OSRM-compatible routing
+  provider through a configurable adapter and uses the shortest distance among
+  the routes returned by that provider.
 - Straight-line distance must not be silently used as a fallback.
 - If the routing provider cannot calculate a route, the request returns a
   service-unavailable error and does not create a ride.

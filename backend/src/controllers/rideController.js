@@ -12,9 +12,11 @@ const {
   RIDE_TYPES,
 } = require('../constants/rideConstants');
 const {
-  calculateDistanceKm,
   calculateFare,
 } = require('../utils/fareCalculator');
+const {
+  calculateRoadDistanceKm,
+} = require('../services/routingService');
 const {
   getAuthenticatedUser,
   validateObjectId,
@@ -190,7 +192,10 @@ exports.requestRide = catchAsync(async (req, res) => {
 
   const pickupLocation = normalizeLocation(req.body.pickupLocation, 'Pickup');
   const destination = normalizeLocation(req.body.destination, 'Destination');
-  const distanceKm = calculateDistanceKm(pickupLocation, destination);
+  const distanceKm = await calculateRoadDistanceKm(
+    pickupLocation,
+    destination
+  );
   const estimatedFare = calculateFare(rideType, distanceKm);
 
   let ride;
