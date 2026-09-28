@@ -1,7 +1,8 @@
 # Vanni Ride Backend Member 2 API
 
-This document describes the ride lifecycle, cash payment, and text chat APIs
-integrated on the `backend-integration` branch.
+This document describes the authentication, profile, ride lifecycle,
+cancellation, cash payment, text chat, rating, history, earnings, and bounded
+administration APIs integrated on the `backend-integration` branch.
 
 ## Authentication dependency
 
@@ -15,6 +16,21 @@ req.user = {
 ```
 
 The B2 controllers also enforce the role and MongoDB ObjectId requirements.
+
+## Authentication and profile endpoints
+
+- `POST /api/auth/register` - Register a `CUSTOMER` or `RIDER` account.
+- `POST /api/auth/login` - Return a JWT for an active account.
+- `POST /api/auth/logout` - Invalidate all tokens issued with the current token
+  version.
+- `GET /api/users/profile` - Return the authenticated user profile.
+- `PUT /api/users/profile` - Update the authenticated user's name or phone.
+- `PATCH /api/users/rider/availability` - Rider-only switch between `AVAILABLE`
+  and `UNAVAILABLE`; a `BUSY` rider cannot change availability manually.
+
+All protected endpoints require `Authorization: Bearer <token>`. Tokens are
+rejected if the user no longer exists, the account is suspended, the embedded
+role differs from the stored role, or logout has invalidated the token version.
 
 ## Ride workflow
 
@@ -42,7 +58,7 @@ cash fare in LKR.
 
 ### Create a ride
 
-`POST /api/rides/request` - Customer only
+`POST /api/rides` - Customer only
 
 ```json
 {
@@ -60,7 +76,7 @@ cash fare in LKR.
 }
 ```
 
-`rideType` may be `TRANSPORT` or `DELIVERY`. A delivery may optionally include
+`rideType` may be `TRANSPORT` or `DELIVERY`. A delivery must include
 `deliveryCategory` with `FOOD`, `WATER`, or `PARCEL`.
 
 ### List available rides
@@ -69,7 +85,7 @@ cash fare in LKR.
 
 ### List the current user's rides
 
-`GET /api/rides/mine` - Customer or rider
+`GET /api/rides` - Customer or rider
 
 ### Get one ride
 
@@ -105,6 +121,24 @@ Only the next expected status is accepted. After `COMPLETED`, the rider becomes
   "reason": "Plans changed"
 }
 ```
+
+`REQUESTED` and `ACCEPTED` rides cancel immediately. Cancelling a `STARTED`
+ride creates a request for the other participant:
+
+- `GET /api/rides/:rideId/cancellation-request` - Retrieve the pending request.
+- `PATCH /api/rides/:rideId/cancellation-request` - Respond with `CANCEL` or
+  `RESUME`.
+
+```json
+{
+  "decision": "CANCEL"
+}
+```
+
+The response window is 15 minutes. If no response arrives, the ride is
+cancelled automatically. Each account may initiate at most five cancellations
+in a rolling one-hour window; the current allowance is available from
+`GET /api/users/cancellation-allowance`.
 
 ## Cash payment endpoints
 

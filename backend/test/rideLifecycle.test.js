@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
 const http = require('http');
+const path = require('path');
 process.env.ROUTING_BASE_URL =
   process.env.ROUTING_BASE_URL || 'http://routing.test';
 const mongoose = require('mongoose');
@@ -13,6 +15,15 @@ const chatController = require('../src/controllers/chatController');
 const ratingController = require('../src/controllers/ratingController');
 const adminController = require('../src/controllers/adminController');
 const historyController = require('../src/controllers/historyController');
+const app = require('../src/app');
+const env = require('../src/config/env');
+const authRoutes = require('../src/routes/authRoutes');
+const userRoutes = require('../src/routes/userRoutes');
+const rideRoutes = require('../src/routes/rideRoutes');
+const paymentRoutes = require('../src/routes/paymentRoutes');
+const chatRoutes = require('../src/routes/chatRoutes');
+const ratingRoutes = require('../src/routes/ratingRoutes');
+const adminRoutes = require('../src/routes/adminRoutes');
 const Ride = require('../src/models/rideModel');
 const Rider = require('../src/models/riderModel');
 const User = require('../src/models/userModel');
@@ -1293,6 +1304,124 @@ test('returns participant-scoped history summaries and paid rider earnings', asy
     ),
     (error) => error.statusCode === 403
   );
+});
+
+test('keeps the Postman collection synchronized with every implemented API route', () => {
+  const collectionPath = path.resolve(
+    __dirname,
+    '../../documentation/postman/VanniRide-B2.postman_collection.json'
+  );
+  const collection = JSON.parse(fs.readFileSync(collectionPath, 'utf8'));
+  const collectedRoutes = [];
+  const collectRequests = (items) => {
+    for (const item of items || []) {
+      if (item.request) {
+        const normalizedPath = String(item.request.url)
+          .replace('{{baseUrl}}', '')
+          .replaceAll('{{rideId}}', ':rideId')
+          .replaceAll('{{riderId}}', ':riderId')
+          .replaceAll('{{userId}}', ':userId')
+          .replaceAll('{{paymentId}}', ':paymentId')
+          .replaceAll('{{chatAccessRequestId}}', ':requestId');
+        collectedRoutes.push(`${item.request.method} ${normalizedPath}`);
+      }
+      collectRequests(item.item);
+    }
+  };
+  collectRequests(collection.item);
+
+  const mountedRouters = [
+    ['/api/auth', authRoutes],
+    ['/api/users', userRoutes],
+    ['/api/rides', rideRoutes],
+    ['/api/rides', paymentRoutes],
+    ['/api/rides', chatRoutes],
+    ['/api', ratingRoutes],
+    ['/api/admin', adminRoutes],
+  ];
+  const implementedRoutes = mountedRouters.flatMap(([basePath, router]) =>
+    router.stack.flatMap((layer) => {
+      if (!layer.route) return [];
+      const routePaths = Array.isArray(layer.route.path)
+        ? layer.route.path
+        : [layer.route.path];
+      return routePaths.flatMap((routePath) =>
+        Object.entries(layer.route.methods)
+          .filter(([, enabled]) => enabled)
+          .map(
+            ([method]) =>
+              `${method.toUpperCase()} ${basePath}${
+                routePath === '/' ? '' : routePath
+              }`
+          )
+      );
+    })
+  );
+
+  assert.equal(new Set(collectedRoutes).size, collectedRoutes.length);
+  assert.equal(implementedRoutes.length, 35);
+  assert.deepEqual(collectedRoutes.sort(), implementedRoutes.sort());
+});
+
+test('enforces bearer authentication, stored roles, account status, and token revocation', async () => {
+  assert.ok(env.jwtSecret, 'JWT_SECRET must be configured for security tests');
+  const customerId = new mongoose.Types.ObjectId();
+  await User.create({
+    _id: customerId,
+    name: 'Security Customer',
+    email: 'phase13-security@example.com',
+    phone: '0700001301',
+    password_hash: 'test-password-hash',
+    role: 'CUSTOMER',
+    account_status: 'ACTIVE',
+    token_version: 0,
+  });
+  const customerToken = jwt.sign(
+    { id: customerId.toString(), role: 'CUSTOMER', tokenVersion: 0 },
+    env.jwtSecret,
+    { expiresIn: '1h' }
+  );
+  const forgedAdminToken = jwt.sign(
+    { id: customerId.toString(), role: 'ADMIN', tokenVersion: 0 },
+    env.jwtSecret,
+    { expiresIn: '1h' }
+  );
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const get = (endpoint, token) =>
+    originalFetch(`${baseUrl}${endpoint}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+  try {
+    assert.equal((await get('/api/users/profile')).status, 401);
+    assert.equal(
+      (await get('/api/admin/users', forgedAdminToken)).status,
+      401
+    );
+    assert.equal((await get('/api/admin/users', customerToken)).status, 403);
+    assert.equal(
+      (await get('/api/users/rider/earnings', customerToken)).status,
+      403
+    );
+
+    await User.updateOne(
+      { _id: customerId },
+      { $set: { account_status: 'SUSPENDED' } }
+    );
+    assert.equal((await get('/api/users/profile', customerToken)).status, 403);
+
+    await User.updateOne(
+      { _id: customerId },
+      { $set: { account_status: 'ACTIVE' }, $inc: { token_version: 1 } }
+    );
+    assert.equal((await get('/api/users/profile', customerToken)).status, 401);
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
 });
 
 test('authenticates ride sockets and persists room-scoped messages', async () => {
