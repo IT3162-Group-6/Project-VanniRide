@@ -1,0 +1,32 @@
+const RIDE_TYPES = Object.freeze(['TRANSPORT', 'DELIVERY']);
+const DELIVERY_CATEGORIES = Object.freeze(['FOOD', 'WATER', 'PARCEL']);
+const RIDE_STATUSES = Object.freeze([
+  'REQUESTED',
+  'ACCEPTED',
+  'ARRIVED',
+  'STARTED',
+  'COMPLETED',
+  'CANCELLED',
+]);
+const RIDER_AVAILABILITY = Object.freeze([
+  'AVAILABLE',
+  'UNAVAILABLE',
+  'BUSY',
+]);
+
+const NEXT_RIDE_STATUS = Object.freeze({
+  ACCEPTED: 'ARRIVED',
+  ARRIVED: 'STARTED',
+  STARTED: 'COMPLETED',
+});
+
+const CANCELLABLE_RIDE_STATUSES = Object.freeze(['REQUESTED', 'ACCEPTED']);
+
+module.exports = {
+  RIDE_TYPES,
+  DELIVERY_CATEGORIES,
+  RIDE_STATUSES,
+  RIDER_AVAILABILITY,
+  NEXT_RIDE_STATUS,
+  CANCELLABLE_RIDE_STATUSES,
+};
