@@ -1,7 +1,7 @@
 # Vanni Ride Backend Member 2 API
 
 This document describes the ride lifecycle, cash payment, and text chat APIs
-implemented on the `backend-ride` branch.
+integrated on the `backend-integration` branch.
 
 ## Authentication dependency
 
@@ -127,7 +127,9 @@ record, initially copied from the ride estimate when the ride is created.
 
 - `GET /api/rides/:rideId/messages` - Customer or assigned rider
 - `POST /api/rides/:rideId/messages` - Customer or assigned rider during an
-  active assigned ride
+  active assigned ride, or during an active approved post-completion window
+- `POST /api/rides/:rideId/chat-access-requests` - Ride customer requests
+  temporary post-completion access and supplies a reason
 
 ```json
 {
@@ -136,6 +138,9 @@ record, initially copied from the ride estimate when the ride is created.
 ```
 
 Only text messages are supported. History remains readable after the ride.
+Completed rides are read-only unless an administrator approves a request; an
+approval allows both ride participants to send messages for 24 hours. Cancelled
+rides always remain read-only.
 
 ## Socket.io
 
@@ -157,7 +162,10 @@ Server events:
 - `new_message`
 
 Socket rooms and messages are restricted to the authenticated customer and
-assigned rider.
+assigned rider. Socket authentication verifies the account still exists, is
+active, has the token's role, and has not logged out since the token was issued.
+The same checks run again for ride joins and message sends. Messages created
+through either HTTP or Socket.IO emit `new_message` to the ride room.
 
 ## Local setup
 

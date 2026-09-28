@@ -6,22 +6,18 @@ const {
 } = require('../utils/authenticatedUser');
 const Message = require('../models/messageModel');
 const Ride = require('../models/rideModel');
-
-const CHAT_ENABLED_STATUSES = ['ACCEPTED', 'ARRIVED', 'STARTED'];
-
-const serializeMessage = (messageDocument) => {
-  const message = messageDocument.toObject
-    ? messageDocument.toObject()
-    : messageDocument;
-
-  return {
-    id: message._id.toString(),
-    rideId: message.ride_id.toString(),
-    senderId: message.sender_id.toString(),
-    messageText: message.message_text,
-    sentAt: message.sent_at,
-  };
-};
+const ChatAccessRequest = require('../models/chatAccessRequestModel');
+const {
+  assertChatSendingAllowed,
+  findActiveChatAccess,
+  normalizeMessageText,
+  serializeChatAccessRequest,
+  serializeMessage,
+} = require('../services/chatService');
+const {
+  emitChatAccessUpdated,
+  emitNewMessage,
+} = require('../utils/socketEvents');
 
 const getParticipantRide = async (rideId, userId, role) => {
   validateObjectId(rideId, 'ride ID');
@@ -57,28 +53,82 @@ exports.getMessages = catchAsync(async (req, res) => {
 exports.sendMessage = catchAsync(async (req, res) => {
   const { userId, role } = getAuthenticatedUser(req, ['CUSTOMER', 'RIDER']);
   const ride = await getParticipantRide(req.params.rideId, userId, role);
-
-  if (!CHAT_ENABLED_STATUSES.includes(ride.status)) {
-    throw new AppError(
-      'Messages can only be sent during an assigned active ride',
-      409
-    );
-  }
-
-  const messageText = String(req.body.messageText || '').trim();
-  if (!messageText) {
-    throw new AppError('Message text is required', 400);
-  }
+  await assertChatSendingAllowed(ride);
+  const messageText = normalizeMessageText(req.body.messageText);
 
   const message = await Message.create({
     ride_id: ride._id,
     sender_id: userId,
     message_text: messageText,
   });
+  emitNewMessage(req, message);
 
   res.status(201).json({
     success: true,
     message: 'Message sent successfully',
     data: { message: serializeMessage(message) },
+  });
+});
+
+exports.requestPostCompletionAccess = catchAsync(async (req, res) => {
+  const { userId, role } = getAuthenticatedUser(req, ['CUSTOMER']);
+  const ride = await getParticipantRide(req.params.rideId, userId, role);
+
+  if (ride.status !== 'COMPLETED') {
+    throw new AppError(
+      'Post-completion chat access can only be requested for a completed ride',
+      409
+    );
+  }
+  if (!ride.rider_id) {
+    throw new AppError('Completed ride has no assigned rider', 409);
+  }
+
+  const reason = String(req.body.reason || '').trim();
+  if (!reason) {
+    throw new AppError('Access request reason is required', 400);
+  }
+  if (reason.length > 500) {
+    throw new AppError('Access request reason cannot exceed 500 characters', 400);
+  }
+
+  const activeAccess = await findActiveChatAccess(ride._id);
+  if (activeAccess) {
+    throw new AppError(
+      'Post-completion chat access is already active for this ride',
+      409
+    );
+  }
+
+  let chatAccessRequest;
+  try {
+    chatAccessRequest = await ChatAccessRequest.create({
+      ride_id: ride._id,
+      requested_by: userId,
+      rider_id: ride.rider_id,
+      reason,
+      status: 'PENDING',
+      reviewed_by: null,
+      reviewed_at: null,
+      approved_from: null,
+      approved_until: null,
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      throw new AppError(
+        'A post-completion chat access request is already pending',
+        409
+      );
+    }
+    throw error;
+  }
+
+  emitChatAccessUpdated(req, ride, chatAccessRequest);
+  res.status(201).json({
+    success: true,
+    message: 'Post-completion chat access request submitted',
+    data: {
+      chatAccessRequest: serializeChatAccessRequest(chatAccessRequest),
+    },
   });
 });

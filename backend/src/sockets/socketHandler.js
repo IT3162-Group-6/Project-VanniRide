@@ -2,9 +2,13 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Ride = require('../models/rideModel');
 const Message = require('../models/messageModel');
+const User = require('../models/userModel');
+const {
+  assertChatSendingAllowed,
+  normalizeMessageText,
+  serializeMessage,
+} = require('../services/chatService');
 const { rideRoom, userRoom } = require('../utils/socketEvents');
-
-const CHAT_ENABLED_STATUSES = ['ACCEPTED', 'ARRIVED', 'STARTED'];
 
 const getToken = (socket) => {
   if (socket.handshake.auth?.token) {
@@ -19,13 +23,25 @@ const getToken = (socket) => {
   return null;
 };
 
-const serializeMessage = (message) => ({
-  id: message._id.toString(),
-  rideId: message.ride_id.toString(),
-  senderId: message.sender_id.toString(),
-  messageText: message.message_text,
-  sentAt: message.sent_at,
-});
+const findCurrentSocketUser = async (tokenUser) => {
+  const user = await User.findById(tokenUser.id)
+    .select('role account_status token_version')
+    .lean();
+  if (!user) {
+    throw new Error('The user belonging to this token no longer exists');
+  }
+  if (user.account_status !== 'ACTIVE') {
+    throw new Error('This account is suspended');
+  }
+  if (
+    user.role !== tokenUser.role ||
+    !Number.isInteger(tokenUser.tokenVersion) ||
+    user.token_version !== tokenUser.tokenVersion
+  ) {
+    throw new Error('This session is no longer valid');
+  }
+  return user;
+};
 
 const findParticipantRide = async (rideId, socketUser) => {
   if (!mongoose.isValidObjectId(rideId)) {
@@ -57,7 +73,7 @@ const respond = (acknowledge, payload) => {
 };
 
 const initializeSocketHandler = (io, config) => {
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const token = getToken(socket);
       if (!token || !config.jwtSecret) {
@@ -67,15 +83,26 @@ const initializeSocketHandler = (io, config) => {
       const decoded = jwt.verify(token, config.jwtSecret);
       if (
         !mongoose.isValidObjectId(decoded.id) ||
-        !['CUSTOMER', 'RIDER'].includes(decoded.role)
+        !['CUSTOMER', 'RIDER', 'ADMIN'].includes(decoded.role)
       ) {
         return next(new Error('Invalid authentication token'));
       }
 
-      socket.user = { id: decoded.id, role: decoded.role };
-      next();
+      socket.user = {
+        id: decoded.id,
+        role: decoded.role,
+        tokenVersion: decoded.tokenVersion,
+      };
+      await findCurrentSocketUser(socket.user);
+      return next();
     } catch (error) {
-      next(new Error('Invalid or expired authentication token'));
+      return next(
+        new Error(
+          ['JsonWebTokenError', 'TokenExpiredError'].includes(error.name)
+            ? 'Invalid or expired authentication token'
+            : error.message || 'Invalid authentication token'
+        )
+      );
     }
   });
 
@@ -85,6 +112,7 @@ const initializeSocketHandler = (io, config) => {
 
     socket.on('join_ride', async ({ rideId } = {}, acknowledge) => {
       try {
+        await findCurrentSocketUser(socket.user);
         await findParticipantRide(rideId, socket.user);
         await socket.join(rideRoom(rideId));
         respond(acknowledge, { success: true, rideId });
@@ -97,21 +125,13 @@ const initializeSocketHandler = (io, config) => {
       'send_message',
       async ({ rideId, messageText } = {}, acknowledge) => {
         try {
+          await findCurrentSocketUser(socket.user);
           const { ride, userId } = await findParticipantRide(
             rideId,
             socket.user
           );
-
-          if (!CHAT_ENABLED_STATUSES.includes(ride.status)) {
-            throw new Error(
-              'Messages can only be sent during an assigned active ride'
-            );
-          }
-
-          const normalizedMessage = String(messageText || '').trim();
-          if (!normalizedMessage) {
-            throw new Error('Message text is required');
-          }
+          await assertChatSendingAllowed(ride);
+          const normalizedMessage = normalizeMessageText(messageText);
 
           const message = await Message.create({
             ride_id: ride._id,

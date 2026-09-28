@@ -12,8 +12,10 @@ const paymentController = require('../src/controllers/paymentController');
 const chatController = require('../src/controllers/chatController');
 const Ride = require('../src/models/rideModel');
 const Rider = require('../src/models/riderModel');
+const User = require('../src/models/userModel');
 const Cancellation = require('../src/models/cancellationModel');
 const CancellationRequest = require('../src/models/cancellationRequestModel');
+const ChatAccessRequest = require('../src/models/chatAccessRequestModel');
 const Payment = require('../src/models/paymentModel');
 const Message = require('../src/models/messageModel');
 const initializeSocketHandler = require('../src/sockets/socketHandler');
@@ -51,10 +53,11 @@ const invokeController = (handler, req) =>
     handler(req, res, reject);
   });
 
-const makeRequest = ({ user, body = {}, params = {} }) => ({
+const makeRequest = ({ user, body = {}, params = {}, app }) => ({
   user,
   body,
   params,
+  ...(app ? { app } : {}),
 });
 
 test.before(async () => {
@@ -66,8 +69,10 @@ test.beforeEach(async () => {
   await Promise.all([
     Ride.deleteMany({}),
     Rider.deleteMany({}),
+    User.deleteMany({}),
     Cancellation.deleteMany({}),
     CancellationRequest.deleteMany({}),
+    ChatAccessRequest.deleteMany({}),
     Payment.deleteMany({}),
     Message.deleteMany({}),
   ]);
@@ -147,17 +152,36 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
   );
   assert.equal(acceptResult.body.data.ride.status, 'ACCEPTED');
 
+  const emittedMessages = [];
+  const mockIo = {
+    room: null,
+    to(room) {
+      this.room = room;
+      return this;
+    },
+    emit(event, payload) {
+      emittedMessages.push({ room: this.room, event, payload });
+    },
+  };
   const messageResult = await invokeController(
     chatController.sendMessage,
     makeRequest({
       user: { id: customerId.toString(), role: 'CUSTOMER' },
       params: { rideId },
       body: { messageText: 'I am waiting near the main gate.' },
+      app: { get: (key) => (key === 'io' ? mockIo : null) },
     })
   );
   assert.equal(messageResult.statusCode, 201);
   assert.equal(
     messageResult.body.data.message.messageText,
+    'I am waiting near the main gate.'
+  );
+  assert.equal(emittedMessages.length, 1);
+  assert.equal(emittedMessages[0].room, `ride_${rideId}`);
+  assert.equal(emittedMessages[0].event, 'new_message');
+  assert.equal(
+    emittedMessages[0].payload.messageText,
     'I am waiting near the main gate.'
   );
 
@@ -522,11 +546,168 @@ test('enforces five cancellations in the rolling one-hour window', async () => {
   assert.equal((await Ride.findById(ride._id).lean()).status, 'REQUESTED');
 });
 
+test('gates post-completion chat behind a customer request and active approval', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const riderUserId = new mongoose.Types.ObjectId();
+  const adminId = new mongoose.Types.ObjectId();
+  const ride = await Ride.create({
+    customer_id: customerId,
+    rider_id: riderUserId,
+    request_type: 'TRANSPORT',
+    pickup_location: {
+      address: 'Campus',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+    distance_km: 0.75,
+    fare_amount: 260,
+    status: 'COMPLETED',
+    accepted_at: new Date(),
+    arrived_at: new Date(),
+    started_at: new Date(),
+    completed_at: new Date(),
+  });
+
+  await assert.rejects(
+    invokeController(
+      chatController.requestPostCompletionAccess,
+      makeRequest({
+        user: { id: riderUserId.toString(), role: 'RIDER' },
+        params: { rideId: ride._id.toString() },
+        body: { reason: 'I need to contact the customer' },
+      })
+    ),
+    (error) => error.statusCode === 403
+  );
+
+  const requestResult = await invokeController(
+    chatController.requestPostCompletionAccess,
+    makeRequest({
+      user: { id: customerId.toString(), role: 'CUSTOMER' },
+      params: { rideId: ride._id.toString() },
+      body: { reason: 'I left an item in the vehicle' },
+    })
+  );
+  assert.equal(requestResult.statusCode, 201);
+  assert.equal(requestResult.body.data.chatAccessRequest.status, 'PENDING');
+
+  await assert.rejects(
+    invokeController(
+      chatController.sendMessage,
+      makeRequest({
+        user: { id: customerId.toString(), role: 'CUSTOMER' },
+        params: { rideId: ride._id.toString() },
+        body: { messageText: 'Did you find my item?' },
+      })
+    ),
+    (error) => error.statusCode === 409
+  );
+
+  const now = new Date();
+  await ChatAccessRequest.updateOne(
+    { _id: requestResult.body.data.chatAccessRequest.id },
+    {
+      $set: {
+        status: 'APPROVED',
+        reviewed_by: adminId,
+        reviewed_at: now,
+        approved_from: new Date(now.getTime() - 1000),
+        approved_until: new Date(now.getTime() + 60 * 60 * 1000),
+      },
+    }
+  );
+
+  const customerMessage = await invokeController(
+    chatController.sendMessage,
+    makeRequest({
+      user: { id: customerId.toString(), role: 'CUSTOMER' },
+      params: { rideId: ride._id.toString() },
+      body: { messageText: 'Did you find my item?' },
+    })
+  );
+  assert.equal(customerMessage.statusCode, 201);
+  const riderMessage = await invokeController(
+    chatController.sendMessage,
+    makeRequest({
+      user: { id: riderUserId.toString(), role: 'RIDER' },
+      params: { rideId: ride._id.toString() },
+      body: { messageText: 'Yes, please contact the administrator.' },
+    })
+  );
+  assert.equal(riderMessage.statusCode, 201);
+
+  await ChatAccessRequest.updateOne(
+    { _id: requestResult.body.data.chatAccessRequest.id },
+    { $set: { approved_until: new Date(Date.now() - 1000) } }
+  );
+  await assert.rejects(
+    invokeController(
+      chatController.sendMessage,
+      makeRequest({
+        user: { id: customerId.toString(), role: 'CUSTOMER' },
+        params: { rideId: ride._id.toString() },
+        body: { messageText: 'This should be blocked' },
+      })
+    ),
+    (error) => error.statusCode === 409
+  );
+
+  const expiredRequest = await ChatAccessRequest.findById(
+    requestResult.body.data.chatAccessRequest.id
+  ).lean();
+  assert.equal(expiredRequest.status, 'EXPIRED');
+  const history = await invokeController(
+    chatController.getMessages,
+    makeRequest({
+      user: { id: customerId.toString(), role: 'CUSTOMER' },
+      params: { rideId: ride._id.toString() },
+    })
+  );
+  assert.equal(history.body.results, 2);
+});
+
 test('authenticates ride sockets and persists room-scoped messages', async () => {
   const jwtSecret = 'socket-test-secret';
   const customerId = new mongoose.Types.ObjectId();
   const riderUserId = new mongoose.Types.ObjectId();
   const outsiderId = new mongoose.Types.ObjectId();
+  await User.create([
+    {
+      _id: customerId,
+      name: 'Socket Customer',
+      email: 'socket-customer@example.com',
+      phone: '0700000101',
+      password_hash: 'test-password-hash',
+      role: 'CUSTOMER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: riderUserId,
+      name: 'Socket Rider',
+      email: 'socket-rider@example.com',
+      phone: '0700000102',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: outsiderId,
+      name: 'Outside Rider',
+      email: 'outside-rider@example.com',
+      phone: '0700000103',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+  ]);
   const ride = await Ride.create({
     customer_id: customerId,
     rider_id: riderUserId,
@@ -556,7 +737,10 @@ test('authenticates ride sockets and persists room-scoped messages', async () =>
 
   const connect = (id, role) =>
     new Promise((resolve, reject) => {
-      const token = jwt.sign({ id: id.toString(), role }, jwtSecret);
+      const token = jwt.sign(
+        { id: id.toString(), role, tokenVersion: 0 },
+        jwtSecret
+      );
       const socket = createSocketClient(url, {
         auth: { token },
         transports: ['websocket'],
@@ -609,6 +793,21 @@ test('authenticates ride sockets and persists room-scoped messages', async () =>
         message_text: 'Socket message',
       }),
       1
+    );
+
+    await User.updateOne(
+      { _id: customerId },
+      { $inc: { token_version: 1 } }
+    );
+    const revokedSend = await emitWithAck(customerSocket, 'send_message', {
+      rideId: ride._id.toString(),
+      messageText: 'Revoked session message',
+    });
+    assert.equal(revokedSend.success, false);
+    assert.equal(revokedSend.message, 'This session is no longer valid');
+    assert.equal(
+      await Message.countDocuments({ message_text: 'Revoked session message' }),
+      0
     );
   } finally {
     customerSocket?.disconnect();

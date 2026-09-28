@@ -8,5 +8,9 @@ router.use(protect);
 
 router.get('/:rideId/messages', chatController.getMessages);
 router.post('/:rideId/messages', chatController.sendMessage);
+router.post(
+  '/:rideId/chat-access-requests',
+  chatController.requestPostCompletionAccess
+);
 
 module.exports = router;

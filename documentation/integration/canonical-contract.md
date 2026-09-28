@@ -325,6 +325,10 @@ ride and its pending payment record.
 - Only the customer may request post-completion access.
 - An administrator approves or rejects the request.
 - Approval enables both participants to send messages for 24 hours.
+- Expired approval records transition to `EXPIRED` when access is checked;
+  message history remains readable.
+- Messages created through either the HTTP endpoint or Socket.IO emit the same
+  `new_message` payload to the ride room.
 
 ## 9. Canonical HTTP API
 
@@ -445,7 +449,8 @@ Expected status codes:
 ## 11. Socket.IO Contract
 
 Socket connections require the same JWT checks as HTTP requests, including user
-existence, token version, account status, and role.
+existence, token version, account status, and role. Session validity is checked
+again when joining a ride room and sending a message.
 
 Client events:
 

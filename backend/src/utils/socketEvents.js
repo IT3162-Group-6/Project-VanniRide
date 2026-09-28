@@ -23,6 +23,28 @@ const cancellationPayload = (request) => ({
   resolvedAt: request.resolved_at || null,
 });
 
+const messagePayload = (message) => ({
+  id: message._id.toString(),
+  rideId: message.ride_id.toString(),
+  senderId: message.sender_id.toString(),
+  messageText: message.message_text,
+  sentAt: message.sent_at,
+});
+
+const chatAccessPayload = (request) => ({
+  id: request._id.toString(),
+  rideId: request.ride_id.toString(),
+  requestedBy: request.requested_by.toString(),
+  riderId: request.rider_id.toString(),
+  reason: request.reason,
+  status: request.status,
+  reviewedBy: request.reviewed_by?.toString() || null,
+  requestedAt: request.requested_at,
+  reviewedAt: request.reviewed_at || null,
+  approvedFrom: request.approved_from || null,
+  approvedUntil: request.approved_until || null,
+});
+
 const emitNewRideRequest = (req, ride) => {
   const io = getIo(req);
   if (!io) return;
@@ -75,8 +97,28 @@ const emitCancellationResolved = (req, ride, cancellationRequest) => {
   emitCancellationResolvedWithIo(getIo(req), ride, cancellationRequest);
 };
 
+const emitNewMessage = (req, message) => {
+  const io = getIo(req);
+  if (!io) return;
+  io.to(rideRoom(message.ride_id.toString())).emit(
+    'new_message',
+    messagePayload(message)
+  );
+};
+
+const emitChatAccessUpdated = (req, ride, chatAccessRequest) => {
+  const io = getIo(req);
+  if (!io) return;
+  io.to(userRoom(ride.customer_id.toString()))
+    .to(userRoom(ride.rider_id.toString()))
+    .to('role_ADMIN')
+    .emit('chat_access_updated', chatAccessPayload(chatAccessRequest));
+};
+
 module.exports = {
+  emitChatAccessUpdated,
   emitNewRideRequest,
+  emitNewMessage,
   emitCancellationRequested,
   emitCancellationResolved,
   emitCancellationResolvedWithIo,
