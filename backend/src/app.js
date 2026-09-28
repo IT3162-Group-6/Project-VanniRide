@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const rideRoutes = require('./routes/rideRoutes'); // Member B2 routes
 const paymentRoutes = require('./routes/paymentRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
@@ -40,6 +41,10 @@ app.use('/api/rides', chatRoutes); // Member B2 ride-scoped text chat
 app.use((req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
+
+
+
+app.use('/api/admin', adminRoutes);
 
 // Global Error Handler
 app.use(errorHandler);
