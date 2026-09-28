@@ -19,6 +19,7 @@ const riderSchema = new mongoose.Schema(
   {
     collection: 'riders',
     versionKey: false,
+    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
   }
 );
 

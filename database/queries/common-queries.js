@@ -108,7 +108,7 @@ if (sampleCustomerId) {
       status: "COMPLETED"
     })
     .sort({
-      created_at: -1
+      requested_at: -1
     })
     .limit(1)
     .toArray();
@@ -129,7 +129,7 @@ if (sampleRide) {
         ride_id: sampleRide._id
       })
       .sort({
-        created_at: 1
+        sent_at: 1
       })
   );
 } else {
@@ -137,15 +137,15 @@ if (sampleRide) {
 }
 
 
-// 8. CANCELLATION COUNT DURING LAST 7 DAYS
-print("\n--- 7-Day Cancellation Count ---");
+// 8. CANCELLATION COUNT DURING THE ROLLING 60-MINUTE WINDOW
+print("\n--- Rolling 60-Minute Cancellation Count ---");
 
 if (sampleCustomerId) {
   const cancellationCount = db.cancellations.countDocuments({
     cancelled_by: sampleCustomerId,
     cancelled_at: {
       $gte: new Date(
-        Date.now() - 7 * 24 * 60 * 60 * 1000
+        Date.now() - 60 * 60 * 1000
       )
     }
   });

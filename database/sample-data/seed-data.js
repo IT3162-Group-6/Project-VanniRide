@@ -13,7 +13,9 @@ if (db.users.findOne({ email: "customer@test.com" })) {
     password_hash: "TEMP_PASSWORD",
     role: "CUSTOMER",
     account_status: "ACTIVE",
-    created_at: new Date()
+    token_version: 0,
+    created_at: new Date(),
+    updated_at: new Date()
   });
 
   const customerId = customerResult.insertedId;
@@ -26,7 +28,9 @@ if (db.users.findOne({ email: "customer@test.com" })) {
     password_hash: "TEMP_PASSWORD",
     role: "RIDER",
     account_status: "ACTIVE",
-    created_at: new Date()
+    token_version: 0,
+    created_at: new Date(),
+    updated_at: new Date()
   });
 
   const riderUserId = riderUserResult.insertedId;
@@ -34,7 +38,9 @@ if (db.users.findOne({ email: "customer@test.com" })) {
   // RIDER PROFILE
   db.riders.insertOne({
     user_id: riderUserId,
-    availability_status: "AVAILABLE"
+    availability_status: "AVAILABLE",
+    created_at: new Date(),
+    updated_at: new Date()
   });
 
   // COMPLETED RIDE
@@ -62,7 +68,7 @@ if (db.users.findOne({ email: "customer@test.com" })) {
 
     status: "COMPLETED",
 
-    created_at: new Date(),
+    requested_at: new Date(),
     accepted_at: new Date(),
     arrived_at: new Date(),
     started_at: new Date(),
@@ -87,16 +93,16 @@ if (db.users.findOne({ email: "customer@test.com" })) {
   db.messages.insertOne({
     ride_id: rideId,
     sender_id: customerId,
-    message: "I am near the university gate.",
-    created_at: new Date()
+    message_text: "I am near the university gate.",
+    sent_at: new Date()
   });
 
   // RIDER MESSAGE
   db.messages.insertOne({
     ride_id: rideId,
     sender_id: riderUserId,
-    message: "Okay, I am coming to the gate now.",
-    created_at: new Date()
+    message_text: "Okay, I am coming to the gate now.",
+    sent_at: new Date()
   });
 
   // RATING

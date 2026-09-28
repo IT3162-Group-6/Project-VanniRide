@@ -7,7 +7,9 @@ const collections = [
   "payments",
   "messages",
   "cancellations",
-  "ratings"
+  "cancellation_requests",
+  "ratings",
+  "chat_access_requests"
 ];
 
 collections.forEach(function(collectionName) {

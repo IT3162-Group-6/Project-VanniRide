@@ -94,7 +94,32 @@ const rideSchema = new mongoose.Schema(
 );
 
 rideSchema.index({ customer_id: 1, status: 1 });
+rideSchema.index(
+  { customer_id: 1, request_type: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'STARTED'] },
+    },
+  }
+);
 rideSchema.index({ rider_id: 1, status: 1 });
-rideSchema.index({ status: 1 });
+rideSchema.index({ status: 1, requested_at: 1 });
+
+rideSchema.pre('validate', function validateDeliveryCategory() {
+  if (this.request_type === 'TRANSPORT' && this.delivery_category !== null) {
+    this.invalidate(
+      'delivery_category',
+      'Transport rides cannot have a delivery category'
+    );
+  }
+
+  if (this.request_type === 'DELIVERY' && !this.delivery_category) {
+    this.invalidate(
+      'delivery_category',
+      'Delivery category is required for delivery requests'
+    );
+  }
+});
 
 module.exports = mongoose.models.Ride || mongoose.model('Ride', rideSchema);

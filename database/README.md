@@ -18,7 +18,9 @@ The database currently contains the following collections:
 - `payments`
 - `messages`
 - `cancellations`
+- `cancellation_requests`
 - `ratings`
+- `chat_access_requests`
 
 ## Folder Structure
 
@@ -93,6 +95,8 @@ Indexes are used to:
 - retrieve messages efficiently
 - support cancellation count queries
 - retrieve rider ratings efficiently
+- resolve pending mutual cancellations after their deadline
+- review and expire post-completion chat access
 
 ### 4. Insert Sample Data
 
@@ -119,7 +123,7 @@ This runs example MongoDB queries for:
 - completed rides
 - pending payments
 - ride messages
-- 7-day cancellation count
+- rolling one-hour cancellation count
 - rider ratings
 - ride/customer relationships
 - ride/rider relationships
@@ -182,8 +186,8 @@ Ratings must be between:
 - Riders return to `AVAILABLE` after completing or cancelling a ride according to the application flow.
 - One ride currently has one payment record.
 - One ride currently has one rating record.
-- Cancellation history supports checking a maximum of 5 cancellations within a 7-day period.
-- The exact application behavior after reaching the cancellation limit will be handled according to the final application rules.
+- A user may initiate at most 5 final cancellations in a rolling 60-minute period across transport and delivery requests.
+- Resumed cancellation requests do not consume the allowance.
 - Sample passwords are only test values and are not intended for production use.
 
 ## Database Documentation
