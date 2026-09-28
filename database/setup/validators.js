@@ -293,4 +293,43 @@ db.runCommand({
   validationAction: "error"
 });
 
+db.runCommand({
+  collMod: "admin_audit_logs",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "admin_id",
+        "action",
+        "target_type",
+        "target_id",
+        "reason",
+        "before",
+        "after",
+        "created_at"
+      ],
+      properties: {
+        admin_id: { bsonType: "objectId" },
+        action: {
+          enum: [
+            "USER_STATUS_CHANGED",
+            "PAYMENT_CORRECTED",
+            "CHAT_ACCESS_REVIEWED"
+          ]
+        },
+        target_type: {
+          enum: ["USER", "PAYMENT", "CHAT_ACCESS_REQUEST"]
+        },
+        target_id: { bsonType: "objectId" },
+        reason: { bsonType: "string", minLength: 1, maxLength: 500 },
+        before: { bsonType: "object" },
+        after: { bsonType: "object" },
+        created_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
 print("All Vanni Ride validators applied successfully.");

@@ -21,6 +21,7 @@ The database currently contains the following collections:
 - `cancellation_requests`
 - `ratings`
 - `chat_access_requests`
+- `admin_audit_logs`
 
 ## Folder Structure
 

@@ -9,7 +9,8 @@ const collections = [
   "cancellations",
   "cancellation_requests",
   "ratings",
-  "chat_access_requests"
+  "chat_access_requests",
+  "admin_audit_logs"
 ];
 
 collections.forEach(function(collectionName) {

@@ -52,15 +52,18 @@ const normalizeMessageText = (value) => {
   return messageText;
 };
 
-const expireElapsedChatAccess = async (rideId, now = new Date()) =>
-  ChatAccessRequest.updateMany(
-    {
-      ride_id: rideId,
-      status: 'APPROVED',
-      approved_until: { $lte: now },
-    },
+const expireElapsedChatAccess = async (rideId, now = new Date()) => {
+  const filter = {
+    status: 'APPROVED',
+    approved_until: { $lte: now },
+  };
+  if (rideId) filter.ride_id = rideId;
+
+  return ChatAccessRequest.updateMany(
+    filter,
     { $set: { status: 'EXPIRED' } }
   );
+};
 
 const findActiveChatAccess = async (rideId, now = new Date()) => {
   await expireElapsedChatAccess(rideId, now);

@@ -258,6 +258,22 @@ Required fields:
 Approval grants both ride participants access to send messages for 24 hours.
 Message history is never deleted when access expires.
 
+### `admin_audit_logs`
+
+Every administrator mutation is recorded as an append-only audit entry.
+
+Required fields:
+
+- `admin_id`: administrator user reference
+- `action`: `USER_STATUS_CHANGED`, `PAYMENT_CORRECTED`, or
+  `CHAT_ACCESS_REVIEWED`
+- `target_type`: `USER`, `PAYMENT`, or `CHAT_ACCESS_REQUEST`
+- `target_id`: changed document reference
+- `reason`: non-empty administrative reason, maximum 500 characters
+- `before`: object containing the relevant values before the change
+- `after`: object containing the relevant values after the change
+- `created_at`: date
+
 ## 6. Cancellation Rules
 
 ### Before the ride starts
@@ -399,6 +415,14 @@ cancellation request.
 - `PATCH /api/admin/chat-access-requests/:requestId`
 - `GET /api/admin/statistics`
 
+Administrator mutations require a non-empty `reason`. Account management only
+allows `ACTIVE` and `SUSPENDED`, invalidates existing sessions by incrementing
+the user's token version, and prevents administrators from changing their own
+status. Payment corrections apply only to completed rides and may correct the
+stored amount and/or `PENDING`/`PAID` status without rewriting the ride fare or
+lifecycle. A chat-access approval lasts exactly 24 hours. Each mutation stores
+an `admin_audit_logs` entry containing its before/after values.
+
 ## 10. API Data and Error Standards
 
 Successful single-resource response:
@@ -490,6 +514,8 @@ Room membership never replaces authorization checks against MongoDB.
 - `ratings.rider_id + ratings.created_at`
 - `chat_access_requests.status + chat_access_requests.requested_at`
 - `chat_access_requests.ride_id + chat_access_requests.approved_until`
+- `admin_audit_logs.admin_id + admin_audit_logs.created_at`
+- `admin_audit_logs.target_type + admin_audit_logs.target_id + admin_audit_logs.created_at`
 
 ## 13. Integration and Definition of Done
 

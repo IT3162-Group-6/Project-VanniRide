@@ -11,6 +11,7 @@ const rideController = require('../src/controllers/rideController');
 const paymentController = require('../src/controllers/paymentController');
 const chatController = require('../src/controllers/chatController');
 const ratingController = require('../src/controllers/ratingController');
+const adminController = require('../src/controllers/adminController');
 const Ride = require('../src/models/rideModel');
 const Rider = require('../src/models/riderModel');
 const User = require('../src/models/userModel');
@@ -20,6 +21,7 @@ const ChatAccessRequest = require('../src/models/chatAccessRequestModel');
 const Payment = require('../src/models/paymentModel');
 const Message = require('../src/models/messageModel');
 const Rating = require('../src/models/ratingModel');
+const AdminAuditLog = require('../src/models/adminAuditLogModel');
 const initializeSocketHandler = require('../src/sockets/socketHandler');
 const { calculateFare } = require('../src/utils/fareCalculator');
 const {
@@ -78,6 +80,7 @@ test.beforeEach(async () => {
     Payment.deleteMany({}),
     Message.deleteMany({}),
     Rating.deleteMany({}),
+    AdminAuditLog.deleteMany({}),
   ]);
 });
 
@@ -814,6 +817,246 @@ test('allows one customer rating per completed ride and summarizes the rider', a
       .sort((left, right) => left - right),
     [3, 5]
   );
+});
+
+test('audits bounded admin management, dispute, approval, and statistics operations', async () => {
+  const adminId = new mongoose.Types.ObjectId();
+  const customerId = new mongoose.Types.ObjectId();
+  const riderUserId = new mongoose.Types.ObjectId();
+  await User.create([
+    {
+      _id: adminId,
+      name: 'System Admin',
+      email: 'phase11-admin@example.com',
+      phone: '0700001101',
+      password_hash: 'test-password-hash',
+      role: 'ADMIN',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: customerId,
+      name: 'Managed Customer',
+      email: 'phase11-customer@example.com',
+      phone: '0700001102',
+      password_hash: 'test-password-hash',
+      role: 'CUSTOMER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: riderUserId,
+      name: 'Managed Rider',
+      email: 'phase11-rider@example.com',
+      phone: '0700001103',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+  ]);
+  await Rider.create({
+    user_id: riderUserId,
+    availability_status: 'AVAILABLE',
+  });
+
+  const adminUser = { id: adminId.toString(), role: 'ADMIN' };
+  const statusResult = await invokeController(
+    adminController.updateUserStatus,
+    makeRequest({
+      user: adminUser,
+      params: { userId: customerId.toString() },
+      body: {
+        accountStatus: 'SUSPENDED',
+        reason: 'Repeated policy violation',
+      },
+    })
+  );
+  assert.equal(statusResult.body.data.user.accountStatus, 'SUSPENDED');
+  const suspendedCustomer = await User.findById(customerId).lean();
+  assert.equal(suspendedCustomer.account_status, 'SUSPENDED');
+  assert.equal(suspendedCustomer.token_version, 1);
+  await assert.rejects(
+    invokeController(
+      adminController.updateUserStatus,
+      makeRequest({
+        user: adminUser,
+        params: { userId: adminId.toString() },
+        body: { accountStatus: 'SUSPENDED', reason: 'Self change' },
+      })
+    ),
+    (error) => error.statusCode === 403
+  );
+
+  const completedRide = await Ride.create({
+    customer_id: customerId,
+    rider_id: riderUserId,
+    request_type: 'TRANSPORT',
+    pickup_location: {
+      address: 'Campus',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+    distance_km: 0.75,
+    fare_amount: 260,
+    status: 'COMPLETED',
+    accepted_at: new Date(),
+    arrived_at: new Date(),
+    started_at: new Date(),
+    completed_at: new Date(),
+  });
+  const cancelledRide = await Ride.create({
+    customer_id: new mongoose.Types.ObjectId(),
+    rider_id: riderUserId,
+    request_type: 'DELIVERY',
+    delivery_category: 'PARCEL',
+    pickup_location: {
+      address: 'Campus',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+    distance_km: 0.75,
+    fare_amount: 210,
+    status: 'CANCELLED',
+    accepted_at: new Date(),
+    cancelled_at: new Date(),
+  });
+  const payment = await Payment.create({
+    ride_id: completedRide._id,
+    amount: 260,
+    payment_method: 'CASH',
+    payment_status: 'PENDING',
+    confirmed_by: null,
+    paid_at: null,
+  });
+  await Cancellation.create({
+    ride_id: cancelledRide._id,
+    cancelled_by: customerId,
+    reason: 'Admin monitoring fixture',
+    previous_status: 'ACCEPTED',
+    cancellation_mode: 'IMMEDIATE',
+    cancelled_at: new Date(),
+  });
+  await Rating.create({
+    ride_id: completedRide._id,
+    customer_id: customerId,
+    rider_id: riderUserId,
+    rating: 5,
+    review: 'Excellent service',
+  });
+  const chatAccessRequest = await ChatAccessRequest.create({
+    ride_id: completedRide._id,
+    requested_by: customerId,
+    rider_id: riderUserId,
+    reason: 'Lost item',
+    status: 'PENDING',
+    reviewed_by: null,
+    reviewed_at: null,
+    approved_from: null,
+    approved_until: null,
+  });
+
+  const paymentResult = await invokeController(
+    adminController.correctPayment,
+    makeRequest({
+      user: adminUser,
+      params: { paymentId: payment._id.toString() },
+      body: {
+        amount: 300,
+        paymentStatus: 'PAID',
+        reason: 'Verified cash dispute receipt',
+      },
+    })
+  );
+  assert.equal(paymentResult.body.data.payment.amount, 300);
+  assert.equal(paymentResult.body.data.payment.paymentStatus, 'PAID');
+  assert.equal(paymentResult.body.data.payment.confirmedBy, null);
+  assert.ok(paymentResult.body.data.payment.paidAt);
+
+  const emittedChatUpdates = [];
+  const mockIo = {
+    rooms: [],
+    to(room) {
+      this.rooms.push(room);
+      return this;
+    },
+    emit(event, payload) {
+      emittedChatUpdates.push({ rooms: [...this.rooms], event, payload });
+      this.rooms = [];
+    },
+  };
+  const reviewResult = await invokeController(
+    adminController.reviewChatAccessRequest,
+    makeRequest({
+      user: adminUser,
+      params: { requestId: chatAccessRequest._id.toString() },
+      body: { decision: 'APPROVE', reason: 'Lost-item contact is justified' },
+      app: { get: (key) => (key === 'io' ? mockIo : null) },
+    })
+  );
+  const reviewedRequest = reviewResult.body.data.chatAccessRequest;
+  assert.equal(reviewedRequest.status, 'APPROVED');
+  assert.equal(reviewedRequest.reviewedBy, adminId.toString());
+  assert.equal(
+    new Date(reviewedRequest.approvedUntil).getTime() -
+      new Date(reviewedRequest.approvedFrom).getTime(),
+    24 * 60 * 60 * 1000
+  );
+  assert.equal(emittedChatUpdates[0].event, 'chat_access_updated');
+  assert.equal(emittedChatUpdates[0].payload.status, 'APPROVED');
+
+  const listChecks = [
+    [adminController.getAllUsers, 'users', 3],
+    [adminController.getAllRides, 'rides', 2],
+    [adminController.getAllCancellations, 'cancellations', 1],
+    [adminController.getAllPayments, 'payments', 1],
+    [adminController.getAllRatings, 'ratings', 1],
+    [adminController.getChatAccessRequests, 'chatAccessRequests', 1],
+  ];
+  for (const [controller, responseKey, expectedCount] of listChecks) {
+    const result = await invokeController(
+      controller,
+      makeRequest({ user: adminUser })
+    );
+    assert.equal(result.body.results, expectedCount);
+    assert.equal(result.body.data[responseKey].length, expectedCount);
+  }
+
+  const statistics = await invokeController(
+    adminController.getAdminStatistics,
+    makeRequest({ user: adminUser })
+  );
+  assert.equal(statistics.body.data.statistics.users.total, 3);
+  assert.equal(statistics.body.data.statistics.users.suspended, 1);
+  assert.equal(statistics.body.data.statistics.rides.total, 2);
+  assert.equal(statistics.body.data.statistics.rides.completed, 1);
+  assert.equal(statistics.body.data.statistics.rides.cancelled, 1);
+  assert.equal(statistics.body.data.statistics.payments.paid, 1);
+  assert.equal(statistics.body.data.statistics.payments.totalPaidAmount, 300);
+  assert.equal(statistics.body.data.statistics.cancellations.total, 1);
+  assert.equal(statistics.body.data.statistics.ratings.averageRating, 5);
+  assert.equal(statistics.body.data.statistics.chatAccessRequests.pending, 0);
+
+  const audits = await AdminAuditLog.find().sort({ created_at: 1 }).lean();
+  assert.deepEqual(
+    audits.map((item) => item.action).sort(),
+    [
+      'CHAT_ACCESS_REVIEWED',
+      'PAYMENT_CORRECTED',
+      'USER_STATUS_CHANGED',
+    ]
+  );
+  assert.ok(audits.every((item) => item.reason.length > 0));
 });
 
 test('authenticates ride sockets and persists room-scoped messages', async () => {

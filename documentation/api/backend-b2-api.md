@@ -186,6 +186,54 @@ The rating must be numeric and between 1 and 5. The review is optional text up
 to 1,000 characters. A completed ride can be rated only once, and the customer
 cannot rate a rider from somebody else's ride.
 
+## Administrator endpoints
+
+All endpoints below require an authenticated `ADMIN` account:
+
+- `GET /api/admin/users`
+- `PATCH /api/admin/users/:userId/status`
+- `GET /api/admin/rides`
+- `GET /api/admin/cancellations`
+- `GET /api/admin/payments`
+- `PATCH /api/admin/payments/:paymentId`
+- `GET /api/admin/ratings`
+- `GET /api/admin/chat-access-requests`
+- `PATCH /api/admin/chat-access-requests/:requestId`
+- `GET /api/admin/statistics`
+
+Account status request:
+
+```json
+{
+  "accountStatus": "SUSPENDED",
+  "reason": "Documented policy violation"
+}
+```
+
+Payment dispute correction for a completed ride:
+
+```json
+{
+  "amount": 300,
+  "paymentStatus": "PAID",
+  "reason": "Verified cash receipt"
+}
+```
+
+Chat-access decision:
+
+```json
+{
+  "decision": "APPROVE",
+  "reason": "Lost-item contact is justified"
+}
+```
+
+Every administrator mutation requires a reason and creates a durable audit log.
+Approving chat access grants both ride participants exactly 24 hours of sending
+access. Administrators can monitor ride history but cannot rewrite ride status
+or historical lifecycle timestamps.
+
 ## Local setup
 
 Copy `.env.example` to `.env`, then run:

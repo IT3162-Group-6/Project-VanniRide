@@ -47,4 +47,11 @@ db.chat_access_requests.createIndex(
   { unique: true, partialFilterExpression: { status: "PENDING" } }
 );
 
+db.admin_audit_logs.createIndex({ admin_id: 1, created_at: -1 });
+db.admin_audit_logs.createIndex({
+  target_type: 1,
+  target_id: 1,
+  created_at: -1
+});
+
 print("All Vanni Ride indexes created successfully.");
