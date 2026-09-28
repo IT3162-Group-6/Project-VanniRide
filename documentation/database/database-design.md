@@ -881,3 +881,73 @@ Validation currently checks:
 - `created_at` must be a date
 
 The validator was tested using an empty message (`message: ""`), and MongoDB correctly rejected the document.
+
+
+
+## Cancellations Collection
+
+The `cancellations` collection stores cancellation records for rides that have been cancelled.
+
+### Fields
+
+- `_id` - MongoDB ObjectId
+- `ride_id` - References the cancelled ride in the `rides` collection
+- `cancelled_by` - References the user who cancelled the ride
+- `reason` - Reason for cancellation
+- `cancelled_at` - Date and time the cancellation occurred
+
+### Cancellation Flow
+
+When a ride is cancelled, the ride itself is not deleted.
+
+Instead, the ride status is updated to `CANCELLED`, and a separate cancellation record is created.
+
+A sample cancellation was tested using a ride in `REQUESTED` status.
+
+The ride was updated from:
+
+`REQUESTED → CANCELLED`
+
+A cancellation record was then created with the user who cancelled the ride, the cancellation reason, and the cancellation timestamp.
+
+### Relationships
+
+`cancellations.ride_id` references `rides._id`.
+
+`cancellations.cancelled_by` references `users._id`.
+
+Both relationships were tested successfully using MongoDB `$lookup`.
+
+### Cancellation Limit Support
+
+The current design supports checking how many cancellations a user has made within the last 7 days.
+
+A query was tested successfully to count cancellations made by a user during the previous 7-day period.
+
+The project rule currently allows a maximum of 5 cancellations within a 7-day period.
+
+The database stores the required cancellation history, while the exact action taken after reaching the limit will be handled according to the final application rules.
+
+### Cancellation Indexes
+
+The following indexes were created:
+
+- Unique index on `{ ride_id: 1 }`
+- Index on `{ cancelled_by: 1, cancelled_at: 1 }`
+
+The unique ride index prevents multiple cancellation records for the same ride.
+
+The cancelled user and timestamp index supports time-based cancellation checks such as the 7-day cancellation count.
+
+### Cancellation Validation
+
+MongoDB JSON Schema validation was added to the `cancellations` collection.
+
+Validation currently checks:
+
+- `ride_id` must be a valid ObjectId
+- `cancelled_by` must be a valid ObjectId
+- `reason` must be a non-empty string
+- `cancelled_at` must be a valid date
+
+The validator was tested using an empty cancellation reason (`reason: ""`), and MongoDB correctly rejected the document.
