@@ -63,6 +63,7 @@ cancellationRequestSchema.index(
 );
 cancellationRequestSchema.index({ status: 1, expires_at: 1 });
 cancellationRequestSchema.index({ responding_user_id: 1, status: 1 });
+cancellationRequestSchema.index({ requested_by: 1, status: 1 });
 
 module.exports =
   mongoose.models.CancellationRequest ||

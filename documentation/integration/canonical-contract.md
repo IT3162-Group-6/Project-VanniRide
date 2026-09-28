@@ -283,9 +283,12 @@ an in-memory timer.
   falls outside the window.
 - `TRANSPORT` and `DELIVERY` cancellations use the same shared allowance.
 - Rejected/resumed pending requests do not consume an allowance.
+- A pending started-ride cancellation temporarily reserves one allowance so
+  concurrent requests cannot exceed the limit. Resuming releases it.
 - A confirmed or automatically finalized started-ride cancellation is counted
   against the initiating user.
-- API responses expose `limit`, `used`, `remaining`, and `resetsAt`.
+- API responses expose `limit`, `used`, `remaining`, `pendingReservations`, and
+  `resetsAt` for the earliest finalized cancellation leaving the window.
 - Customers must be able to view their remaining allowance.
 
 ## 7. Routing and Fare Contract
@@ -350,6 +353,7 @@ created through protected setup tooling.
 - `PATCH /api/rides/:rideId/accept`
 - `PATCH /api/rides/:rideId/status`
 - `PATCH /api/rides/:rideId/cancel`
+- `GET /api/rides/:rideId/cancellation-request` - retrieve a pending request
 - `PATCH /api/rides/:rideId/cancellation-request` - other participant chooses
   `CANCEL` or `RESUME`
 
@@ -471,6 +475,7 @@ Room membership never replaces authorization checks against MongoDB.
 - Unique `cancellations.ride_id`
 - `cancellations.cancelled_by + cancellations.cancelled_at`
 - Partial unique pending request index for `cancellation_requests.ride_id`
+- `cancellation_requests.requested_by + cancellation_requests.status`
 - Unique `ratings.ride_id`
 - `ratings.rider_id + ratings.created_at`
 - `chat_access_requests.status + chat_access_requests.requested_at`

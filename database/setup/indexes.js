@@ -34,6 +34,7 @@ db.cancellation_requests.createIndex(
 );
 db.cancellation_requests.createIndex({ status: 1, expires_at: 1 });
 db.cancellation_requests.createIndex({ responding_user_id: 1, status: 1 });
+db.cancellation_requests.createIndex({ requested_by: 1, status: 1 });
 
 db.ratings.createIndex({ ride_id: 1 }, { unique: true });
 db.ratings.createIndex({ rider_id: 1, created_at: -1 });

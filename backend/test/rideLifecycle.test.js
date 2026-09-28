@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
+process.env.ROUTING_BASE_URL =
+  process.env.ROUTING_BASE_URL || 'http://routing.test';
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const { Server: SocketServer } = require('socket.io');
@@ -11,17 +13,27 @@ const chatController = require('../src/controllers/chatController');
 const Ride = require('../src/models/rideModel');
 const Rider = require('../src/models/riderModel');
 const Cancellation = require('../src/models/cancellationModel');
+const CancellationRequest = require('../src/models/cancellationRequestModel');
 const Payment = require('../src/models/paymentModel');
 const Message = require('../src/models/messageModel');
 const initializeSocketHandler = require('../src/sockets/socketHandler');
+const { calculateFare } = require('../src/utils/fareCalculator');
 const {
-  calculateDistanceKm,
-  calculateFare,
-} = require('../src/utils/fareCalculator');
+  calculateRoadDistanceKm,
+} = require('../src/services/routingService');
 
 const TEST_DATABASE_URI =
   process.env.MONGODB_TEST_URI ||
   'mongodb://127.0.0.1:27017/vanniRideDB_test';
+const originalFetch = global.fetch;
+
+const routingResponse = (distances = [750]) => ({
+  ok: true,
+  json: async () => ({
+    code: 'Ok',
+    routes: distances.map((distance) => ({ distance })),
+  }),
+});
 
 const invokeController = (handler, req) =>
   new Promise((resolve, reject) => {
@@ -46,6 +58,7 @@ const makeRequest = ({ user, body = {}, params = {} }) => ({
 });
 
 test.before(async () => {
+  global.fetch = async () => routingResponse();
   await mongoose.connect(TEST_DATABASE_URI, { serverSelectionTimeoutMS: 5000 });
 });
 
@@ -54,6 +67,7 @@ test.beforeEach(async () => {
     Ride.deleteMany({}),
     Rider.deleteMany({}),
     Cancellation.deleteMany({}),
+    CancellationRequest.deleteMany({}),
     Payment.deleteMany({}),
     Message.deleteMany({}),
   ]);
@@ -62,12 +76,17 @@ test.beforeEach(async () => {
 test.after(async () => {
   await mongoose.connection.dropDatabase();
   await mongoose.disconnect();
+  global.fetch = originalFetch;
 });
 
-test('calculates distance and estimated fare from coordinates', () => {
-  const distanceKm = calculateDistanceKm(
+test('uses the shortest returned road route to estimate the fare', async () => {
+  const distanceKm = await calculateRoadDistanceKm(
     { latitude: 8.7581, longitude: 80.4982 },
-    { latitude: 8.7514, longitude: 80.4971 }
+    { latitude: 8.7514, longitude: 80.4971 },
+    {
+      baseUrl: 'http://routing.test',
+      fetchImplementation: async () => routingResponse([920, 750, 810]),
+    }
   );
 
   assert.equal(distanceKm, 0.75);
@@ -296,6 +315,133 @@ test('cancels a requested ride without deleting its history', async () => {
   assert.equal(cancelResult.body.data.ride.status, 'CANCELLED');
   assert.equal(await Ride.countDocuments({ _id: rideId }), 1);
   assert.equal(await Cancellation.countDocuments({ ride_id: rideId }), 1);
+});
+
+test('requires the other participant to resolve a started cancellation', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const riderUserId = new mongoose.Types.ObjectId();
+  await Rider.create({
+    user_id: riderUserId,
+    availability_status: 'BUSY',
+  });
+  const ride = await Ride.create({
+    customer_id: customerId,
+    rider_id: riderUserId,
+    request_type: 'TRANSPORT',
+    pickup_location: {
+      address: 'Campus',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+    distance_km: 0.75,
+    fare_amount: 260,
+    status: 'STARTED',
+    accepted_at: new Date(),
+    arrived_at: new Date(),
+    started_at: new Date(),
+  });
+
+  const requestResult = await invokeController(
+    rideController.cancelRide,
+    makeRequest({
+      user: { id: customerId.toString(), role: 'CUSTOMER' },
+      params: { rideId: ride._id.toString() },
+      body: { reason: 'Please stop the trip' },
+    })
+  );
+  assert.equal(requestResult.statusCode, 202);
+  assert.equal(
+    requestResult.body.data.cancellationRequest.status,
+    'PENDING'
+  );
+  assert.equal(
+    requestResult.body.data.cancellationAllowance.pendingReservations,
+    1
+  );
+
+  await assert.rejects(
+    invokeController(
+      rideController.respondToCancellation,
+      makeRequest({
+        user: { id: customerId.toString(), role: 'CUSTOMER' },
+        params: { rideId: ride._id.toString() },
+        body: { decision: 'CANCEL' },
+      })
+    ),
+    (error) => error.statusCode === 403
+  );
+
+  const responseResult = await invokeController(
+    rideController.respondToCancellation,
+    makeRequest({
+      user: { id: riderUserId.toString(), role: 'RIDER' },
+      params: { rideId: ride._id.toString() },
+      body: { decision: 'CANCEL' },
+    })
+  );
+  assert.equal(responseResult.body.data.ride.status, 'CANCELLED');
+  assert.equal(
+    responseResult.body.data.cancellationRequest.status,
+    'CONFIRMED'
+  );
+
+  const cancellation = await Cancellation.findOne({
+    ride_id: ride._id,
+  }).lean();
+  assert.equal(cancellation.cancellation_mode, 'MUTUAL');
+  const rider = await Rider.findOne({ user_id: riderUserId }).lean();
+  assert.equal(rider.availability_status, 'AVAILABLE');
+});
+
+test('enforces five cancellations in the rolling one-hour window', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const now = new Date();
+  await Cancellation.insertMany(
+    Array.from({ length: 5 }, () => ({
+      ride_id: new mongoose.Types.ObjectId(),
+      cancelled_by: customerId,
+      reason: 'Existing cancellation',
+      previous_status: 'REQUESTED',
+      cancellation_mode: 'IMMEDIATE',
+      cancelled_at: now,
+    }))
+  );
+  const ride = await Ride.create({
+    customer_id: customerId,
+    request_type: 'DELIVERY',
+    delivery_category: 'PARCEL',
+    pickup_location: {
+      address: 'Campus',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+    distance_km: 0.75,
+    fare_amount: 210,
+    status: 'REQUESTED',
+  });
+
+  await assert.rejects(
+    invokeController(
+      rideController.cancelRide,
+      makeRequest({
+        user: { id: customerId.toString(), role: 'CUSTOMER' },
+        params: { rideId: ride._id.toString() },
+        body: { reason: 'One cancellation too many' },
+      })
+    ),
+    (error) => error.statusCode === 409
+  );
+  assert.equal((await Ride.findById(ride._id).lean()).status, 'REQUESTED');
 });
 
 test('authenticates ride sockets and persists room-scoped messages', async () => {

@@ -20,5 +20,8 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.10.2",
     "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.4"
   }
 }

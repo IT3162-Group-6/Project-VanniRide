@@ -10,6 +10,19 @@ const statusPayload = (ride) => ({
   updatedAt: new Date().toISOString(),
 });
 
+const cancellationPayload = (request) => ({
+  id: request._id.toString(),
+  rideId: request.ride_id.toString(),
+  requestedBy: request.requested_by.toString(),
+  respondingUserId: request.responding_user_id.toString(),
+  reason: request.reason,
+  status: request.status,
+  requestedAt: request.requested_at,
+  expiresAt: request.expires_at,
+  respondedAt: request.responded_at || null,
+  resolvedAt: request.resolved_at || null,
+});
+
 const emitNewRideRequest = (req, ride) => {
   const io = getIo(req);
   if (!io) return;
@@ -38,8 +51,35 @@ const emitRideStatusChanged = (req, ride) => {
   emitter.emit('ride_status_changed', statusPayload(ride));
 };
 
+const emitCancellationRequested = (req, ride, cancellationRequest) => {
+  const io = getIo(req);
+  if (!io) return;
+  io.to(rideRoom(ride._id.toString()))
+    .to(userRoom(cancellationRequest.responding_user_id.toString()))
+    .emit('cancellation_requested', cancellationPayload(cancellationRequest));
+};
+
+const emitCancellationResolvedWithIo = (io, ride, cancellationRequest) => {
+  if (!io || !cancellationRequest) return;
+  let emitter = io
+    .to(rideRoom(cancellationRequest.ride_id.toString()))
+    .to(userRoom(cancellationRequest.requested_by.toString()))
+    .to(userRoom(cancellationRequest.responding_user_id.toString()));
+  emitter.emit('cancellation_resolved', {
+    ...cancellationPayload(cancellationRequest),
+    rideStatus: ride?.status || null,
+  });
+};
+
+const emitCancellationResolved = (req, ride, cancellationRequest) => {
+  emitCancellationResolvedWithIo(getIo(req), ride, cancellationRequest);
+};
+
 module.exports = {
   emitNewRideRequest,
+  emitCancellationRequested,
+  emitCancellationResolved,
+  emitCancellationResolvedWithIo,
   emitRideStatusChanged,
   rideRoom,
   userRoom,

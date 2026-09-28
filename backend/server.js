@@ -4,6 +4,9 @@ const app = require('./src/app');
 const config = require('./src/config/env');
 const connectDatabase = require('./src/config/database');
 const initializeSocketHandler = require('./src/sockets/socketHandler');
+const {
+  startCancellationWorker,
+} = require('./src/workers/cancellationWorker');
 
 // Catch uncaught exceptions (Synchronous code crashes)
 process.on('uncaughtException', (err) => {
@@ -23,6 +26,7 @@ const startServer = async () => {
   });
   app.set('io', io);
   initializeSocketHandler(io, config);
+  startCancellationWorker(io, config.cancellationSweepIntervalMs);
 
   server.listen(config.port, () => {
     console.log(

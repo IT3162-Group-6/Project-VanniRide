@@ -2,7 +2,7 @@ const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const Ride = require('../models/rideModel');
 const Rider = require('../models/riderModel');
-const Cancellation = require('../models/cancellationModel');
+const CancellationRequest = require('../models/cancellationRequestModel');
 const Payment = require('../models/paymentModel');
 const User = require('../models/userModel');
 const {
@@ -23,8 +23,15 @@ const {
 } = require('../utils/authenticatedUser');
 const {
   emitNewRideRequest,
+  emitCancellationRequested,
+  emitCancellationResolved,
   emitRideStatusChanged,
 } = require('../utils/socketEvents');
+const {
+  createImmediateCancellation,
+  createStartedCancellationRequest,
+  respondToCancellationRequest,
+} = require('../services/cancellationService');
 
 const ACTIVE_RIDE_STATUSES = ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'STARTED'];
 
@@ -126,6 +133,26 @@ const serializeRidesForViewer = async (rides, role) => {
         : { customer: participant }
     );
   });
+};
+
+const serializeCancellationRequest = (requestDocument) => {
+  if (!requestDocument) return null;
+  const request = requestDocument.toObject
+    ? requestDocument.toObject()
+    : requestDocument;
+
+  return {
+    id: request._id.toString(),
+    rideId: request.ride_id.toString(),
+    requestedBy: request.requested_by.toString(),
+    respondingUserId: request.responding_user_id.toString(),
+    reason: request.reason,
+    status: request.status,
+    requestedAt: request.requested_at,
+    expiresAt: request.expires_at,
+    respondedAt: request.responded_at || null,
+    resolvedAt: request.resolved_at || null,
+  };
 };
 
 const ensureRideAccess = async (ride, userId, role) => {
@@ -421,6 +448,28 @@ exports.updateRideStatus = catchAsync(async (req, res) => {
   }
 
   if (targetStatus === 'COMPLETED') {
+    const pendingCancellation = await CancellationRequest.exists({
+      ride_id: ride._id,
+      status: 'PENDING',
+    });
+    if (pendingCancellation) {
+      await Ride.updateOne(
+        {
+          _id: ride._id,
+          status: 'COMPLETED',
+          completed_at: transitionedAt,
+        },
+        {
+          $set: { status: 'STARTED' },
+          $unset: { completed_at: '' },
+        }
+      );
+      throw new AppError(
+        'Resolve the pending cancellation request before completing the ride',
+        409
+      );
+    }
+
     let availabilityResult;
     try {
       availabilityResult = await Rider.updateOne(
@@ -488,56 +537,108 @@ exports.cancelRide = catchAsync(async (req, res) => {
     throw new AppError('You are not authorized to cancel this ride', 403);
   }
 
-  if (!CANCELLABLE_RIDE_STATUSES.includes(ride.status)) {
-    throw new AppError(`A ride in ${ride.status} status cannot be cancelled`, 409);
-  }
-
   const reason = String(req.body.reason || '').trim();
   if (!reason) {
     throw new AppError('Cancellation reason is required', 400);
   }
 
-  const previousStatus = ride.status;
-  const cancelledAt = new Date();
-  const cancelledRide = await Ride.findOneAndUpdate(
-    { _id: ride._id, status: previousStatus },
-    { $set: { status: 'CANCELLED', cancelled_at: cancelledAt } },
-    { returnDocument: 'after', runValidators: true }
-  );
-
-  if (!cancelledRide) {
-    throw new AppError('Ride status changed before it could be cancelled', 409);
-  }
-
-  try {
-    await Cancellation.create({
-      ride_id: ride._id,
-      cancelled_by: userId,
+  if (CANCELLABLE_RIDE_STATUSES.includes(ride.status)) {
+    const result = await createImmediateCancellation({
+      ride,
+      userId,
       reason,
-      previous_status: previousStatus,
-      cancellation_mode: 'IMMEDIATE',
-      cancelled_at: cancelledAt,
     });
-  } catch (error) {
-    await Ride.updateOne(
-      { _id: ride._id, status: 'CANCELLED', cancelled_at: cancelledAt },
-      { $set: { status: previousStatus }, $unset: { cancelled_at: '' } }
-    );
-    throw error;
+    emitRideStatusChanged(req, result.ride);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Ride cancelled successfully',
+      data: {
+        ride: serializeRide(result.ride),
+        cancellationAllowance: result.allowance,
+      },
+    });
   }
 
-  if (ride.rider_id) {
-    await Rider.updateOne(
-      { user_id: ride.rider_id, availability_status: 'BUSY' },
-      { $set: { availability_status: 'AVAILABLE' } }
-    );
+  if (ride.status === 'STARTED') {
+    const respondingUserId = isCustomer ? ride.rider_id : ride.customer_id;
+    const result = await createStartedCancellationRequest({
+      ride,
+      userId,
+      respondingUserId,
+      reason,
+    });
+    emitCancellationRequested(req, ride, result.cancellationRequest);
+
+    return res.status(202).json({
+      success: true,
+      message: 'Cancellation confirmation requested from the other participant',
+      data: {
+        cancellationRequest: serializeCancellationRequest(
+          result.cancellationRequest
+        ),
+        cancellationAllowance: result.allowance,
+      },
+    });
   }
 
-  emitRideStatusChanged(req, cancelledRide);
+  throw new AppError(`A ride in ${ride.status} status cannot be cancelled`, 409);
+});
 
-  res.status(200).json({
+exports.getPendingCancellationRequest = catchAsync(async (req, res) => {
+  const { userId, role } = getAuthenticatedUser(req, ['CUSTOMER', 'RIDER']);
+  validateRideId(req.params.rideId);
+
+  const ride = await Ride.findById(req.params.rideId);
+  if (!ride) throw new AppError('Ride not found', 404);
+  await ensureRideAccess(ride, userId, role);
+
+  const cancellationRequest = await CancellationRequest.findOne({
+    ride_id: ride._id,
+    status: 'PENDING',
+  });
+  if (!cancellationRequest) {
+    throw new AppError('No pending cancellation request was found', 404);
+  }
+
+  return res.status(200).json({
     success: true,
-    message: 'Ride cancelled successfully',
-    data: { ride: serializeRide(cancelledRide) },
+    data: {
+      cancellationRequest: serializeCancellationRequest(cancellationRequest),
+    },
+  });
+});
+
+exports.respondToCancellation = catchAsync(async (req, res) => {
+  const { userId } = getAuthenticatedUser(req, ['CUSTOMER', 'RIDER']);
+  validateRideId(req.params.rideId);
+  const decision = String(req.body.decision || '').toUpperCase();
+  if (!['CANCEL', 'RESUME'].includes(decision)) {
+    throw new AppError('Decision must be CANCEL or RESUME', 400);
+  }
+
+  const result = await respondToCancellationRequest({
+    rideId: req.params.rideId,
+    respondingUserId: userId,
+    decision,
+  });
+  emitCancellationResolved(req, result.ride, result.cancellationRequest);
+  if (result.ride?.status === 'CANCELLED') {
+    emitRideStatusChanged(req, result.ride);
+  }
+
+  return res.status(200).json({
+    success: true,
+    message:
+      result.ride?.status === 'CANCELLED'
+        ? 'Ride cancelled successfully'
+        : 'Ride will resume',
+    data: {
+      ride: result.ride ? serializeRide(result.ride) : null,
+      cancellationRequest: serializeCancellationRequest(
+        result.cancellationRequest
+      ),
+      cancellationAllowance: result.allowance || null,
+    },
   });
 });

@@ -8,6 +8,10 @@ router.use(protect);
 
 router.get('/profile', userController.getProfile);
 router.put('/profile', userController.updateProfile);
+router.get(
+  '/cancellation-allowance',
+  userController.getCancellationAllowance
+);
 
 router.patch(
   '/rider/availability',

@@ -2,6 +2,9 @@ const AppError = require('../utils/appError');
 const User = require('../models/userModel');
 const Rider = require('../models/riderModel');
 const { serializeUser } = require('./authController');
+const {
+  getCancellationAllowance,
+} = require('../services/cancellationService');
 
 const serializeRider = (riderDocument) => {
   if (!riderDocument) return null;
@@ -112,6 +115,18 @@ exports.updateRiderAvailability = async (req, res, next) => {
       success: true,
       message: `Rider availability updated to ${availabilityStatus}`,
       data: { rider: serializeRider(rider) },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.getCancellationAllowance = async (req, res, next) => {
+  try {
+    const allowance = await getCancellationAllowance(req.user._id);
+    return res.status(200).json({
+      success: true,
+      data: { cancellationAllowance: allowance },
     });
   } catch (error) {
     return next(error);

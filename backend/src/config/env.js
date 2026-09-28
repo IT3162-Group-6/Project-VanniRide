@@ -10,4 +10,7 @@ module.exports = {
   routingProfile: process.env.ROUTING_PROFILE || 'driving',
   routingAlternatives: Number(process.env.ROUTING_ALTERNATIVES || 3),
   routingTimeoutMs: Number(process.env.ROUTING_TIMEOUT_MS || 5000),
+  cancellationSweepIntervalMs: Number(
+    process.env.CANCELLATION_SWEEP_INTERVAL_MS || 30000
+  ),
 };
