@@ -402,6 +402,17 @@ cancellation request.
 - `POST /api/rides/:rideId/rating`
 - `GET /api/riders/:riderId/ratings`
 
+### Customer and rider history
+
+- `GET /api/users/history` - participant-scoped ride, payment, cancellation,
+  and rating history with a role-specific summary
+- `GET /api/users/rider/earnings` - rider-only confirmed earnings and pending
+  receipt summary for completed rides
+
+Earnings use the authoritative amount stored on each payment. Only `PAID`
+payments count toward confirmed earnings; `PENDING` completed-ride payments are
+reported separately as pending receipts.
+
 ### Administration
 
 - `GET /api/admin/users`

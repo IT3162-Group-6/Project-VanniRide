@@ -234,6 +234,17 @@ Approving chat access grants both ride participants exactly 24 hours of sending
 access. Administrators can monitor ride history but cannot rewrite ride status
 or historical lifecycle timestamps.
 
+## Customer and rider history endpoints
+
+- `GET /api/users/history` - Returns the authenticated customer or rider's
+  rides with the linked payment, cancellation, rating, and other participant.
+- `GET /api/users/rider/earnings` - Rider-only confirmed cash earnings and
+  pending receipt summary.
+
+History summaries report ride counts, payment counts, paid totals,
+cancellations, and ratings. Rider earnings include only stored `PAID` payment
+amounts for completed rides; the fare is never recalculated for reporting.
+
 ## Local setup
 
 Copy `.env.example` to `.env`, then run:

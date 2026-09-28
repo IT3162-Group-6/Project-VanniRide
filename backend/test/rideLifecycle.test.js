@@ -12,6 +12,7 @@ const paymentController = require('../src/controllers/paymentController');
 const chatController = require('../src/controllers/chatController');
 const ratingController = require('../src/controllers/ratingController');
 const adminController = require('../src/controllers/adminController');
+const historyController = require('../src/controllers/historyController');
 const Ride = require('../src/models/rideModel');
 const Rider = require('../src/models/riderModel');
 const User = require('../src/models/userModel');
@@ -1057,6 +1058,241 @@ test('audits bounded admin management, dispute, approval, and statistics operati
     ]
   );
   assert.ok(audits.every((item) => item.reason.length > 0));
+});
+
+test('returns participant-scoped history summaries and paid rider earnings', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const riderUserId = new mongoose.Types.ObjectId();
+  const otherCustomerId = new mongoose.Types.ObjectId();
+  const otherRiderId = new mongoose.Types.ObjectId();
+  await User.create([
+    {
+      _id: customerId,
+      name: 'History Customer',
+      email: 'phase12-customer@example.com',
+      phone: '0700001201',
+      password_hash: 'test-password-hash',
+      role: 'CUSTOMER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: riderUserId,
+      name: 'History Rider',
+      email: 'phase12-rider@example.com',
+      phone: '0700001202',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: otherCustomerId,
+      name: 'Other Customer',
+      email: 'phase12-other-customer@example.com',
+      phone: '0700001203',
+      password_hash: 'test-password-hash',
+      role: 'CUSTOMER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: otherRiderId,
+      name: 'Other Rider',
+      email: 'phase12-other-rider@example.com',
+      phone: '0700001204',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+  ]);
+  await Rider.create({
+    user_id: riderUserId,
+    availability_status: 'AVAILABLE',
+  });
+
+  const location = {
+    pickup_location: {
+      address: 'Campus',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+    distance_km: 0.75,
+  };
+  const now = new Date();
+  const paidRide = await Ride.create({
+    customer_id: customerId,
+    rider_id: riderUserId,
+    request_type: 'TRANSPORT',
+    ...location,
+    fare_amount: 260,
+    status: 'COMPLETED',
+    accepted_at: now,
+    arrived_at: now,
+    started_at: now,
+    completed_at: now,
+  });
+  const pendingRide = await Ride.create({
+    customer_id: customerId,
+    rider_id: riderUserId,
+    request_type: 'DELIVERY',
+    delivery_category: 'PARCEL',
+    ...location,
+    fare_amount: 280,
+    status: 'COMPLETED',
+    accepted_at: now,
+    arrived_at: now,
+    started_at: now,
+    completed_at: now,
+  });
+  const cancelledRide = await Ride.create({
+    customer_id: customerId,
+    rider_id: riderUserId,
+    request_type: 'DELIVERY',
+    delivery_category: 'FOOD',
+    ...location,
+    fare_amount: 210,
+    status: 'CANCELLED',
+    accepted_at: now,
+    cancelled_at: now,
+  });
+  const unrelatedRide = await Ride.create({
+    customer_id: otherCustomerId,
+    rider_id: otherRiderId,
+    request_type: 'TRANSPORT',
+    ...location,
+    fare_amount: 900,
+    status: 'COMPLETED',
+    accepted_at: now,
+    arrived_at: now,
+    started_at: now,
+    completed_at: now,
+  });
+  await Payment.create([
+    {
+      ride_id: paidRide._id,
+      amount: 300,
+      payment_method: 'CASH',
+      payment_status: 'PAID',
+      confirmed_by: riderUserId,
+      paid_at: now,
+    },
+    {
+      ride_id: pendingRide._id,
+      amount: 280,
+      payment_method: 'CASH',
+      payment_status: 'PENDING',
+    },
+    {
+      ride_id: cancelledRide._id,
+      amount: 210,
+      payment_method: 'CASH',
+      payment_status: 'PENDING',
+    },
+    {
+      ride_id: unrelatedRide._id,
+      amount: 900,
+      payment_method: 'CASH',
+      payment_status: 'PAID',
+      confirmed_by: otherRiderId,
+      paid_at: now,
+    },
+  ]);
+  await Cancellation.create({
+    ride_id: cancelledRide._id,
+    cancelled_by: customerId,
+    reason: 'History fixture cancellation',
+    previous_status: 'ACCEPTED',
+    cancellation_mode: 'IMMEDIATE',
+    cancelled_at: now,
+  });
+  await Rating.create({
+    ride_id: paidRide._id,
+    customer_id: customerId,
+    rider_id: riderUserId,
+    rating: 5,
+    review: 'Excellent ride',
+  });
+
+  const customerHistory = await invokeController(
+    historyController.getMyHistory,
+    makeRequest({
+      user: { id: customerId.toString(), role: 'CUSTOMER' },
+    })
+  );
+  assert.equal(customerHistory.statusCode, 200);
+  assert.equal(customerHistory.body.results, 3);
+  assert.deepEqual(customerHistory.body.data.summary.rides, {
+    total: 3,
+    active: 0,
+    completed: 2,
+    cancelled: 1,
+  });
+  assert.deepEqual(customerHistory.body.data.summary.payments, {
+    paid: 1,
+    pending: 2,
+    totalPaidAmount: 300,
+  });
+  assert.equal(customerHistory.body.data.summary.cancellations.total, 1);
+  assert.equal(customerHistory.body.data.summary.ratings.submitted, 1);
+  assert.ok(
+    customerHistory.body.data.history.every(
+      (item) => item.ride.customerId === customerId.toString()
+    )
+  );
+
+  const riderHistory = await invokeController(
+    historyController.getMyHistory,
+    makeRequest({
+      user: { id: riderUserId.toString(), role: 'RIDER' },
+    })
+  );
+  assert.equal(riderHistory.body.results, 3);
+  assert.deepEqual(riderHistory.body.data.summary.ratings, {
+    received: 1,
+    averageRating: 5,
+  });
+  assert.ok(
+    riderHistory.body.data.history.every(
+      (item) => item.ride.riderId === riderUserId.toString()
+    )
+  );
+
+  const earningsResult = await invokeController(
+    historyController.getRiderEarnings,
+    makeRequest({
+      user: { id: riderUserId.toString(), role: 'RIDER' },
+    })
+  );
+  assert.equal(earningsResult.body.results, 1);
+  assert.deepEqual(earningsResult.body.data.summary, {
+    currency: 'LKR',
+    totalEarnings: 300,
+    paidRideCount: 1,
+    pendingReceiptAmount: 280,
+    pendingReceiptCount: 1,
+  });
+  assert.equal(earningsResult.body.data.earnings[0].amount, 300);
+  assert.equal(
+    earningsResult.body.data.earnings[0].rideId,
+    paidRide._id.toString()
+  );
+
+  await assert.rejects(
+    invokeController(
+      historyController.getRiderEarnings,
+      makeRequest({
+        user: { id: customerId.toString(), role: 'CUSTOMER' },
+      })
+    ),
+    (error) => error.statusCode === 403
+  );
 });
 
 test('authenticates ride sockets and persists room-scoped messages', async () => {
