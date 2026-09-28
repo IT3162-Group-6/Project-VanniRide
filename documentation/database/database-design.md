@@ -951,3 +951,66 @@ Validation currently checks:
 - `cancelled_at` must be a valid date
 
 The validator was tested using an empty cancellation reason (`reason: ""`), and MongoDB correctly rejected the document.
+
+
+## Ratings Collection
+
+The `ratings` collection stores customer ratings and reviews for completed rides.
+
+### Fields
+
+- `_id` - MongoDB ObjectId
+- `ride_id` - References the completed ride in the `rides` collection
+- `customer_id` - References the customer who submitted the rating
+- `rider_id` - References the rider who received the rating
+- `rating` - Numeric rating value from 1 to 5
+- `review` - Optional text review
+- `created_at` - Date and time the rating was submitted
+
+### Rating Flow
+
+After a ride is completed, the customer can provide a rating and optional review for the assigned rider.
+
+A sample rating was tested using the completed test ride.
+
+The customer submitted:
+
+- Rating: `5`
+- Review: `Good service`
+
+### Relationships
+
+`ratings.ride_id` references `rides._id`.
+
+`ratings.customer_id` references `users._id`.
+
+`ratings.rider_id` references `users._id`.
+
+All three relationships were tested successfully using MongoDB `$lookup`.
+
+### Rating Indexes
+
+The following indexes were created:
+
+- Unique index on `{ ride_id: 1 }`
+- Index on `{ rider_id: 1, created_at: -1 }`
+- Index on `{ customer_id: 1 }`
+
+The unique ride index prevents multiple rating records for the same ride.
+
+The rider and timestamp index supports retrieving a rider's ratings and reviews over time.
+
+### Rating Validation
+
+MongoDB JSON Schema validation was added to the `ratings` collection.
+
+Validation currently checks:
+
+- `ride_id` must be a valid ObjectId
+- `customer_id` must be a valid ObjectId
+- `rider_id` must be a valid ObjectId
+- `rating` must be between 1 and 5
+- `review` must be a string or `null`
+- `created_at` must be a valid date
+
+The validator was tested using an invalid rating value (`rating: 6`), and MongoDB correctly rejected the document.
