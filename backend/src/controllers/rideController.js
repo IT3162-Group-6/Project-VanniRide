@@ -4,6 +4,7 @@ const Ride = require('../models/rideModel');
 const Rider = require('../models/riderModel');
 const Cancellation = require('../models/cancellationModel');
 const Payment = require('../models/paymentModel');
+const User = require('../models/userModel');
 const {
   CANCELLABLE_RIDE_STATUSES,
   DELIVERY_CATEGORIES,
@@ -22,6 +23,8 @@ const {
   emitNewRideRequest,
   emitRideStatusChanged,
 } = require('../utils/socketEvents');
+
+const ACTIVE_RIDE_STATUSES = ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'STARTED'];
 
 const validateRideId = (rideId) => {
   validateObjectId(rideId, 'ride ID');
@@ -44,6 +47,17 @@ const normalizeLocation = (location, label) => {
     throw new AppError(`${label} coordinates must be valid numbers`, 400);
   }
 
+  if (latitude < -90 || latitude > 90) {
+    throw new AppError(`${label} latitude must be between -90 and 90`, 400);
+  }
+
+  if (longitude < -180 || longitude > 180) {
+    throw new AppError(
+      `${label} longitude must be between -180 and 180`,
+      400
+    );
+  }
+
   return { address, latitude, longitude };
 };
 
@@ -53,7 +67,16 @@ const serializeLocation = (location) => ({
   longitude: location.longitude,
 });
 
-const serializeRide = (rideDocument) => {
+const serializeUserSummary = (user) =>
+  user
+    ? {
+        id: user._id.toString(),
+        name: user.name,
+        phone: user.phone,
+      }
+    : null;
+
+const serializeRide = (rideDocument, participants = {}) => {
   const ride = rideDocument.toObject ? rideDocument.toObject() : rideDocument;
 
   return {
@@ -73,7 +96,34 @@ const serializeRide = (rideDocument) => {
     startedAt: ride.started_at || null,
     completedAt: ride.completed_at || null,
     cancelledAt: ride.cancelled_at || null,
+    assignedRider: serializeUserSummary(participants.assignedRider),
+    customer: serializeUserSummary(participants.customer),
   };
+};
+
+const serializeRidesForViewer = async (rides, role) => {
+  const participantField = role === 'CUSTOMER' ? 'rider_id' : 'customer_id';
+  const ids = [
+    ...new Set(
+      rides
+        .map((ride) => ride[participantField]?.toString())
+        .filter(Boolean)
+    ),
+  ];
+  const users = ids.length
+    ? await User.find({ _id: { $in: ids } }).select('name phone').lean()
+    : [];
+  const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+
+  return rides.map((ride) => {
+    const participant = usersById.get(ride[participantField]?.toString());
+    return serializeRide(
+      ride,
+      role === 'CUSTOMER'
+        ? { assignedRider: participant }
+        : { customer: participant }
+    );
+  });
 };
 
 const ensureRideAccess = async (ride, userId, role) => {
@@ -118,28 +168,62 @@ exports.requestRide = catchAsync(async (req, res) => {
     );
   }
 
+  if (rideType === 'DELIVERY' && !deliveryCategory) {
+    throw new AppError('Delivery category is required for delivery requests', 400);
+  }
+
+  if (rideType === 'TRANSPORT' && deliveryCategory) {
+    throw new AppError('Transport requests cannot have a delivery category', 400);
+  }
+
+  const activeRideExists = await Ride.exists({
+    customer_id: userId,
+    request_type: rideType,
+    status: { $in: ACTIVE_RIDE_STATUSES },
+  });
+  if (activeRideExists) {
+    throw new AppError(
+      `You already have an active ${rideType.toLowerCase()} request`,
+      409
+    );
+  }
+
   const pickupLocation = normalizeLocation(req.body.pickupLocation, 'Pickup');
   const destination = normalizeLocation(req.body.destination, 'Destination');
   const distanceKm = calculateDistanceKm(pickupLocation, destination);
   const estimatedFare = calculateFare(rideType, distanceKm);
 
-  const ride = await Ride.create({
-    customer_id: userId,
-    rider_id: null,
-    request_type: rideType,
-    delivery_category: rideType === 'DELIVERY' ? deliveryCategory : null,
-    pickup_location: pickupLocation,
-    destination,
-    distance_km: distanceKm,
-    fare_amount: estimatedFare,
-    status: 'REQUESTED',
-  });
+  let ride;
+  try {
+    ride = await Ride.create({
+      customer_id: userId,
+      rider_id: null,
+      request_type: rideType,
+      delivery_category: rideType === 'DELIVERY' ? deliveryCategory : null,
+      pickup_location: pickupLocation,
+      destination,
+      distance_km: distanceKm,
+      fare_amount: estimatedFare,
+      status: 'REQUESTED',
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      throw new AppError(
+        `You already have an active ${rideType.toLowerCase()} request`,
+        409
+      );
+    }
+    throw error;
+  }
 
   try {
     await Payment.create({
       ride_id: ride._id,
+      amount: estimatedFare,
       payment_method: 'CASH',
       payment_status: 'PENDING',
+      confirmed_by: null,
+      paid_at: null,
     });
   } catch (error) {
     await Ride.deleteOne({ _id: ride._id, status: 'REQUESTED' });
@@ -183,11 +267,12 @@ exports.getMyRides = catchAsync(async (req, res) => {
   const filter =
     role === 'CUSTOMER' ? { customer_id: userId } : { rider_id: userId };
   const rides = await Ride.find(filter).sort({ requested_at: -1 }).lean();
+  const serializedRides = await serializeRidesForViewer(rides, role);
 
   res.status(200).json({
     success: true,
     results: rides.length,
-    data: { rides: rides.map(serializeRide) },
+    data: { rides: serializedRides },
   });
 });
 
@@ -202,9 +287,22 @@ exports.getRideById = catchAsync(async (req, res) => {
 
   await ensureRideAccess(ride, userId, role);
 
+  const participant = await User.findById(
+    role === 'CUSTOMER' ? ride.rider_id : ride.customer_id
+  )
+    .select('name phone')
+    .lean();
+
   res.status(200).json({
     success: true,
-    data: { ride: serializeRide(ride) },
+    data: {
+      ride: serializeRide(
+        ride,
+        role === 'CUSTOMER'
+          ? { assignedRider: participant }
+          : { customer: participant }
+      ),
+    },
   });
 });
 
@@ -223,17 +321,26 @@ exports.acceptRide = catchAsync(async (req, res) => {
   }
 
   const acceptedAt = new Date();
-  const ride = await Ride.findOneAndUpdate(
-    { _id: req.params.rideId, status: 'REQUESTED', rider_id: null },
-    {
-      $set: {
-        rider_id: userId,
-        status: 'ACCEPTED',
-        accepted_at: acceptedAt,
+  let ride;
+  try {
+    ride = await Ride.findOneAndUpdate(
+      { _id: req.params.rideId, status: 'REQUESTED', rider_id: null },
+      {
+        $set: {
+          rider_id: userId,
+          status: 'ACCEPTED',
+          accepted_at: acceptedAt,
+        },
       },
-    },
-    { returnDocument: 'after', runValidators: true }
-  );
+      { returnDocument: 'after', runValidators: true }
+    );
+  } catch (error) {
+    await Rider.updateOne(
+      { user_id: userId, availability_status: 'BUSY' },
+      { $set: { availability_status: 'AVAILABLE' } }
+    );
+    throw error;
+  }
 
   if (!ride) {
     await Rider.updateOne(
@@ -245,10 +352,14 @@ exports.acceptRide = catchAsync(async (req, res) => {
 
   emitRideStatusChanged(req, ride);
 
+  const customer = await User.findById(ride.customer_id)
+    .select('name phone')
+    .lean();
+
   res.status(200).json({
     success: true,
     message: 'Ride accepted successfully',
-    data: { ride: serializeRide(ride) },
+    data: { ride: serializeRide(ride, { customer }) },
   });
 });
 
@@ -274,6 +385,7 @@ exports.updateRideStatus = catchAsync(async (req, res) => {
     COMPLETED: 'completed_at',
   };
 
+  const transitionedAt = new Date();
   const ride = await Ride.findOneAndUpdate(
     {
       _id: req.params.rideId,
@@ -283,7 +395,7 @@ exports.updateRideStatus = catchAsync(async (req, res) => {
     {
       $set: {
         status: targetStatus,
-        [timestampFields[targetStatus]]: new Date(),
+        [timestampFields[targetStatus]]: transitionedAt,
       },
     },
     { returnDocument: 'after', runValidators: true }
@@ -304,18 +416,53 @@ exports.updateRideStatus = catchAsync(async (req, res) => {
   }
 
   if (targetStatus === 'COMPLETED') {
-    await Rider.updateOne(
-      { user_id: userId, availability_status: 'BUSY' },
-      { $set: { availability_status: 'AVAILABLE' } }
-    );
+    let availabilityResult;
+    try {
+      availabilityResult = await Rider.updateOne(
+        { user_id: userId },
+        { $set: { availability_status: 'AVAILABLE' } }
+      );
+    } catch (error) {
+      await Ride.updateOne(
+        {
+          _id: ride._id,
+          status: 'COMPLETED',
+          completed_at: transitionedAt,
+        },
+        {
+          $set: { status: 'STARTED' },
+          $unset: { completed_at: '' },
+        }
+      );
+      throw error;
+    }
+
+    if (availabilityResult.matchedCount !== 1) {
+      await Ride.updateOne(
+        {
+          _id: ride._id,
+          status: 'COMPLETED',
+          completed_at: transitionedAt,
+        },
+        {
+          $set: { status: 'STARTED' },
+          $unset: { completed_at: '' },
+        }
+      );
+      throw new AppError('Rider profile not found for ride completion', 409);
+    }
   }
 
   emitRideStatusChanged(req, ride);
 
+  const customer = await User.findById(ride.customer_id)
+    .select('name phone')
+    .lean();
+
   res.status(200).json({
     success: true,
     message: `Ride marked as ${targetStatus}`,
-    data: { ride: serializeRide(ride) },
+    data: { ride: serializeRide(ride, { customer }) },
   });
 });
 
@@ -340,6 +487,11 @@ exports.cancelRide = catchAsync(async (req, res) => {
     throw new AppError(`A ride in ${ride.status} status cannot be cancelled`, 409);
   }
 
+  const reason = String(req.body.reason || '').trim();
+  if (!reason) {
+    throw new AppError('Cancellation reason is required', 400);
+  }
+
   const previousStatus = ride.status;
   const cancelledAt = new Date();
   const cancelledRide = await Ride.findOneAndUpdate(
@@ -356,7 +508,9 @@ exports.cancelRide = catchAsync(async (req, res) => {
     await Cancellation.create({
       ride_id: ride._id,
       cancelled_by: userId,
-      reason: req.body.reason || null,
+      reason,
+      previous_status: previousStatus,
+      cancellation_mode: 'IMMEDIATE',
       cancelled_at: cancelledAt,
     });
   } catch (error) {
