@@ -7,6 +7,7 @@ const rideRoutes = require('./routes/rideRoutes'); // Member B2 routes
 const paymentRoutes = require('./routes/paymentRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 
@@ -33,18 +34,16 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/rides', rideRoutes); // Member B2 ride lifecycle
 app.use('/api/rides', paymentRoutes); // Member B2 cash payment tracking
 app.use('/api/rides', chatRoutes); // Member B2 ride-scoped text chat
+app.use('/api/admin', adminRoutes);
 
 // Handle 404 Routes (Must remain below active routes)
 app.use((req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
-
-
-
-app.use('/api/admin', adminRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

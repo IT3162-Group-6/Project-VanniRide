@@ -1,82 +1,119 @@
 const AppError = require('../utils/appError');
-const users = require('../models/userModel');
+const User = require('../models/userModel');
+const Rider = require('../models/riderModel');
+const { serializeUser } = require('./authController');
+
+const serializeRider = (riderDocument) => {
+  if (!riderDocument) return null;
+  const rider = riderDocument.toObject
+    ? riderDocument.toObject()
+    : riderDocument;
+
+  return {
+    id: rider._id.toString(),
+    userId: rider.user_id.toString(),
+    availabilityStatus: rider.availability_status,
+    createdAt: rider.created_at,
+    updatedAt: rider.updated_at,
+  };
+};
 
 exports.getProfile = async (req, res, next) => {
   try {
-    const user = users.find((u) => u.id === req.user.id);
+    const rider =
+      req.user.role === 'RIDER'
+        ? await Rider.findOne({ user_id: req.user._id })
+        : null;
 
-    if (!user) {
-      return next(new AppError('User profile not found', 404));
+    if (req.user.role === 'RIDER' && !rider) {
+      return next(new AppError('Rider profile not found', 404));
     }
 
-    const { password, ...userProfile } = user;
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      data: { user: userProfile },
+      data: {
+        user: serializeUser(req.user),
+        rider: serializeRider(rider),
+      },
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
 exports.updateProfile = async (req, res, next) => {
   try {
-    const { name, phone } = req.body;
-    const userIndex = users.findIndex((u) => u.id === req.user.id);
-
-    if (userIndex === -1) {
-      return next(new AppError('User not found', 404));
+    const updates = {};
+    if (req.body.name !== undefined) {
+      const name = String(req.body.name).trim();
+      if (!name) return next(new AppError('Name cannot be empty', 400));
+      updates.name = name;
     }
 
-    if (name) users[userIndex].name = name;
-    if (phone) users[userIndex].phone = phone;
+    if (req.body.phone !== undefined) {
+      const phone = String(req.body.phone).trim();
+      if (!phone) return next(new AppError('Phone cannot be empty', 400));
+      updates.phone = phone;
+    }
 
-    const updatedUser = { ...users[userIndex] };
-    delete updatedUser.password;
+    if (Object.keys(updates).length === 0) {
+      return next(new AppError('Provide name or phone to update', 400));
+    }
 
-    res.status(200).json({
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { returnDocument: 'after', runValidators: true }
+    );
+
+    return res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
-      data: { user: updatedUser },
+      data: { user: serializeUser(user) },
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
 exports.updateRiderAvailability = async (req, res, next) => {
   try {
-    const { availabilityStatus } = req.body;
+    const availabilityStatus = String(
+      req.body.availabilityStatus || ''
+    ).toUpperCase();
 
-    if (req.user.role !== 'RIDER') {
+    if (!['AVAILABLE', 'UNAVAILABLE'].includes(availabilityStatus)) {
       return next(
-        new AppError('Only riders can update availability status', 403)
+        new AppError('Availability must be AVAILABLE or UNAVAILABLE', 400)
       );
     }
 
-    const validStatuses = ['AVAILABLE', 'UNAVAILABLE', 'BUSY'];
-    if (!validStatuses.includes(availabilityStatus)) {
-      return next(
-        new AppError(
-          'Invalid status. Allowed values: AVAILABLE, UNAVAILABLE, BUSY',
-          400
-        )
-      );
-    }
-
-    const userIndex = users.findIndex((u) => u.id === req.user.id);
-    users[userIndex].availabilityStatus = availabilityStatus;
-
-    res.status(200).json({
-      success: true,
-      message: `Rider status updated to ${availabilityStatus}`,
-      data: {
-        userId: req.user.id,
-        availabilityStatus,
+    const rider = await Rider.findOneAndUpdate(
+      {
+        user_id: req.user._id,
+        availability_status: { $ne: 'BUSY' },
       },
+      { $set: { availability_status: availabilityStatus } },
+      { returnDocument: 'after', runValidators: true }
+    );
+
+    if (!rider) {
+      const riderExists = await Rider.exists({ user_id: req.user._id });
+      if (!riderExists) {
+        return next(new AppError('Rider profile not found', 404));
+      }
+
+      return next(
+        new AppError('A busy rider cannot manually change availability', 409)
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Rider availability updated to ${availabilityStatus}`,
+      data: { rider: serializeRider(rider) },
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };

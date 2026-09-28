@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const rideController = require('../controllers/rideController');
+const { protect } = require('../middlewares/authMiddleware');
 
-// Member B1's protect/restrictTo middleware will be mounted during integration.
-// Controllers still reject requests that do not contain an authenticated req.user.
-router.post('/request', rideController.requestRide);
+router.use(protect);
+
+router.post('/', rideController.requestRide);
 router.get('/available', rideController.getAvailableRides);
-router.get('/mine', rideController.getMyRides);
+router.get('/', rideController.getMyRides);
 router.get('/:rideId', rideController.getRideById);
 router.patch('/:rideId/accept', rideController.acceptRide);
 router.patch('/:rideId/status', rideController.updateRideStatus);

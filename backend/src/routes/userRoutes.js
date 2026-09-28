@@ -9,7 +9,7 @@ router.use(protect);
 router.get('/profile', userController.getProfile);
 router.put('/profile', userController.updateProfile);
 
-router.put(
+router.patch(
   '/rider/availability',
   restrictTo('RIDER'),
   userController.updateRiderAvailability
