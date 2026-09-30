@@ -1,24 +1,43 @@
-&#x20;  ## Folder ownership
+# Vanni Ride — React Frontend
 
-&#x20;  - /frontend  → Dulani and Pavan
+Student-powered ride & delivery platform for the University of Vavuniya.
+Three roles: **Customer**, **Rider**, **Admin**.
 
-&#x20;  - /backend   → Anuhas and Heshan
+## Run
 
-&#x20;  - /database  → Manindu and Tharukie
+```bash
+npm install
+npm run dev
+```
 
-&#x20;  - /documentation/database → Manindu and Tharukie
+## Demo accounts (password `123456` for all)
 
+| Role     | Email               |
+|----------|---------------------|
+| Customer | customer@vau.ac.lk  |
+| Rider    | rider@vau.ac.lk     |
+| Admin    | admin@vau.ac.lk     |
 
+Demo data lives in `localStorage`. Admin → Profile → "Reset demo data" restores the seed.
 
+## Folder structure
 
-
-&#x20;  ## Workflow
-
-&#x20;  1. Never commit directly to main.
-
-&#x20;  2. Branch name = folder/short-description (e.g. database/ride-schema, frontend/login-page).
-
-&#x20;  3. Commit small, push, open a Pull Request into main.
-
-&#x20;  4. Get at least 1 approval from your pair before merging.
-
+```
+src/
+├── components/
+│   ├── Navbar.jsx           # public header + in-app topbar (variant prop)
+│   ├── Sidebar.jsx          # role-based side navigation
+│   ├── BottomNav.jsx        # role-based mobile tab bar
+│   ├── RideCard.jsx         # one ride/delivery row
+│   ├── StatusBadge.jsx      # coloured status pill
+│   ├── ChatBox.jsx          # reusable conversation panel
+│   ├── PaymentCard.jsx      # saved payment method row
+│   ├── UserTable.jsx        # admin user table
+│   ├── ProtectedRoute.jsx   # auth + role guard
+│   ├── AppLayout.jsx        # sidebar + topbar shell for logged-in users
+│   ├── MarketingLayout.jsx  # public pages shell
+│   ├── Icon.jsx / MapArt.jsx / HeroArt.jsx / Toast.jsx / InstallPrompt.jsx
+│
+├── pages/
+│   ├── Home.jsx  Login.jsx  Register.jsx
+│   ├── customer/
