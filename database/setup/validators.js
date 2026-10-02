@@ -40,10 +40,43 @@ db.runCommand({
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["user_id", "availability_status", "created_at", "updated_at"],
+      required: [
+        "user_id",
+        "availability_status",
+        "vehicle",
+        "approval_status",
+        "review_reason",
+        "reviewed_by",
+        "reviewed_at",
+        "created_at",
+        "updated_at"
+      ],
       properties: {
         user_id: { bsonType: "objectId" },
         availability_status: { enum: ["AVAILABLE", "UNAVAILABLE", "BUSY"] },
+        vehicle: {
+          bsonType: "object",
+          required: ["type", "model", "registration_number", "color"],
+          properties: {
+            type: { bsonType: "string", minLength: 1, maxLength: 50 },
+            model: { bsonType: "string", minLength: 1, maxLength: 100 },
+            registration_number: {
+              bsonType: "string",
+              minLength: 1,
+              maxLength: 30,
+              pattern: "^[A-Z0-9 -]+$"
+            },
+            color: { bsonType: "string", minLength: 1, maxLength: 50 }
+          }
+        },
+        approval_status: { enum: ["PENDING", "APPROVED", "REJECTED"] },
+        review_reason: {
+          bsonType: ["string", "null"],
+          minLength: 1,
+          maxLength: 500
+        },
+        reviewed_by: { bsonType: ["objectId", "null"] },
+        reviewed_at: { bsonType: ["date", "null"] },
         created_at: { bsonType: "date" },
         updated_at: { bsonType: "date" }
       }
@@ -195,8 +228,12 @@ db.runCommand({
         ride_id: { bsonType: "objectId" },
         cancelled_by: { bsonType: "objectId" },
         reason: { bsonType: "string", minLength: 1, maxLength: 500 },
-        previous_status: { enum: ["REQUESTED", "ACCEPTED", "STARTED"] },
-        cancellation_mode: { enum: ["IMMEDIATE", "MUTUAL", "AUTO_TIMEOUT"] },
+        previous_status: {
+          enum: ["REQUESTED", "ACCEPTED", "ARRIVED", "STARTED"]
+        },
+        cancellation_mode: {
+          enum: ["IMMEDIATE", "MUTUAL", "AUTO_TIMEOUT", "ADMIN_FORCE"]
+        },
         cancelled_at: { bsonType: "date" }
       }
     }
@@ -314,11 +351,14 @@ db.runCommand({
           enum: [
             "USER_STATUS_CHANGED",
             "PAYMENT_CORRECTED",
-            "CHAT_ACCESS_REVIEWED"
+            "CHAT_ACCESS_REVIEWED",
+            "RIDER_APPROVAL_REVIEWED",
+            "RIDE_MESSAGES_VIEWED",
+            "RIDE_FORCE_CANCELLED"
           ]
         },
         target_type: {
-          enum: ["USER", "PAYMENT", "CHAT_ACCESS_REQUEST"]
+          enum: ["USER", "PAYMENT", "CHAT_ACCESS_REQUEST", "RIDER", "RIDE"]
         },
         target_id: { bsonType: "objectId" },
         reason: { bsonType: "string", minLength: 1, maxLength: 500 },

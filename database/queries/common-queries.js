@@ -32,12 +32,23 @@ print("\n--- Available Riders ---");
 
 printResults(
   db.riders.find({
-    availability_status: "AVAILABLE"
+    availability_status: "AVAILABLE",
+    approval_status: "APPROVED"
   })
 );
 
 
-// 2. REQUESTED RIDES
+// 2. RIDERS AWAITING ADMIN APPROVAL
+print("\n--- Pending Rider Approvals ---");
+
+printResults(
+  db.riders.find({
+    approval_status: "PENDING"
+  })
+);
+
+
+// 3. REQUESTED RIDES
 print("\n--- Requested Rides ---");
 
 printResults(
@@ -47,7 +58,7 @@ printResults(
 );
 
 
-// 3. ACTIVE RIDES FOR SAMPLE CUSTOMER
+// 4. ACTIVE RIDES FOR SAMPLE CUSTOMER
 print("\n--- Active Customer Rides ---");
 
 if (sampleCustomerId) {
@@ -64,7 +75,7 @@ if (sampleCustomerId) {
 }
 
 
-// 4. RIDES ASSIGNED TO SAMPLE RIDER
+// 5. RIDES ASSIGNED TO SAMPLE RIDER
 print("\n--- Rider Assigned Rides ---");
 
 if (sampleRiderId) {
@@ -78,7 +89,7 @@ if (sampleRiderId) {
 }
 
 
-// 5. COMPLETED RIDES
+// 6. COMPLETED RIDES
 print("\n--- Completed Rides ---");
 
 printResults(
@@ -88,7 +99,7 @@ printResults(
 );
 
 
-// 6. PENDING PAYMENTS
+// 7. PENDING PAYMENTS
 print("\n--- Pending Payments ---");
 
 printResults(
@@ -119,7 +130,7 @@ if (sampleCustomerId) {
 }
 
 
-// 7. MESSAGES FOR SAMPLE RIDE
+// 8. MESSAGES FOR SAMPLE RIDE
 print("\n--- Ride Messages ---");
 
 if (sampleRide) {
@@ -137,7 +148,7 @@ if (sampleRide) {
 }
 
 
-// 8. CANCELLATION COUNT DURING THE ROLLING 60-MINUTE WINDOW
+// 9. CANCELLATION COUNT DURING THE ROLLING 60-MINUTE WINDOW
 print("\n--- Rolling 60-Minute Cancellation Count ---");
 
 if (sampleCustomerId) {
@@ -156,7 +167,7 @@ if (sampleCustomerId) {
 }
 
 
-// 9. RATINGS FOR SAMPLE RIDER
+// 10. RATINGS FOR SAMPLE RIDER
 print("\n--- Rider Ratings ---");
 
 if (sampleRiderId) {
@@ -174,7 +185,7 @@ if (sampleRiderId) {
 }
 
 
-// 10. RIDES WITH CUSTOMER DETAILS
+// 11. RIDES WITH CUSTOMER DETAILS
 print("\n--- Rides With Customer Details ---");
 
 printResults(
@@ -191,7 +202,7 @@ printResults(
 );
 
 
-// 11. RIDES WITH RIDER DETAILS
+// 12. RIDES WITH RIDER DETAILS
 print("\n--- Rides With Rider Details ---");
 
 printResults(

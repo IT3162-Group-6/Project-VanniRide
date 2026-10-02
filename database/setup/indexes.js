@@ -4,6 +4,16 @@ db.users.createIndex({ email: 1 }, { unique: true });
 
 db.riders.createIndex({ user_id: 1 }, { unique: true });
 db.riders.createIndex({ availability_status: 1 });
+db.riders.createIndex({ approval_status: 1 });
+db.riders.createIndex(
+  { "vehicle.registration_number": 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      "vehicle.registration_number": { $type: "string" }
+    }
+  }
+);
 
 db.rides.createIndex({ customer_id: 1, status: 1 });
 db.rides.createIndex(

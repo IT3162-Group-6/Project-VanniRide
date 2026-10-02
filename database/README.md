@@ -29,6 +29,7 @@ The database currently contains the following collections:
 database/
 ├── setup/
 │   ├── create-collections.js
+│   ├── migrate-rider-approval.js
 │   ├── validators.js
 │   └── indexes.js
 │
@@ -61,7 +62,17 @@ mongosh database\setup\create-collections.js
 
 This creates the required MongoDB collections if they do not already exist.
 
-### 2. Apply Validation Rules
+### 2. Migrate Existing Rider Profiles
+
+```bat
+mongosh database\setup\migrate-rider-approval.js
+```
+
+This safely changes legacy rider profiles to `PENDING` and `UNAVAILABLE` before
+the stricter validation rules are applied. Legacy riders must submit their
+vehicle information before an administrator can approve them.
+
+### 3. Apply Validation Rules
 
 ```bat
 mongosh database\setup\validators.js
@@ -73,13 +84,15 @@ Validation is used to prevent invalid values such as:
 
 - invalid user roles
 - invalid rider availability values
+- incomplete vehicle information
+- invalid rider approval values
 - invalid ride statuses
 - invalid payment values
 - empty messages
 - empty cancellation reasons
 - ratings outside the range 1 to 5
 
-### 3. Create Indexes
+### 4. Create Indexes
 
 ```bat
 mongosh database\setup\indexes.js
@@ -91,6 +104,8 @@ Indexes are used to:
 
 - prevent duplicate user emails
 - prevent duplicate rider profiles
+- prevent duplicate vehicle registration numbers
+- support rider approval queues
 - improve ride queries
 - support payment lookup
 - retrieve messages efficiently
@@ -99,7 +114,7 @@ Indexes are used to:
 - resolve pending mutual cancellations after their deadline
 - review and expire post-completion chat access
 
-### 4. Insert Sample Data
+### 5. Insert Sample Data
 
 ```bat
 mongosh database\sample-data\seed-data.js
@@ -109,7 +124,7 @@ This inserts sample users, rider data, ride data, payment data, messages, and a 
 
 The script checks for existing sample data before inserting new records.
 
-### 5. Run Common Queries
+### 6. Run Common Queries
 
 ```bat
 mongosh database\queries\common-queries.js
@@ -118,6 +133,7 @@ mongosh database\queries\common-queries.js
 This runs example MongoDB queries for:
 
 - available riders
+- riders awaiting approval
 - requested rides
 - active customer rides
 - rider-assigned rides
@@ -142,6 +158,15 @@ This runs example MongoDB queries for:
 - `AVAILABLE`
 - `UNAVAILABLE`
 - `BUSY`
+
+### Rider Approval
+
+- `PENDING`
+- `APPROVED`
+- `REJECTED`
+
+Every new rider supplies a vehicle type, model, registration number, and colour.
+Only an approved rider can become available or accept a request.
 
 ### Ride Request Types
 
@@ -189,6 +214,7 @@ Ratings must be between:
 - One ride currently has one rating record.
 - A user may initiate at most 5 final cancellations in a rolling 60-minute period across transport and delivery requests.
 - Resumed cancellation requests do not consume the allowance.
+- Administrator force-cancellation does not consume a participant's allowance.
 - Sample passwords are only test values and are not intended for production use.
 
 ## Database Documentation
@@ -196,4 +222,8 @@ Ratings must be between:
 Detailed information about the database design, fields, relationships, validation rules, indexes, and tested flows is available in:
 
 `documentation/database/database-design.md`
+
+The approved integration schema additions are documented in:
+
+`documentation/database/integration-schema-update.md`
 

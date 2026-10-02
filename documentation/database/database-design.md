@@ -1,5 +1,10 @@
 # Vanni Ride - Database Design
 
+> Integration update: rider vehicle/approval fields, admin-force cancellation,
+> and expanded admin auditing are defined in
+> `integration-schema-update.md`. That update and the canonical integration
+> contract take precedence where this original design summary differs.
+
 ## 1. Database Overview
 
 Vanni Ride is a transportation and delivery coordination platform for the University of Vavuniya community.

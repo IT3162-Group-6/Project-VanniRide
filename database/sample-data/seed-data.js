@@ -20,6 +20,21 @@ if (db.users.findOne({ email: "customer@test.com" })) {
 
   const customerId = customerResult.insertedId;
 
+  // ADMIN USER
+  const adminResult = db.users.insertOne({
+    name: "Test Admin",
+    email: "admin@test.com",
+    phone: "0700000000",
+    password_hash: "TEMP_PASSWORD",
+    role: "ADMIN",
+    account_status: "ACTIVE",
+    token_version: 0,
+    created_at: new Date(),
+    updated_at: new Date()
+  });
+
+  const adminId = adminResult.insertedId;
+
   // RIDER USER
   const riderUserResult = db.users.insertOne({
     name: "Test Rider",
@@ -39,6 +54,16 @@ if (db.users.findOne({ email: "customer@test.com" })) {
   db.riders.insertOne({
     user_id: riderUserId,
     availability_status: "AVAILABLE",
+    vehicle: {
+      type: "Motorcycle",
+      model: "Honda Dio",
+      registration_number: "NP-TEST-1001",
+      color: "Black"
+    },
+    approval_status: "APPROVED",
+    review_reason: "Approved sample rider",
+    reviewed_by: adminId,
+    reviewed_at: new Date(),
     created_at: new Date(),
     updated_at: new Date()
   });
