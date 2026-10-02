@@ -5,27 +5,42 @@ import RideCard from '../../components/RideCard';
 import RiderArt from '../../components/RiderArt';
 import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppState';
-import { ridesApi } from '../../services/api';
+import { riderApi, ridesApi } from '../../services/api';
 
 export default function RiderDashboard() {
-  const { user, updateUser } = useAuth();
+  const { user, setRiderAvailability } = useAuth();
   const { showToast } = useAppState();
   const navigate = useNavigate();
   const [available, setAvailable] = useState([]);
   const [mine, setMine] = useState([]);
   const [active, setActive] = useState(null);
+  const [earnings, setEarnings] = useState(null);
+  const [error, setError] = useState('');
+  const approved = user.riderProfile?.approvalStatus === 'approved';
 
   useEffect(() => {
-    ridesApi.list({ available: true }).then(setAvailable);
-    ridesApi.list({ riderId: user.id }).then(setMine);
-    ridesApi.active({ riderId: user.id }).then(setActive);
-  }, [user.id]);
+    Promise.all([
+      approved && user.online ? ridesApi.list({ available: true }) : Promise.resolve([]),
+      ridesApi.history(),
+      riderApi.earnings(),
+    ]).then(([openRides, history, earningsResult]) => {
+      setAvailable(openRides);
+      setMine(history.rides);
+      setActive(history.rides.find((ride) => ['accepted', 'ontheway', 'picked'].includes(ride.status)) || null);
+      setEarnings(earningsResult.summary);
+    }).catch((requestError) => setError(requestError.message));
+  }, [approved, user.id, user.online]);
 
   const completed = mine.filter((r) => r.status === 'completed');
 
   async function toggleOnline() {
     const next = !user.online;
-    await updateUser({ online: next });
+    try {
+      await setRiderAvailability(next);
+    } catch (requestError) {
+      setError(requestError.message);
+      return;
+    }
     showToast(next ? "You're online — requests will appear" : "You're offline");
   }
 
@@ -35,7 +50,7 @@ export default function RiderDashboard() {
         <div>
           <h2>Hi {user.name.split(' ')[0]}!</h2>
           <p>{user.online ? 'You are online and receiving requests.' : 'You are offline right now.'}</p>
-          <button className={`btn ${user.online ? 'btn-outline' : 'btn-primary'} btn-sm`} style={{ marginTop: 12 }} onClick={toggleOnline}>
+          <button disabled={!approved} className={`btn ${user.online ? 'btn-outline' : 'btn-primary'} btn-sm`} style={{ marginTop: 12 }} onClick={toggleOnline}>
             {user.online ? 'Go offline' : 'Go online'}
           </button>
         </div>
@@ -45,10 +60,13 @@ export default function RiderDashboard() {
         </div>
       </div>
 
+      {!approved && <div className="alert alert-error">Rider approval is {user.riderProfile?.approvalStatus || 'pending'}. You can update your vehicle profile while waiting.</div>}
+      {error && <div className="alert alert-error">{error}</div>}
+
       <div className="stat-grid">
-        <div className="stat-card"><span>Earnings</span><b>LKR {Number(user.earnings || 0).toLocaleString()}</b></div>
+        <div className="stat-card"><span>Confirmed earnings</span><b>LKR {Number(earnings?.totalEarnings || 0).toLocaleString()}</b></div>
         <div className="stat-card"><span>Completed rides</span><b>{completed.length}</b></div>
-        <div className="stat-card"><span>Rating</span><b>{user.rating || 5}★</b></div>
+        <div className="stat-card"><span>Rating</span><b>{mine.length ? 'See history' : '—'}</b></div>
         <div className="stat-card"><span>Open requests</span><b>{available.length}</b></div>
       </div>
 

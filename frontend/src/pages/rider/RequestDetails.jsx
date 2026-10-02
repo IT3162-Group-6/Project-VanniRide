@@ -3,13 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import MapArt from '../../components/MapArt';
 import StatusBadge from '../../components/StatusBadge';
-import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppState';
-import { ridesApi, estimateFare } from '../../services/api';
+import { ridesApi } from '../../services/api';
 
 export default function RequestDetails() {
   const { id } = useParams();
-  const { user } = useAuth();
   const { showToast } = useAppState();
   const navigate = useNavigate();
   const [ride, setRide] = useState(null);
@@ -23,7 +21,7 @@ export default function RequestDetails() {
   async function accept() {
     setBusy(true);
     try {
-      await ridesApi.accept(ride.id, user.id);
+      await ridesApi.accept(ride.id);
       showToast('Request accepted — head to the pickup point');
       navigate('/rider/active');
     } catch (e) {
@@ -36,13 +34,11 @@ export default function RequestDetails() {
   if (error) return <div className="alert alert-error">{error}</div>;
   if (!ride) return <p className="muted">Loading…</p>;
 
-  const breakdown = estimateFare(ride.distanceKm);
-
   return (
     <div className="request-layout">
       <div className="card">
         <div className="card-head">
-          <h3>{ride.code}</h3>
+          <h3>Request #{ride.id.slice(-6)}</h3>
           <StatusBadge status={ride.status} />
         </div>
 
@@ -56,16 +52,12 @@ export default function RequestDetails() {
           <div><span>Type</span><b style={{ textTransform: 'capitalize' }}>{ride.type}</b></div>
           <div><span>Customer</span><b>{ride.customer?.name}</b></div>
           <div><span>Distance</span><b>{ride.distanceKm} km</b></div>
-          <div><span>Estimated time</span><b>{ride.etaMin} mins</b></div>
-          <div><span>Payment</span><b style={{ textTransform: 'capitalize' }}>{ride.payment}</b></div>
-          {ride.note && <div><span>Note</span><b>{ride.note}</b></div>}
+          <div><span>Category</span><b>{ride.deliveryCategory || 'Transport'}</b></div>
+          <div><span>Payment</span><b>Cash</b></div>
         </div>
 
         <label className="field-label" style={{ marginTop: 18 }}>Fare</label>
-        <div className="fare-row"><span>Base</span><span>LKR {breakdown.base.toFixed(2)}</span></div>
-        <div className="fare-row"><span>Distance</span><span>LKR {breakdown.distanceCost.toFixed(2)}</span></div>
-        <div className="fare-row"><span>Demand</span><span>LKR {breakdown.demand.toFixed(2)}</span></div>
-        <div className="fare-total"><span>You earn</span><span>LKR {ride.fare.toFixed(2)}</span></div>
+        <div className="fare-total"><span>Cash fare</span><span>LKR {Number(ride.fare).toFixed(2)}</span></div>
 
         <div style={{ display: 'flex', gap: 12, marginTop: 18 }}>
           <button className="btn btn-ghost" onClick={() => navigate('/rider/requests')}><Icon name="back" /> Back</button>

@@ -45,3 +45,14 @@ immediately. Once a trip has started, the page displays the pending 15-minute
 mutual confirmation, lets the responding participant cancel or resume, and
 shows the remaining allowance. The arrived state follows the backend rule and
 does not offer cancellation.
+
+## Rider workflow
+
+Rider screens use the real approval and availability profile. Pending or
+rejected riders remain offline and cannot load requests. Approved riders can
+go online, accept an available request, progress it through arrived, started,
+and completed states, handle mutual cancellation, and confirm cash only after
+completion. Vehicle changes return the rider to pending approval.
+
+Rider history and dashboard earnings use confirmed backend cash payments;
+pending cash receipts are shown separately and can be confirmed from history.

@@ -13,9 +13,10 @@ export default function AvailableRequests() {
   const [rides, setRides] = useState([]);
   const [tab, setTab] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    ridesApi.list({ available: true }).then(setRides).finally(() => setLoading(false));
+    ridesApi.list({ available: true }).then(setRides).catch((requestError) => setError(requestError.message)).finally(() => setLoading(false));
   }, []);
 
   const shown = tab === 'all' ? rides : rides.filter((r) => r.type === tab);
@@ -23,6 +24,7 @@ export default function AvailableRequests() {
   return (
     <div className="card">
       <div className="card-head"><h3>Available Requests</h3></div>
+      {error && <div className="alert alert-error">{error}</div>}
 
       <div className="tabs">
         {TABS.map((t) => (

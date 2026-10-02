@@ -128,6 +128,7 @@ const normalizeApiRide = (ride) =>
 const normalizeHistoryItem = (item) => ({
   ...normalizeApiRide(item.ride),
   rider: item.participant || null,
+  customer: item.participant || null,
   participant: item.participant || null,
   payment: item.payment
     ? {
@@ -349,6 +350,35 @@ export const authApi = {
   },
 };
 
+export const riderApi = {
+  async setAvailability(available) {
+    const response = await http('/users/rider/availability', {
+      method: 'PATCH',
+      body: { availabilityStatus: available ? 'AVAILABLE' : 'UNAVAILABLE' },
+    });
+    return normalizeRiderProfile(response.data?.riderProfile);
+  },
+
+  async updateVehicle(vehicle) {
+    const response = await http('/users/rider/profile', {
+      method: 'PUT',
+      body: { vehicle },
+    });
+    return {
+      riderProfile: normalizeRiderProfile(response.data?.riderProfile),
+      reapprovalTriggered: Boolean(response.data?.reapprovalTriggered),
+    };
+  },
+
+  async earnings() {
+    const response = await http('/users/rider/earnings');
+    return {
+      summary: response.data?.summary || null,
+      earnings: response.data?.earnings || [],
+    };
+  },
+};
+
 /* ============================================================
    RIDES
    ============================================================ */
@@ -356,6 +386,12 @@ export const ridesApi = {
   async list({ customerId, riderId, status, available } = {}) {
     if (!USE_MOCK_AUTH && customerId) {
       const response = await http('/rides');
+      let rides = (response.data?.rides || []).map(normalizeApiRide);
+      if (status) rides = rides.filter((ride) => ride.status === status);
+      return rides;
+    }
+    if (!USE_MOCK_AUTH && (riderId || available)) {
+      const response = await http(available ? '/rides/available' : '/rides');
       let rides = (response.data?.rides || []).map(normalizeApiRide);
       if (status) rides = rides.filter((ride) => ride.status === status);
       return rides;
@@ -372,6 +408,10 @@ export const ridesApi = {
   },
 
   async get(id) {
+    if (!USE_MOCK_AUTH) {
+      const response = await http(`/rides/${id}`);
+      return normalizeApiRide(response.data?.ride);
+    }
     if (!USE_MOCK_DATA) return http(`/rides/${id}`);
     await delay(150);
     const d = db();
@@ -408,6 +448,10 @@ export const ridesApi = {
   },
 
   async accept(rideId, riderId) {
+    if (!USE_MOCK_AUTH) {
+      const response = await http(`/rides/${rideId}/accept`, { method: 'PATCH' });
+      return normalizeApiRide(response.data?.ride);
+    }
     if (!USE_MOCK_DATA) return http(`/rides/${rideId}/accept`, { method: 'POST', body: { riderId } });
     await delay();
     const d = db();
@@ -421,6 +465,18 @@ export const ridesApi = {
   },
 
   async updateStatus(rideId, status) {
+    if (!USE_MOCK_AUTH) {
+      const backendStatus = {
+        [RIDE_STATUS.ONTHEWAY]: 'ARRIVED',
+        [RIDE_STATUS.PICKED]: 'STARTED',
+        [RIDE_STATUS.COMPLETED]: 'COMPLETED',
+      }[status] || String(status).toUpperCase();
+      const response = await http(`/rides/${rideId}/status`, {
+        method: 'PATCH',
+        body: { status: backendStatus },
+      });
+      return normalizeApiRide(response.data?.ride);
+    }
     if (!USE_MOCK_DATA) return http(`/rides/${rideId}/status`, { method: 'PATCH', body: { status } });
     await delay(180);
     const d = db();
@@ -497,6 +553,14 @@ export const ridesApi = {
           method: String(payment.paymentMethod || '').toLowerCase(),
           status: String(payment.paymentStatus || '').toLowerCase(),
         }
+      : null;
+  },
+
+  async confirmCashPayment(rideId) {
+    const response = await http(`/rides/${rideId}/payment`, { method: 'PATCH' });
+    const payment = response.data?.payment;
+    return payment
+      ? { ...payment, method: 'cash', status: String(payment.paymentStatus).toLowerCase() }
       : null;
   },
 
@@ -602,4 +666,4 @@ export const adminApi = {
   },
 };
 
-export default { authApi, mapApi, ridesApi, chatApi, paymentsApi, adminApi };
+export default { authApi, riderApi, mapApi, ridesApi, chatApi, paymentsApi, adminApi };

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { authApi } from '../services/api';
+import { authApi, riderApi } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -56,6 +56,25 @@ export function AuthProvider({ children }) {
     return refreshed;
   }, []);
 
+  const setRiderAvailability = useCallback(async (available) => {
+    const riderProfile = await riderApi.setAvailability(available);
+    const updated = { ...user, riderProfile, online: riderProfile.availabilityStatus === 'available' };
+    setUser(updated);
+    return updated;
+  }, [user]);
+
+  const updateRiderVehicle = useCallback(async (vehicle) => {
+    const result = await riderApi.updateVehicle(vehicle);
+    const updated = {
+      ...user,
+      riderProfile: result.riderProfile,
+      vehicle: `${result.riderProfile.vehicle.model} · ${result.riderProfile.vehicle.registrationNumber}`,
+      online: false,
+    };
+    setUser(updated);
+    return { ...result, user: updated };
+  }, [user]);
+
   const value = {
     user,
     loading,
@@ -64,6 +83,8 @@ export function AuthProvider({ children }) {
     register,
     logout,
     updateUser,
+    setRiderAvailability,
+    updateRiderVehicle,
     refresh,
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

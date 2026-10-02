@@ -8,7 +8,7 @@ global.localStorage = {
   removeItem: (key) => storage.delete(key),
 };
 
-const { ApiError, authApi, getToken, mapApi, ridesApi } = await import(
+const { ApiError, authApi, getToken, mapApi, riderApi, ridesApi } = await import(
   '../src/services/api.js'
 );
 
@@ -377,4 +377,28 @@ test('loads customer history, cash status, allowance, and mutual cancellation AP
   assert.equal(resumed.ride.status, 'picked');
   assert.deepEqual(JSON.parse(requests[3].options.body), { reason: 'Plans changed' });
   assert.deepEqual(JSON.parse(requests[4].options.body), { decision: 'RESUME' });
+});
+
+test('connects rider availability, requests, lifecycle, earnings, vehicle, and cash confirmation', async () => {
+  localStorage.setItem('vr_token', 'rider-token');
+  const requests = [];
+  global.fetch = async (url, options) => {
+    const request = { url: String(url), options }; requests.push(request);
+    if (request.url.endsWith('/users/rider/availability')) return jsonResponse({success:true,data:{riderProfile:{approvalStatus:'APPROVED',availabilityStatus:'AVAILABLE'}}});
+    if (request.url.endsWith('/users/rider/profile')) return jsonResponse({success:true,data:{riderProfile:{approvalStatus:'PENDING',availabilityStatus:'UNAVAILABLE',vehicle:{model:'Dio',registrationNumber:'NP-9'}},reapprovalTriggered:true}});
+    if (request.url.endsWith('/users/rider/earnings')) return jsonResponse({success:true,data:{summary:{totalEarnings:500,pendingReceiptAmount:200},earnings:[]}});
+    if (request.url.endsWith('/rides/available')) return jsonResponse({success:true,data:{rides:[{id:'r1',rideType:'TRANSPORT',pickupLocation:{address:'A'},destination:{address:'B'},status:'REQUESTED',estimatedFare:200}]}});
+    if (request.url.endsWith('/rides/r1/accept')) return jsonResponse({success:true,data:{ride:{id:'r1',rideType:'TRANSPORT',pickupLocation:{address:'A'},destination:{address:'B'},status:'ACCEPTED',estimatedFare:200}}});
+    if (request.url.endsWith('/rides/r1/status')) return jsonResponse({success:true,data:{ride:{id:'r1',rideType:'TRANSPORT',pickupLocation:{address:'A'},destination:{address:'B'},status:'ARRIVED',estimatedFare:200}}});
+    if (request.url.endsWith('/rides/r1/payment')) return jsonResponse({success:true,data:{payment:{id:'p1',paymentMethod:'CASH',paymentStatus:'PAID',amount:200}}});
+    throw new Error(`Unexpected request ${request.url}`);
+  };
+  assert.equal((await riderApi.setAvailability(true)).availabilityStatus, 'available');
+  assert.equal((await riderApi.updateVehicle({type:'Motorcycle',model:'Dio',registrationNumber:'NP-9',color:'Black'})).reapprovalTriggered, true);
+  assert.equal((await riderApi.earnings()).summary.totalEarnings, 500);
+  assert.equal((await ridesApi.list({available:true}))[0].status, 'pending');
+  assert.equal((await ridesApi.accept('r1')).status, 'accepted');
+  assert.equal((await ridesApi.updateStatus('r1', 'ontheway')).apiStatus, 'ARRIVED');
+  assert.equal((await ridesApi.confirmCashPayment('r1')).status, 'paid');
+  assert.equal(JSON.parse(requests[5].options.body).status, 'ARRIVED');
 });
