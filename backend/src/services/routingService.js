@@ -19,7 +19,7 @@ const normalizeBaseUrl = (value) => {
 const routeCoordinate = (location) =>
   `${Number(location.longitude)},${Number(location.latitude)}`;
 
-const calculateRoadDistanceKm = async (
+const calculateRoadRoute = async (
   pickupLocation,
   destination,
   options = {}
@@ -50,7 +50,7 @@ const calculateRoadDistanceKm = async (
   )}`;
   const url =
     `${baseUrl}/route/v1/${profile}/${coordinates}` +
-    `?alternatives=${alternatives}&steps=false&overview=false`;
+    `?alternatives=${alternatives}&steps=false&overview=full&geometries=geojson`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -75,18 +75,35 @@ const calculateRoadDistanceKm = async (
       );
     }
 
-    const distances = payload.routes
-      .map((route) => Number(route.distance))
-      .filter((distance) => Number.isFinite(distance) && distance >= 0);
-    if (distances.length === 0) {
+    const routes = payload.routes
+      .map((route) => ({ ...route, numericDistance: Number(route.distance) }))
+      .filter(
+        (route) =>
+          Number.isFinite(route.numericDistance) && route.numericDistance >= 0
+      );
+    if (routes.length === 0) {
       throw new AppError(
         'The road-routing service did not return a route distance',
         503
       );
     }
 
-    const shortestReturnedDistanceMetres = Math.min(...distances);
-    return Math.round((shortestReturnedDistanceMetres / 1000) * 100) / 100;
+    const shortestRoute = routes.reduce((shortest, route) =>
+      route.numericDistance < shortest.numericDistance ? route : shortest
+    );
+    const numericDuration = Number(shortestRoute.duration);
+    return {
+      distanceKm:
+        Math.round((shortestRoute.numericDistance / 1000) * 100) / 100,
+      durationMinutes: Number.isFinite(numericDuration)
+        ? Math.max(1, Math.round(numericDuration / 60))
+        : null,
+      routeGeometry:
+        shortestRoute.geometry?.type === 'LineString' &&
+        Array.isArray(shortestRoute.geometry.coordinates)
+          ? shortestRoute.geometry
+          : null,
+    };
   } catch (error) {
     if (error instanceof AppError) throw error;
     if (error.name === 'AbortError') {
@@ -98,4 +115,17 @@ const calculateRoadDistanceKm = async (
   }
 };
 
-module.exports = { calculateRoadDistanceKm };
+const calculateRoadDistanceKm = async (
+  pickupLocation,
+  destination,
+  options = {}
+) => {
+  const route = await calculateRoadRoute(
+    pickupLocation,
+    destination,
+    options
+  );
+  return route.distanceKm;
+};
+
+module.exports = { calculateRoadDistanceKm, calculateRoadRoute };

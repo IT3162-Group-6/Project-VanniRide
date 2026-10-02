@@ -21,5 +21,12 @@ exports.validateRegister = (req, res, next) => {
     return next(new AppError('Role must be CUSTOMER or RIDER', 400));
   }
 
+  if (
+    String(role).toUpperCase() === 'RIDER' &&
+    (!req.body.vehicle || typeof req.body.vehicle !== 'object')
+  ) {
+    return next(new AppError('Vehicle information is required for riders', 400));
+  }
+
   next();
 };

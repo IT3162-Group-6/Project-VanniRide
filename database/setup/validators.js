@@ -263,7 +263,15 @@ db.runCommand({
         requested_by: { bsonType: "objectId" },
         responding_user_id: { bsonType: "objectId" },
         reason: { bsonType: "string", minLength: 1, maxLength: 500 },
-        status: { enum: ["PENDING", "CONFIRMED", "RESUMED", "AUTO_CANCELLED"] },
+        status: {
+          enum: [
+            "PENDING",
+            "CONFIRMED",
+            "RESUMED",
+            "AUTO_CANCELLED",
+            "ADMIN_CANCELLED"
+          ]
+        },
         requested_at: { bsonType: "date" },
         expires_at: { bsonType: "date" },
         responded_at: { bsonType: ["date", "null"] },

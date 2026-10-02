@@ -4,6 +4,10 @@ const env = require('../config/env');
 const AppError = require('../utils/appError');
 const User = require('../models/userModel');
 const Rider = require('../models/riderModel');
+const {
+  normalizeVehicle,
+  serializeRiderProfile,
+} = require('../services/riderService');
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
@@ -40,6 +44,7 @@ const signToken = (user) => {
 
 exports.register = async (req, res, next) => {
   let createdUser;
+  let createdRider = null;
 
   try {
     const { name, phone, password } = req.body;
@@ -67,9 +72,14 @@ exports.register = async (req, res, next) => {
     });
 
     if (role === 'RIDER') {
-      await Rider.create({
+      createdRider = await Rider.create({
         user_id: createdUser._id,
         availability_status: 'UNAVAILABLE',
+        vehicle: normalizeVehicle(req.body.vehicle),
+        approval_status: 'PENDING',
+        review_reason: null,
+        reviewed_by: null,
+        reviewed_at: null,
       });
     }
 
@@ -78,7 +88,10 @@ exports.register = async (req, res, next) => {
     return res.status(201).json({
       success: true,
       token,
-      data: { user: serializeUser(createdUser) },
+      data: {
+        user: serializeUser(createdUser),
+        riderProfile: serializeRiderProfile(createdRider),
+      },
     });
   } catch (error) {
     if (createdUser?._id) {
@@ -86,6 +99,10 @@ exports.register = async (req, res, next) => {
         Rider.deleteOne({ user_id: createdUser._id }),
         User.deleteOne({ _id: createdUser._id }),
       ]);
+    }
+
+    if (error?.code === 11000 && error?.keyPattern?.['vehicle.registration_number']) {
+      return next(new AppError('Vehicle registration number is already registered', 409));
     }
 
     if (error?.code === 11000) {
@@ -123,11 +140,18 @@ exports.login = async (req, res, next) => {
     }
 
     const token = signToken(user);
+    const riderProfile =
+      user.role === 'RIDER'
+        ? await Rider.findOne({ user_id: user._id })
+        : null;
 
     return res.status(200).json({
       success: true,
       token,
-      data: { user: serializeUser(user) },
+      data: {
+        user: serializeUser(user),
+        riderProfile: serializeRiderProfile(riderProfile),
+      },
     });
   } catch (error) {
     return next(error);

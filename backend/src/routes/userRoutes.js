@@ -21,6 +21,12 @@ router.patch(
   userController.updateRiderAvailability
 );
 
+router.put(
+  '/rider/profile',
+  restrictTo('RIDER'),
+  userController.updateRiderProfile
+);
+
 router.get(
   '/rider/earnings',
   restrictTo('RIDER'),

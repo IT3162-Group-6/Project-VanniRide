@@ -348,6 +348,7 @@ Rules:
 - force-cancellation bypasses participant mutual confirmation;
 - any pending mutual cancellation request is resolved without consuming the
   initiating participant's allowance;
+- a pending mutual request is retained with status `ADMIN_CANCELLED`;
 - the ride becomes `CANCELLED` and retains its full history;
 - an assigned `BUSY` rider returns to `AVAILABLE` only if still approved and
   active; otherwise the rider becomes `UNAVAILABLE`;

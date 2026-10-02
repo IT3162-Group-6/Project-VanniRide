@@ -18,6 +18,9 @@ const {
   calculateRoadDistanceKm,
 } = require('../services/routingService');
 const {
+  releaseRiderAfterRide,
+} = require('../services/riderService');
+const {
   getAuthenticatedUser,
   validateObjectId,
 } = require('../utils/authenticatedUser');
@@ -169,6 +172,7 @@ const ensureRideAccess = async (ride, userId, role) => {
       const availableRider = await Rider.exists({
         user_id: userId,
         availability_status: 'AVAILABLE',
+        approval_status: 'APPROVED',
       });
       if (availableRider) {
         return;
@@ -219,6 +223,12 @@ exports.requestRide = catchAsync(async (req, res) => {
 
   const pickupLocation = normalizeLocation(req.body.pickupLocation, 'Pickup');
   const destination = normalizeLocation(req.body.destination, 'Destination');
+  if (
+    pickupLocation.latitude === destination.latitude &&
+    pickupLocation.longitude === destination.longitude
+  ) {
+    throw new AppError('Pickup and destination must be different', 400);
+  }
   const distanceKm = await calculateRoadDistanceKm(
     pickupLocation,
     destination
@@ -277,6 +287,13 @@ exports.getAvailableRides = catchAsync(async (req, res) => {
 
   if (!rider) {
     throw new AppError('Rider profile not found', 404);
+  }
+
+  if (rider.approval_status !== 'APPROVED') {
+    throw new AppError(
+      `Rider approval is ${rider.approval_status.toLowerCase()}`,
+      403
+    );
   }
 
   if (rider.availability_status !== 'AVAILABLE') {
@@ -343,12 +360,26 @@ exports.acceptRide = catchAsync(async (req, res) => {
   validateRideId(req.params.rideId);
 
   const rider = await Rider.findOneAndUpdate(
-    { user_id: userId, availability_status: 'AVAILABLE' },
+    {
+      user_id: userId,
+      availability_status: 'AVAILABLE',
+      approval_status: 'APPROVED',
+    },
     { $set: { availability_status: 'BUSY' } },
     { returnDocument: 'after' }
   );
 
   if (!rider) {
+    const currentRider = await Rider.findOne({ user_id: userId }).lean();
+    if (!currentRider) {
+      throw new AppError('Rider profile not found', 404);
+    }
+    if (currentRider.approval_status !== 'APPROVED') {
+      throw new AppError(
+        `Rider approval is ${currentRider.approval_status.toLowerCase()}`,
+        403
+      );
+    }
     throw new AppError('Rider must be available to accept a ride', 409);
   }
 
@@ -470,12 +501,8 @@ exports.updateRideStatus = catchAsync(async (req, res) => {
       );
     }
 
-    let availabilityResult;
     try {
-      availabilityResult = await Rider.updateOne(
-        { user_id: userId },
-        { $set: { availability_status: 'AVAILABLE' } }
-      );
+      await releaseRiderAfterRide(userId);
     } catch (error) {
       await Ride.updateOne(
         {
@@ -491,20 +518,6 @@ exports.updateRideStatus = catchAsync(async (req, res) => {
       throw error;
     }
 
-    if (availabilityResult.matchedCount !== 1) {
-      await Ride.updateOne(
-        {
-          _id: ride._id,
-          status: 'COMPLETED',
-          completed_at: transitionedAt,
-        },
-        {
-          $set: { status: 'STARTED' },
-          $unset: { completed_at: '' },
-        }
-      );
-      throw new AppError('Rider profile not found for ride completion', 409);
-    }
   }
 
   emitRideStatusChanged(req, ride);

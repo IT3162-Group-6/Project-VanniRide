@@ -6,17 +6,30 @@ const {
 } = require('../utils/authenticatedUser');
 const AdminAuditLog = require('../models/adminAuditLogModel');
 const Cancellation = require('../models/cancellationModel');
+const CancellationRequest = require('../models/cancellationRequestModel');
 const ChatAccessRequest = require('../models/chatAccessRequestModel');
+const Message = require('../models/messageModel');
 const Payment = require('../models/paymentModel');
 const Rating = require('../models/ratingModel');
 const Ride = require('../models/rideModel');
+const Rider = require('../models/riderModel');
 const User = require('../models/userModel');
 const {
   expireElapsedChatAccess,
   serializeChatAccessRequest,
 } = require('../services/chatService');
 const { CHAT_ACCESS_DURATION_MS } = require('../constants/rideConstants');
-const { emitChatAccessUpdated } = require('../utils/socketEvents');
+const {
+  emitCancellationResolved,
+  emitChatAccessUpdated,
+  emitRiderApprovalUpdated,
+  emitRideForceCancelled,
+  emitRideStatusChanged,
+} = require('../utils/socketEvents');
+const {
+  releaseRiderAfterRide,
+  serializeRiderProfile,
+} = require('../services/riderService');
 
 const normalizeReason = (value) => {
   if (typeof value !== 'string') {
@@ -116,12 +129,148 @@ const serializeRating = (ratingDocument) => {
 
 const createAuditLog = (entry) => AdminAuditLog.create(entry);
 
+const serializeAdminMessage = (message, sender) => ({
+  id: message._id.toString(),
+  rideId: message.ride_id.toString(),
+  sender: sender
+    ? {
+        id: sender._id.toString(),
+        name: sender.name,
+        role: sender.role,
+      }
+    : null,
+  messageText: message.message_text,
+  sentAt: message.sent_at,
+});
+
 exports.getAllUsers = catchAsync(async (req, res) => {
   const users = await User.find().sort({ created_at: -1 });
   return res.status(200).json({
     success: true,
     results: users.length,
     data: { users: users.map(serializeUser) },
+  });
+});
+
+exports.getAllRiders = catchAsync(async (req, res) => {
+  const approvalStatus = req.query?.approvalStatus
+    ? String(req.query.approvalStatus).toUpperCase()
+    : null;
+  if (
+    approvalStatus &&
+    !['PENDING', 'APPROVED', 'REJECTED'].includes(approvalStatus)
+  ) {
+    throw new AppError(
+      'Approval status must be PENDING, APPROVED, or REJECTED',
+      400
+    );
+  }
+
+  const riders = await Rider.find(
+    approvalStatus ? { approval_status: approvalStatus } : {}
+  )
+    .sort({ created_at: -1 })
+    .lean();
+  const userIds = riders.map((rider) => rider.user_id);
+  const users = await User.find({ _id: { $in: userIds } }).lean();
+  const usersById = new Map(
+    users.map((user) => [user._id.toString(), serializeUser(user)])
+  );
+
+  const results = riders.map((rider) => ({
+    ...serializeRiderProfile(rider),
+    user: usersById.get(rider.user_id.toString()) || null,
+  }));
+  return res.status(200).json({
+    success: true,
+    results: results.length,
+    data: { riders: results },
+  });
+});
+
+exports.reviewRiderApproval = catchAsync(async (req, res) => {
+  const { userId: adminId } = getAuthenticatedUser(req, ['ADMIN']);
+  validateObjectId(req.params.riderUserId, 'rider user ID');
+  const decision = String(req.body.decision || '').toUpperCase();
+  if (!['APPROVE', 'REJECT'].includes(decision)) {
+    throw new AppError('Decision must be APPROVE or REJECT', 400);
+  }
+  const reason = normalizeReason(req.body.reason);
+  const rider = await Rider.findOne({ user_id: req.params.riderUserId }).lean();
+  if (!rider) throw new AppError('Rider profile not found', 404);
+  if (rider.availability_status === 'BUSY') {
+    throw new AppError('A busy rider cannot be reviewed', 409);
+  }
+  const approvalStatus = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+  if (rider.approval_status === approvalStatus) {
+    throw new AppError(`Rider is already ${approvalStatus}`, 409);
+  }
+
+  const reviewedAt = new Date();
+  const updatedRider = await Rider.findOneAndUpdate(
+    {
+      _id: rider._id,
+      approval_status: rider.approval_status,
+      availability_status: { $ne: 'BUSY' },
+    },
+    {
+      $set: {
+        approval_status: approvalStatus,
+        availability_status: 'UNAVAILABLE',
+        review_reason: reason,
+        reviewed_by: adminId,
+        reviewed_at: reviewedAt,
+      },
+    },
+    { returnDocument: 'after', runValidators: true }
+  );
+  if (!updatedRider) {
+    throw new AppError('Rider profile changed before it could be reviewed', 409);
+  }
+
+  try {
+    await createAuditLog({
+      admin_id: adminId,
+      action: 'RIDER_APPROVAL_REVIEWED',
+      target_type: 'RIDER',
+      target_id: rider._id,
+      reason,
+      before: {
+        approval_status: rider.approval_status,
+        availability_status: rider.availability_status,
+        review_reason: rider.review_reason || null,
+        reviewed_by: rider.reviewed_by || null,
+        reviewed_at: rider.reviewed_at || null,
+      },
+      after: {
+        approval_status: updatedRider.approval_status,
+        availability_status: updatedRider.availability_status,
+        review_reason: updatedRider.review_reason,
+        reviewed_by: updatedRider.reviewed_by,
+        reviewed_at: updatedRider.reviewed_at,
+      },
+    });
+  } catch (error) {
+    await Rider.updateOne(
+      { _id: updatedRider._id, approval_status: approvalStatus },
+      {
+        $set: {
+          approval_status: rider.approval_status,
+          availability_status: rider.availability_status,
+          review_reason: rider.review_reason || null,
+          reviewed_by: rider.reviewed_by || null,
+          reviewed_at: rider.reviewed_at || null,
+        },
+      }
+    );
+    throw error;
+  }
+
+  emitRiderApprovalUpdated(req, updatedRider);
+  return res.status(200).json({
+    success: true,
+    message: `Rider ${approvalStatus.toLowerCase()} successfully`,
+    data: { riderProfile: serializeRiderProfile(updatedRider) },
   });
 });
 
@@ -207,6 +356,198 @@ exports.getAllRides = catchAsync(async (req, res) => {
     success: true,
     results: rides.length,
     data: { rides: rides.map(serializeRide) },
+  });
+});
+
+exports.getRideMessages = catchAsync(async (req, res) => {
+  const { userId: adminId } = getAuthenticatedUser(req, ['ADMIN']);
+  validateObjectId(req.params.rideId, 'ride ID');
+  const reason = normalizeReason(req.query?.reason);
+  const rideExists = await Ride.exists({ _id: req.params.rideId });
+  if (!rideExists) throw new AppError('Ride not found', 404);
+
+  const requestedLimit = Number(req.query?.limit || 50);
+  if (!Number.isInteger(requestedLimit) || requestedLimit < 1) {
+    throw new AppError('Message limit must be a positive integer', 400);
+  }
+  const limit = Math.min(requestedLimit, 100);
+  const filter = { ride_id: req.params.rideId };
+  if (req.query?.before) {
+    validateObjectId(req.query.before, 'message cursor');
+    filter._id = { $lt: req.query.before };
+  }
+
+  const descendingMessages = await Message.find(filter)
+    .sort({ sent_at: -1, _id: -1 })
+    .limit(limit)
+    .lean();
+  const messages = [...descendingMessages].reverse();
+  const senderIds = [...new Set(messages.map((item) => item.sender_id.toString()))];
+  const senders = await User.find({ _id: { $in: senderIds } })
+    .select('name role')
+    .lean();
+  const sendersById = new Map(
+    senders.map((sender) => [sender._id.toString(), sender])
+  );
+  const serializedMessages = messages.map((message) =>
+    serializeAdminMessage(message, sendersById.get(message.sender_id.toString()))
+  );
+  const nextCursor =
+    descendingMessages.length === limit
+      ? descendingMessages[descendingMessages.length - 1]._id.toString()
+      : null;
+
+  await createAuditLog({
+    admin_id: adminId,
+    action: 'RIDE_MESSAGES_VIEWED',
+    target_type: 'RIDE',
+    target_id: req.params.rideId,
+    reason,
+    before: {},
+    after: {
+      returned_count: messages.length,
+      requested_limit: limit,
+      before_cursor: req.query?.before || null,
+      next_cursor: nextCursor,
+    },
+  });
+
+  return res.status(200).json({
+    success: true,
+    results: serializedMessages.length,
+    data: { messages: serializedMessages, nextCursor },
+  });
+});
+
+exports.forceCancelRide = catchAsync(async (req, res) => {
+  const { userId: adminId } = getAuthenticatedUser(req, ['ADMIN']);
+  validateObjectId(req.params.rideId, 'ride ID');
+  const reason = normalizeReason(req.body.reason);
+  const activeStatuses = ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'STARTED'];
+  const previousRide = await Ride.findById(req.params.rideId).lean();
+  if (!previousRide) throw new AppError('Ride not found', 404);
+  if (!activeStatuses.includes(previousRide.status)) {
+    throw new AppError(
+      `A ride in ${previousRide.status} status cannot be force-cancelled`,
+      409
+    );
+  }
+
+  const riderBefore = previousRide.rider_id
+    ? await Rider.findOne({ user_id: previousRide.rider_id }).lean()
+    : null;
+  const pendingRequest = await CancellationRequest.findOne({
+    ride_id: previousRide._id,
+    status: 'PENDING',
+  }).lean();
+  const cancelledAt = new Date();
+  const cancelledRide = await Ride.findOneAndUpdate(
+    { _id: previousRide._id, status: previousRide.status },
+    { $set: { status: 'CANCELLED', cancelled_at: cancelledAt } },
+    { returnDocument: 'after', runValidators: true }
+  );
+  if (!cancelledRide) {
+    throw new AppError('Ride status changed before it could be cancelled', 409);
+  }
+
+  let cancellation;
+  let resolvedRequest = null;
+  let riderAvailability = riderBefore?.availability_status || null;
+  try {
+    cancellation = await Cancellation.create({
+      ride_id: previousRide._id,
+      cancelled_by: adminId,
+      reason,
+      previous_status: previousRide.status,
+      cancellation_mode: 'ADMIN_FORCE',
+      cancelled_at: cancelledAt,
+    });
+    if (pendingRequest) {
+      resolvedRequest = await CancellationRequest.findOneAndUpdate(
+        { _id: pendingRequest._id, status: 'PENDING' },
+        {
+          $set: {
+            status: 'ADMIN_CANCELLED',
+            responded_at: null,
+            resolved_at: cancelledAt,
+          },
+        },
+        { returnDocument: 'after', runValidators: true }
+      );
+      if (!resolvedRequest) {
+        throw new AppError(
+          'Cancellation request changed before admin cancellation completed',
+          409
+        );
+      }
+    }
+    if (previousRide.rider_id) {
+      riderAvailability = await releaseRiderAfterRide(previousRide.rider_id);
+    }
+    await createAuditLog({
+      admin_id: adminId,
+      action: 'RIDE_FORCE_CANCELLED',
+      target_type: 'RIDE',
+      target_id: previousRide._id,
+      reason,
+      before: {
+        ride_status: previousRide.status,
+        rider_availability: riderBefore?.availability_status || null,
+        cancellation_request_status: pendingRequest?.status || null,
+      },
+      after: {
+        ride_status: cancelledRide.status,
+        rider_availability: riderAvailability,
+        cancellation_request_status: resolvedRequest?.status || null,
+      },
+    });
+  } catch (error) {
+    await Promise.allSettled([
+      cancellation?._id
+        ? Cancellation.deleteOne({ _id: cancellation._id })
+        : Promise.resolve(),
+      Ride.updateOne(
+        { _id: previousRide._id, status: 'CANCELLED', cancelled_at: cancelledAt },
+        {
+          $set: { status: previousRide.status },
+          $unset: { cancelled_at: '' },
+        }
+      ),
+      pendingRequest
+        ? CancellationRequest.updateOne(
+            { _id: pendingRequest._id, status: 'ADMIN_CANCELLED' },
+            {
+              $set: {
+                status: 'PENDING',
+                responded_at: pendingRequest.responded_at || null,
+                resolved_at: pendingRequest.resolved_at || null,
+              },
+            }
+          )
+        : Promise.resolve(),
+      riderBefore
+        ? Rider.updateOne(
+            { _id: riderBefore._id },
+            { $set: { availability_status: riderBefore.availability_status } }
+          )
+        : Promise.resolve(),
+    ]);
+    throw error;
+  }
+
+  if (resolvedRequest) {
+    emitCancellationResolved(req, cancelledRide, resolvedRequest);
+  }
+  emitRideStatusChanged(req, cancelledRide);
+  emitRideForceCancelled(req, cancelledRide, reason);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Ride force-cancelled successfully',
+    data: {
+      ride: serializeRide(cancelledRide),
+      cancellation: serializeCancellation(cancellation),
+    },
   });
 });
 
@@ -476,7 +817,13 @@ exports.reviewChatAccessRequest = catchAsync(async (req, res) => {
 });
 
 exports.getAdminStatistics = catchAsync(async (req, res) => {
-  const [userStatsRows, rideStatusRows, paymentStatsRows, ratingStatsRows] =
+  const [
+    userStatsRows,
+    rideStatusRows,
+    paymentStatsRows,
+    ratingStatsRows,
+    riderApprovalRows,
+  ] =
     await Promise.all([
       User.aggregate([
         {
@@ -540,6 +887,9 @@ exports.getAdminStatistics = catchAsync(async (req, res) => {
           },
         },
       ]),
+      Rider.aggregate([
+        { $group: { _id: '$approval_status', count: { $sum: 1 } } },
+      ]),
     ]);
 
   const [totalCancellations, pendingChatAccessRequests] = await Promise.all([
@@ -576,6 +926,9 @@ exports.getAdminStatistics = catchAsync(async (req, res) => {
     total: 0,
     averageRating: null,
   };
+  const riderApprovals = Object.fromEntries(
+    riderApprovalRows.map((item) => [item._id, item.count])
+  );
 
   return res.status(200).json({
     success: true,
@@ -611,6 +964,11 @@ exports.getAdminStatistics = catchAsync(async (req, res) => {
               : Math.round(ratingStats.averageRating * 100) / 100,
         },
         chatAccessRequests: { pending: pendingChatAccessRequests },
+        riderApprovals: {
+          pending: riderApprovals.PENDING || 0,
+          approved: riderApprovals.APPROVED || 0,
+          rejected: riderApprovals.REJECTED || 0,
+        },
       },
     },
   });

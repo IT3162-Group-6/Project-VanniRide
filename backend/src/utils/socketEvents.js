@@ -115,6 +115,37 @@ const emitChatAccessUpdated = (req, ride, chatAccessRequest) => {
     .emit('chat_access_updated', chatAccessPayload(chatAccessRequest));
 };
 
+const emitRiderApprovalUpdated = (req, rider) => {
+  const io = getIo(req);
+  if (!io) return;
+  const payload = {
+    riderUserId: rider.user_id.toString(),
+    approvalStatus: rider.approval_status,
+    reviewReason: rider.review_reason || null,
+    reviewedAt: rider.reviewed_at || null,
+    availabilityStatus: rider.availability_status,
+  };
+  io.to(userRoom(rider.user_id.toString()))
+    .to('role_ADMIN')
+    .emit('rider_approval_updated', payload);
+};
+
+const emitRideForceCancelled = (req, ride, reason) => {
+  const io = getIo(req);
+  if (!io) return;
+  let emitter = io
+    .to(rideRoom(ride._id.toString()))
+    .to(userRoom(ride.customer_id.toString()))
+    .to('role_ADMIN');
+  if (ride.rider_id) {
+    emitter = emitter.to(userRoom(ride.rider_id.toString()));
+  }
+  emitter.emit('ride_force_cancelled', {
+    ...statusPayload(ride),
+    reason,
+  });
+};
+
 module.exports = {
   emitChatAccessUpdated,
   emitNewRideRequest,
@@ -123,6 +154,8 @@ module.exports = {
   emitCancellationResolved,
   emitCancellationResolvedWithIo,
   emitRideStatusChanged,
+  emitRiderApprovalUpdated,
+  emitRideForceCancelled,
   rideRoom,
   userRoom,
 };

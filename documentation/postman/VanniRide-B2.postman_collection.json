@@ -11,6 +11,7 @@
     { "key": "adminToken", "value": "" },
     { "key": "rideId", "value": "" },
     { "key": "riderId", "value": "" },
+    { "key": "riderUserId", "value": "" },
     { "key": "userId", "value": "" },
     { "key": "paymentId", "value": "" },
     { "key": "chatAccessRequestId", "value": "" }
@@ -71,7 +72,32 @@
             "url": "{{baseUrl}}/api/users/rider/availability"
           }
         },
+        {
+          "name": "Update Rider Vehicle Profile",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"vehicle\": {\n    \"type\": \"Motorcycle\",\n    \"model\": \"Honda Dio\",\n    \"registrationNumber\": \"NP-7788\",\n    \"color\": \"Black\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/users/rider/profile"
+          }
+        },
         { "name": "Get Rider Earnings", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/users/rider/earnings" } }
+      ]
+    },
+    {
+      "name": "Maps",
+      "item": [
+        { "name": "Search Places", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/maps/search?q=University%20of%20Vavuniya" } },
+        { "name": "Reverse Geocode", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/maps/reverse?latitude=8.7581&longitude=80.4982" } },
+        {
+          "name": "Preview Route and Fare",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"rideType\": \"TRANSPORT\",\n  \"deliveryCategory\": null,\n  \"pickupLocation\": {\n    \"address\": \"University of Vavuniya\",\n    \"latitude\": 8.7581,\n    \"longitude\": 80.4982\n  },\n  \"destination\": {\n    \"address\": \"Vavuniya Town\",\n    \"latitude\": 8.7514,\n    \"longitude\": 80.4971\n  }\n}" },
+            "url": "{{baseUrl}}/api/maps/route-preview"
+          }
+        }
       ]
     },
     {
@@ -179,7 +205,27 @@
             "url": "{{baseUrl}}/api/admin/users/{{userId}}/status"
           }
         },
+        { "name": "List Riders", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/riders" } },
+        {
+          "name": "Review Rider Approval",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"APPROVE\",\n  \"reason\": \"Vehicle details verified\"\n}" },
+            "url": "{{baseUrl}}/api/admin/riders/{{riderUserId}}/approval"
+          }
+        },
         { "name": "List Rides", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/rides" } },
+        { "name": "View Ride Conversation", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/rides/{{rideId}}/messages?reason=Operational%20review&limit=50" } },
+        {
+          "name": "Force-cancel Ride",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Administrative safety cancellation\"\n}" },
+            "url": "{{baseUrl}}/api/admin/rides/{{rideId}}/cancel"
+          }
+        },
         { "name": "List Cancellations", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/cancellations" } },
         { "name": "List Payments", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/payments" } },
         {

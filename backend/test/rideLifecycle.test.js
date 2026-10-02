@@ -14,7 +14,10 @@ const paymentController = require('../src/controllers/paymentController');
 const chatController = require('../src/controllers/chatController');
 const ratingController = require('../src/controllers/ratingController');
 const adminController = require('../src/controllers/adminController');
+const authController = require('../src/controllers/authController');
 const historyController = require('../src/controllers/historyController');
+const mapController = require('../src/controllers/mapController');
+const userController = require('../src/controllers/userController');
 const app = require('../src/app');
 const env = require('../src/config/env');
 const authRoutes = require('../src/routes/authRoutes');
@@ -24,6 +27,7 @@ const paymentRoutes = require('../src/routes/paymentRoutes');
 const chatRoutes = require('../src/routes/chatRoutes');
 const ratingRoutes = require('../src/routes/ratingRoutes');
 const adminRoutes = require('../src/routes/adminRoutes');
+const mapRoutes = require('../src/routes/mapRoutes');
 const Ride = require('../src/models/rideModel');
 const Rider = require('../src/models/riderModel');
 const User = require('../src/models/userModel');
@@ -38,7 +42,13 @@ const initializeSocketHandler = require('../src/sockets/socketHandler');
 const { calculateFare } = require('../src/utils/fareCalculator');
 const {
   calculateRoadDistanceKm,
+  calculateRoadRoute,
 } = require('../src/services/routingService');
+const {
+  clearGeocodingCache,
+  reverseGeocode,
+  searchPlaces,
+} = require('../src/services/geocodingService');
 
 const TEST_DATABASE_URI =
   process.env.MONGODB_TEST_URI ||
@@ -49,8 +59,34 @@ const routingResponse = (distances = [750]) => ({
   ok: true,
   json: async () => ({
     code: 'Ok',
-    routes: distances.map((distance) => ({ distance })),
+    routes: distances.map((distance, index) => ({
+      distance,
+      duration: distance / 8,
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [80.4982, 8.7581],
+          [80.4971 + index * 0.00001, 8.7514],
+        ],
+      },
+    })),
   }),
+});
+
+let riderFixtureSequence = 0;
+const approvedRider = (userId, availabilityStatus = 'AVAILABLE') => ({
+  user_id: userId,
+  availability_status: availabilityStatus,
+  vehicle: {
+    type: 'Motorcycle',
+    model: 'Test Model',
+    registration_number: `TEST-${++riderFixtureSequence}`,
+    color: 'Black',
+  },
+  approval_status: 'APPROVED',
+  review_reason: 'Approved test fixture',
+  reviewed_by: new mongoose.Types.ObjectId(),
+  reviewed_at: new Date(),
 });
 
 const invokeController = (handler, req) =>
@@ -69,10 +105,11 @@ const invokeController = (handler, req) =>
     handler(req, res, reject);
   });
 
-const makeRequest = ({ user, body = {}, params = {}, app }) => ({
+const makeRequest = ({ user, body = {}, params = {}, query = {}, app }) => ({
   user,
   body,
   params,
+  query,
   ...(app ? { app } : {}),
 });
 
@@ -82,6 +119,7 @@ test.before(async () => {
 });
 
 test.beforeEach(async () => {
+  riderFixtureSequence = 0;
   await Promise.all([
     Ride.deleteMany({}),
     Rider.deleteMany({}),
@@ -117,14 +155,323 @@ test('uses the shortest returned road route to estimate the fare', async () => {
   assert.equal(calculateFare('DELIVERY', distanceKm), 210);
 });
 
+test('returns map-ready road routes and caches geocoding provider results', async () => {
+  const route = await calculateRoadRoute(
+    { latitude: 8.7581, longitude: 80.4982 },
+    { latitude: 8.7514, longitude: 80.4971 },
+    {
+      baseUrl: 'http://routing.test',
+      fetchImplementation: async () => routingResponse([920, 750, 810]),
+    }
+  );
+  assert.equal(route.distanceKm, 0.75);
+  assert.equal(route.durationMinutes, 2);
+  assert.equal(route.routeGeometry.type, 'LineString');
+
+  clearGeocodingCache();
+  let providerCalls = 0;
+  const geocodingFetch = async (url) => {
+    providerCalls += 1;
+    const isReverse = new URL(url).pathname.endsWith('/reverse');
+    return {
+      ok: true,
+      status: 200,
+      json: async () =>
+        isReverse
+          ? {
+              place_id: 2,
+              display_name: 'Vavuniya Town',
+              lat: '8.7514',
+              lon: '80.4971',
+            }
+          : [
+              {
+                place_id: 1,
+                display_name: 'University of Vavuniya',
+                lat: '8.7581',
+                lon: '80.4982',
+              },
+            ],
+    };
+  };
+  const geocodingOptions = {
+    baseUrl: 'https://geocoding.test',
+    userAgent: 'VanniRide test suite',
+    minIntervalMs: 0,
+    cacheTtlMs: 60_000,
+    fetchImplementation: geocodingFetch,
+  };
+  const firstSearch = await searchPlaces('University', geocodingOptions);
+  const secondSearch = await searchPlaces('University', geocodingOptions);
+  const reverse = await reverseGeocode(8.7514, 80.4971, geocodingOptions);
+  assert.equal(firstSearch[0].displayName, 'University of Vavuniya');
+  assert.deepEqual(secondSearch, firstSearch);
+  assert.equal(reverse.displayName, 'Vavuniya Town');
+  assert.equal(providerCalls, 2);
+
+  const preview = await invokeController(
+    mapController.previewRoute,
+    makeRequest({
+      user: { id: new mongoose.Types.ObjectId().toString(), role: 'CUSTOMER' },
+      body: {
+        rideType: 'TRANSPORT',
+        pickupLocation: {
+          address: 'University of Vavuniya',
+          latitude: 8.7581,
+          longitude: 80.4982,
+        },
+        destination: {
+          address: 'Vavuniya Town',
+          latitude: 8.7514,
+          longitude: 80.4971,
+        },
+      },
+    })
+  );
+  assert.equal(preview.statusCode, 200);
+  assert.equal(preview.body.data.routePreview.distanceKm, 0.75);
+  assert.equal(preview.body.data.routePreview.estimatedFare, 260);
+  assert.equal(preview.body.data.routePreview.routeGeometry.type, 'LineString');
+});
+
+test('requires rider approval and resubmits changed vehicle details for review', async () => {
+  const adminId = new mongoose.Types.ObjectId();
+  await User.create({
+    _id: adminId,
+    name: 'Rider Review Admin',
+    email: 'rider-review-admin@example.com',
+    phone: '0700001400',
+    password_hash: 'test-password-hash',
+    role: 'ADMIN',
+    account_status: 'ACTIVE',
+  });
+
+  const registration = await invokeController(
+    authController.register,
+    makeRequest({
+      body: {
+        name: 'Approval Rider',
+        email: 'approval-rider@example.com',
+        phone: '0700001401',
+        password: 'Password123!',
+        role: 'RIDER',
+        vehicle: {
+          type: 'Motorcycle',
+          model: 'Honda Dio',
+          registrationNumber: 'NP-ABC-1401',
+          color: 'Blue',
+        },
+      },
+    })
+  );
+  const riderUserId = registration.body.data.user.id;
+  assert.equal(registration.statusCode, 201);
+  assert.equal(registration.body.data.riderProfile.approvalStatus, 'PENDING');
+  assert.equal(registration.body.data.riderProfile.availabilityStatus, 'UNAVAILABLE');
+
+  await assert.rejects(
+    invokeController(
+      userController.updateRiderAvailability,
+      makeRequest({
+        user: { _id: riderUserId, role: 'RIDER' },
+        body: { availabilityStatus: 'AVAILABLE' },
+      })
+    ),
+    (error) => error.statusCode === 403
+  );
+
+  const emitted = [];
+  const io = {
+    to() {
+      return this;
+    },
+    emit(event, payload) {
+      emitted.push({ event, payload });
+    },
+  };
+  const approval = await invokeController(
+    adminController.reviewRiderApproval,
+    makeRequest({
+      user: { id: adminId.toString(), role: 'ADMIN' },
+      params: { riderUserId },
+      body: { decision: 'APPROVE', reason: 'Vehicle documents verified' },
+      app: { get: () => io },
+    })
+  );
+  assert.equal(approval.body.data.riderProfile.approvalStatus, 'APPROVED');
+  assert.ok(emitted.some(({ event }) => event === 'rider_approval_updated'));
+  assert.equal(
+    await AdminAuditLog.countDocuments({ action: 'RIDER_APPROVAL_REVIEWED' }),
+    1
+  );
+
+  const availability = await invokeController(
+    userController.updateRiderAvailability,
+    makeRequest({
+      user: { _id: riderUserId, role: 'RIDER' },
+      body: { availabilityStatus: 'AVAILABLE' },
+    })
+  );
+  assert.equal(availability.body.data.riderProfile.availabilityStatus, 'AVAILABLE');
+
+  const changedVehicle = await invokeController(
+    userController.updateRiderProfile,
+    makeRequest({
+      user: { _id: riderUserId, role: 'RIDER' },
+      body: {
+        vehicle: {
+          type: 'Motorcycle',
+          model: 'Honda Dio',
+          registrationNumber: 'NP-ABC-1402',
+          color: 'Red',
+        },
+      },
+    })
+  );
+  assert.equal(changedVehicle.body.data.reapprovalTriggered, true);
+  assert.equal(changedVehicle.body.data.riderProfile.approvalStatus, 'PENDING');
+  assert.equal(changedVehicle.body.data.riderProfile.availabilityStatus, 'UNAVAILABLE');
+});
+
+test('audits admin conversation access and force cancellation without using participant allowances', async () => {
+  const adminId = new mongoose.Types.ObjectId();
+  const customerId = new mongoose.Types.ObjectId();
+  const riderUserId = new mongoose.Types.ObjectId();
+  await User.create([
+    {
+      _id: adminId,
+      name: 'Operations Admin',
+      email: 'operations-admin@example.com',
+      phone: '0700001500',
+      password_hash: 'test-password-hash',
+      role: 'ADMIN',
+      account_status: 'ACTIVE',
+    },
+    {
+      _id: customerId,
+      name: 'Force Cancel Customer',
+      email: 'force-cancel-customer@example.com',
+      phone: '0700001501',
+      password_hash: 'test-password-hash',
+      role: 'CUSTOMER',
+      account_status: 'ACTIVE',
+    },
+    {
+      _id: riderUserId,
+      name: 'Force Cancel Rider',
+      email: 'force-cancel-rider@example.com',
+      phone: '0700001502',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      account_status: 'ACTIVE',
+    },
+  ]);
+  await Rider.create(approvedRider(riderUserId, 'BUSY'));
+  const ride = await Ride.create({
+    customer_id: customerId,
+    rider_id: riderUserId,
+    request_type: 'TRANSPORT',
+    pickup_location: { address: 'A', latitude: 8.75, longitude: 80.49 },
+    destination: { address: 'B', latitude: 8.76, longitude: 80.5 },
+    distance_km: 2,
+    fare_amount: 360,
+    status: 'STARTED',
+    accepted_at: new Date(),
+    arrived_at: new Date(),
+    started_at: new Date(),
+  });
+  await Message.create([
+    { ride_id: ride._id, sender_id: customerId, message_text: 'Private pickup note' },
+    { ride_id: ride._id, sender_id: riderUserId, message_text: 'I have arrived' },
+  ]);
+  await CancellationRequest.create({
+    ride_id: ride._id,
+    requested_by: customerId,
+    responding_user_id: riderUserId,
+    reason: 'Please confirm',
+    status: 'PENDING',
+    expires_at: new Date(Date.now() + 15 * 60 * 1000),
+  });
+
+  const messageResult = await invokeController(
+    adminController.getRideMessages,
+    makeRequest({
+      user: { id: adminId.toString(), role: 'ADMIN' },
+      params: { rideId: ride._id.toString() },
+      query: { reason: 'Investigating a reported safety concern', limit: '10' },
+    })
+  );
+  assert.equal(messageResult.body.results, 2);
+  const viewAudit = await AdminAuditLog.findOne({ action: 'RIDE_MESSAGES_VIEWED' }).lean();
+  assert.ok(viewAudit);
+  assert.equal(JSON.stringify(viewAudit).includes('Private pickup note'), false);
+
+  const emitted = [];
+  const io = {
+    to() {
+      return this;
+    },
+    emit(event, payload) {
+      emitted.push({ event, payload });
+    },
+  };
+  const cancelled = await invokeController(
+    adminController.forceCancelRide,
+    makeRequest({
+      user: { id: adminId.toString(), role: 'ADMIN' },
+      params: { rideId: ride._id.toString() },
+      body: { reason: 'Safety intervention by operations' },
+      app: { get: () => io },
+    })
+  );
+  assert.equal(cancelled.body.data.ride.status, 'CANCELLED');
+  assert.equal(cancelled.body.data.cancellation.cancellationMode, 'ADMIN_FORCE');
+  assert.equal(
+    (await CancellationRequest.findOne({ ride_id: ride._id }).lean()).status,
+    'ADMIN_CANCELLED'
+  );
+  assert.equal(
+    (await Rider.findOne({ user_id: riderUserId }).lean()).availability_status,
+    'AVAILABLE'
+  );
+  assert.equal(
+    await Cancellation.countDocuments({ cancelled_by: { $in: [customerId, riderUserId] } }),
+    0
+  );
+  assert.equal(await AdminAuditLog.countDocuments({ action: 'RIDE_FORCE_CANCELLED' }), 1);
+  assert.ok(emitted.some(({ event }) => event === 'ride_force_cancelled'));
+});
+
 test('completes the ordered ride lifecycle and releases the rider', async () => {
   const customerId = new mongoose.Types.ObjectId();
   const riderUserId = new mongoose.Types.ObjectId();
   const competingRiderUserId = new mongoose.Types.ObjectId();
 
   await Rider.create([
-    { user_id: riderUserId, availability_status: 'AVAILABLE' },
-    { user_id: competingRiderUserId, availability_status: 'AVAILABLE' },
+    approvedRider(riderUserId),
+    approvedRider(competingRiderUserId),
+  ]);
+  await User.create([
+    {
+      _id: riderUserId,
+      name: 'Lifecycle Rider',
+      email: 'lifecycle-rider@example.com',
+      phone: '0700001001',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: competingRiderUserId,
+      name: 'Competing Rider',
+      email: 'competing-rider@example.com',
+      phone: '0700001002',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
   ]);
 
   const createResult = await invokeController(
@@ -440,9 +787,16 @@ test('cancels a requested ride without deleting its history', async () => {
 test('requires the other participant to resolve a started cancellation', async () => {
   const customerId = new mongoose.Types.ObjectId();
   const riderUserId = new mongoose.Types.ObjectId();
-  await Rider.create({
-    user_id: riderUserId,
-    availability_status: 'BUSY',
+  await Rider.create(approvedRider(riderUserId, 'BUSY'));
+  await User.create({
+    _id: riderUserId,
+    name: 'Cancellation Rider',
+    email: 'cancellation-rider@example.com',
+    phone: '0700002001',
+    password_hash: 'test-password-hash',
+    role: 'RIDER',
+    account_status: 'ACTIVE',
+    token_version: 0,
   });
   const ride = await Ride.create({
     customer_id: customerId,
@@ -694,10 +1048,7 @@ test('allows one customer rating per completed ride and summarizes the rider', a
   const secondCustomerId = new mongoose.Types.ObjectId();
   const outsiderCustomerId = new mongoose.Types.ObjectId();
   const riderUserId = new mongoose.Types.ObjectId();
-  await Rider.create({
-    user_id: riderUserId,
-    availability_status: 'AVAILABLE',
-  });
+  await Rider.create(approvedRider(riderUserId));
 
   const rideData = (customerId) => ({
     customer_id: customerId,
@@ -867,10 +1218,7 @@ test('audits bounded admin management, dispute, approval, and statistics operati
       token_version: 0,
     },
   ]);
-  await Rider.create({
-    user_id: riderUserId,
-    availability_status: 'AVAILABLE',
-  });
+  await Rider.create(approvedRider(riderUserId));
 
   const adminUser = { id: adminId.toString(), role: 'ADMIN' };
   const statusResult = await invokeController(
@@ -1118,10 +1466,7 @@ test('returns participant-scoped history summaries and paid rider earnings', asy
       token_version: 0,
     },
   ]);
-  await Rider.create({
-    user_id: riderUserId,
-    availability_status: 'AVAILABLE',
-  });
+  await Rider.create(approvedRider(riderUserId));
 
   const location = {
     pickup_location: {
@@ -1318,8 +1663,10 @@ test('keeps the Postman collection synchronized with every implemented API route
       if (item.request) {
         const normalizedPath = String(item.request.url)
           .replace('{{baseUrl}}', '')
+          .split('?')[0]
           .replaceAll('{{rideId}}', ':rideId')
           .replaceAll('{{riderId}}', ':riderId')
+          .replaceAll('{{riderUserId}}', ':riderUserId')
           .replaceAll('{{userId}}', ':userId')
           .replaceAll('{{paymentId}}', ':paymentId')
           .replaceAll('{{chatAccessRequestId}}', ':requestId');
@@ -1338,6 +1685,7 @@ test('keeps the Postman collection synchronized with every implemented API route
     ['/api/rides', chatRoutes],
     ['/api', ratingRoutes],
     ['/api/admin', adminRoutes],
+    ['/api/maps', mapRoutes],
   ];
   const implementedRoutes = mountedRouters.flatMap(([basePath, router]) =>
     router.stack.flatMap((layer) => {
@@ -1359,7 +1707,7 @@ test('keeps the Postman collection synchronized with every implemented API route
   );
 
   assert.equal(new Set(collectedRoutes).size, collectedRoutes.length);
-  assert.equal(implementedRoutes.length, 35);
+  assert.equal(implementedRoutes.length, 43);
   assert.deepEqual(collectedRoutes.sort(), implementedRoutes.sort());
 });
 

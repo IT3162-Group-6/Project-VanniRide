@@ -9,6 +9,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const ratingRoutes = require('./routes/ratingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const userRoutes = require('./routes/userRoutes');
+const mapRoutes = require('./routes/mapRoutes');
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/maps', mapRoutes);
 app.use('/api/rides', rideRoutes); // Member B2 ride lifecycle
 app.use('/api/rides', paymentRoutes); // Member B2 cash payment tracking
 app.use('/api/rides', chatRoutes); // Member B2 ride-scoped text chat

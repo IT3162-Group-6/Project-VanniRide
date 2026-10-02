@@ -61,6 +61,8 @@ them.
 
 An admin force-cancellation records the administrator in `cancelled_by`. It
 does not consume the customer's or rider's hourly cancellation allowance.
+Any pending mutual cancellation request is retained with status
+`ADMIN_CANCELLED`.
 
 ## Updated admin audit values
 

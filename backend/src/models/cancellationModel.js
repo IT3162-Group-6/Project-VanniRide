@@ -24,7 +24,7 @@ const cancellationSchema = new mongoose.Schema(
     previous_status: {
       type: String,
       required: true,
-      enum: ['REQUESTED', 'ACCEPTED', 'STARTED'],
+      enum: ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'STARTED'],
     },
     cancellation_mode: {
       type: String,

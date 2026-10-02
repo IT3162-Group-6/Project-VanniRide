@@ -3,6 +3,7 @@ const Cancellation = require('../models/cancellationModel');
 const CancellationRequest = require('../models/cancellationRequestModel');
 const Ride = require('../models/rideModel');
 const Rider = require('../models/riderModel');
+const { releaseRiderAfterRide } = require('./riderService');
 const {
   CANCELLATION_LIMIT,
   CANCELLATION_RESPONSE_MS,
@@ -74,7 +75,10 @@ const rollbackFinalCancellation = async ({
     ),
     riderWasReleased && riderId
       ? Rider.updateOne(
-          { user_id: riderId, availability_status: 'AVAILABLE' },
+          {
+            user_id: riderId,
+            availability_status: { $in: ['AVAILABLE', 'UNAVAILABLE'] },
+          },
           { $set: { availability_status: 'BUSY' } }
         )
       : Promise.resolve(),
@@ -83,13 +87,7 @@ const rollbackFinalCancellation = async ({
 
 const releaseAssignedRider = async (riderId) => {
   if (!riderId) return false;
-  const result = await Rider.updateOne(
-    { user_id: riderId },
-    { $set: { availability_status: 'AVAILABLE' } }
-  );
-  if (result.matchedCount !== 1) {
-    throw new AppError('Assigned rider profile not found', 409);
-  }
+  await releaseRiderAfterRide(riderId);
   return true;
 };
 

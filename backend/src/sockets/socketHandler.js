@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Ride = require('../models/rideModel');
 const Message = require('../models/messageModel');
 const User = require('../models/userModel');
+const Rider = require('../models/riderModel');
 const {
   assertChatSendingAllowed,
   normalizeMessageText,
@@ -40,7 +41,12 @@ const findCurrentSocketUser = async (tokenUser) => {
   ) {
     throw new Error('This session is no longer valid');
   }
-  return user;
+  const riderApproved =
+    user.role !== 'RIDER' ||
+    Boolean(
+      await Rider.exists({ user_id: user._id, approval_status: 'APPROVED' })
+    );
+  return { ...user, riderApproved };
 };
 
 const findParticipantRide = async (rideId, socketUser) => {
@@ -93,7 +99,8 @@ const initializeSocketHandler = (io, config) => {
         role: decoded.role,
         tokenVersion: decoded.tokenVersion,
       };
-      await findCurrentSocketUser(socket.user);
+      const currentUser = await findCurrentSocketUser(socket.user);
+      socket.user.riderApproved = currentUser.riderApproved;
       return next();
     } catch (error) {
       return next(
@@ -108,7 +115,9 @@ const initializeSocketHandler = (io, config) => {
 
   io.on('connection', (socket) => {
     socket.join(userRoom(socket.user.id));
-    socket.join(`role_${socket.user.role}`);
+    if (socket.user.role !== 'RIDER' || socket.user.riderApproved) {
+      socket.join(`role_${socket.user.role}`);
+    }
 
     socket.on('join_ride', async ({ rideId } = {}, acknowledge) => {
       try {

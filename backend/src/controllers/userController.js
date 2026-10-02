@@ -5,21 +5,10 @@ const { serializeUser } = require('./authController');
 const {
   getCancellationAllowance,
 } = require('../services/cancellationService');
-
-const serializeRider = (riderDocument) => {
-  if (!riderDocument) return null;
-  const rider = riderDocument.toObject
-    ? riderDocument.toObject()
-    : riderDocument;
-
-  return {
-    id: rider._id.toString(),
-    userId: rider.user_id.toString(),
-    availabilityStatus: rider.availability_status,
-    createdAt: rider.created_at,
-    updatedAt: rider.updated_at,
-  };
-};
+const {
+  normalizeVehicle,
+  serializeRiderProfile,
+} = require('../services/riderService');
 
 exports.getProfile = async (req, res, next) => {
   try {
@@ -36,7 +25,7 @@ exports.getProfile = async (req, res, next) => {
       success: true,
       data: {
         user: serializeUser(req.user),
-        rider: serializeRider(rider),
+        riderProfile: serializeRiderProfile(rider),
       },
     });
   } catch (error) {
@@ -95,6 +84,7 @@ exports.updateRiderAvailability = async (req, res, next) => {
       {
         user_id: req.user._id,
         availability_status: { $ne: 'BUSY' },
+        approval_status: 'APPROVED',
       },
       { $set: { availability_status: availabilityStatus } },
       { returnDocument: 'after', runValidators: true }
@@ -106,6 +96,17 @@ exports.updateRiderAvailability = async (req, res, next) => {
         return next(new AppError('Rider profile not found', 404));
       }
 
+      const currentRider = await Rider.findOne({ user_id: req.user._id })
+        .select('availability_status approval_status')
+        .lean();
+      if (currentRider.approval_status !== 'APPROVED') {
+        return next(
+          new AppError(
+            `Rider approval is ${currentRider.approval_status.toLowerCase()}`,
+            403
+          )
+        );
+      }
       return next(
         new AppError('A busy rider cannot manually change availability', 409)
       );
@@ -114,9 +115,67 @@ exports.updateRiderAvailability = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: `Rider availability updated to ${availabilityStatus}`,
-      data: { rider: serializeRider(rider) },
+      data: { riderProfile: serializeRiderProfile(rider) },
     });
   } catch (error) {
+    return next(error);
+  }
+};
+
+exports.updateRiderProfile = async (req, res, next) => {
+  try {
+    const vehicle = normalizeVehicle(req.body.vehicle);
+    const rider = await Rider.findOne({ user_id: req.user._id });
+    if (!rider) {
+      return next(new AppError('Rider profile not found', 404));
+    }
+    if (rider.availability_status === 'BUSY') {
+      return next(
+        new AppError('A busy rider cannot change vehicle information', 409)
+      );
+    }
+
+    const currentVehicle = rider.vehicle?.toObject
+      ? rider.vehicle.toObject()
+      : rider.vehicle;
+    const changed =
+      !currentVehicle ||
+      currentVehicle.type !== vehicle.type ||
+      currentVehicle.model !== vehicle.model ||
+      currentVehicle.registration_number !== vehicle.registration_number ||
+      currentVehicle.color !== vehicle.color;
+    if (!changed) {
+      return next(new AppError('Vehicle information has not changed', 409));
+    }
+
+    const reapprovalTriggered = rider.approval_status === 'APPROVED';
+    rider.vehicle = vehicle;
+    rider.approval_status = 'PENDING';
+    rider.availability_status = 'UNAVAILABLE';
+    rider.review_reason = null;
+    rider.reviewed_by = null;
+    rider.reviewed_at = null;
+    await rider.save();
+
+    return res.status(200).json({
+      success: true,
+      message: reapprovalTriggered
+        ? 'Vehicle updated and submitted for reapproval'
+        : 'Vehicle information submitted for approval',
+      data: {
+        riderProfile: serializeRiderProfile(rider),
+        reapprovalTriggered,
+      },
+    });
+  } catch (error) {
+    if (
+      error?.code === 11000 &&
+      error?.keyPattern?.['vehicle.registration_number']
+    ) {
+      return next(
+        new AppError('Vehicle registration number is already registered', 409)
+      );
+    }
     return next(error);
   }
 };

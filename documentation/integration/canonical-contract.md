@@ -121,7 +121,8 @@ ride.
 
 ### Administrative request statuses
 
-- Cancellation request: `PENDING`, `CONFIRMED`, `RESUMED`, `AUTO_CANCELLED`
+- Cancellation request: `PENDING`, `CONFIRMED`, `RESUMED`, `AUTO_CANCELLED`,
+  `ADMIN_CANCELLED`
 - Chat access request: `PENDING`, `APPROVED`, `REJECTED`, `EXPIRED`
 
 ## 5. MongoDB Collections and Fields

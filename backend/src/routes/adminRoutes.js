@@ -9,8 +9,15 @@ router.use(restrictTo('ADMIN'));
 
 router.get('/users', adminController.getAllUsers);
 router.patch('/users/:userId/status', adminController.updateUserStatus);
+router.get('/riders', adminController.getAllRiders);
+router.patch(
+  '/riders/:riderUserId/approval',
+  adminController.reviewRiderApproval
+);
 
 router.get('/rides', adminController.getAllRides);
+router.get('/rides/:rideId/messages', adminController.getRideMessages);
+router.patch('/rides/:rideId/cancel', adminController.forceCancelRide);
 router.get('/cancellations', adminController.getAllCancellations);
 router.get('/payments', adminController.getAllPayments);
 router.patch('/payments/:paymentId', adminController.correctPayment);

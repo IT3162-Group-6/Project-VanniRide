@@ -14,12 +14,15 @@ const adminAuditLogSchema = new mongoose.Schema(
         'USER_STATUS_CHANGED',
         'PAYMENT_CORRECTED',
         'CHAT_ACCESS_REVIEWED',
+        'RIDER_APPROVAL_REVIEWED',
+        'RIDE_MESSAGES_VIEWED',
+        'RIDE_FORCE_CANCELLED',
       ],
     },
     target_type: {
       type: String,
       required: true,
-      enum: ['USER', 'PAYMENT', 'CHAT_ACCESS_REQUEST'],
+      enum: ['USER', 'PAYMENT', 'CHAT_ACCESS_REQUEST', 'RIDER', 'RIDE'],
     },
     target_id: {
       type: mongoose.Schema.Types.ObjectId,

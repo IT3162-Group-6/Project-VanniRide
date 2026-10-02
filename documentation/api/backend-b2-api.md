@@ -1,8 +1,8 @@
 # Vanni Ride Backend Member 2 API
 
-This document describes the authentication, profile, ride lifecycle,
-cancellation, cash payment, text chat, rating, history, earnings, and bounded
-administration APIs integrated on the `backend-integration` branch.
+This document describes the authentication, profile, map support, ride
+lifecycle, cancellation, cash payment, text chat, rating, history, earnings,
+and administration APIs on the integration branch.
 
 ## Authentication dependency
 
@@ -26,7 +26,14 @@ The B2 controllers also enforce the role and MongoDB ObjectId requirements.
 - `GET /api/users/profile` - Return the authenticated user profile.
 - `PUT /api/users/profile` - Update the authenticated user's name or phone.
 - `PATCH /api/users/rider/availability` - Rider-only switch between `AVAILABLE`
-  and `UNAVAILABLE`; a `BUSY` rider cannot change availability manually.
+  and `UNAVAILABLE`; only an approved, non-busy rider may use it.
+- `PUT /api/users/rider/profile` - Rider-only vehicle update. A changed vehicle
+  returns the rider to `PENDING` approval and `UNAVAILABLE`.
+
+Rider registration requires `vehicle.type`, `vehicle.model`,
+`vehicle.registrationNumber`, and `vehicle.color`. New riders remain
+`PENDING` and cannot receive or accept ride requests until an administrator
+approves them.
 
 All protected endpoints require `Authorization: Bearer <token>`. Tokens are
 rejected if the user no longer exists, the account is suspended, the embedded
@@ -38,8 +45,9 @@ role differs from the stored role, or logout has invalidated the token version.
 REQUESTED -> ACCEPTED -> ARRIVED -> STARTED -> COMPLETED
 ```
 
-Cancellation is supported from `REQUESTED` and `ACCEPTED`. Rides are retained
-after cancellation and a separate cancellation record is created.
+Immediate cancellation is supported from `REQUESTED` and `ACCEPTED`.
+`ARRIVED` and `STARTED` use mutual cancellation. Rides are retained after
+cancellation and a separate cancellation record is created.
 
 ## Location format
 
@@ -51,8 +59,26 @@ after cancellation and a separate cancellation record is created.
 }
 ```
 
-Distance is estimated from the coordinates. Fare is stored as an estimated
-cash fare in LKR.
+Distance follows the shortest road route returned by the configured
+OSRM-compatible service, rather than a straight line. Fare is stored as an
+estimated cash fare in LKR.
+
+## Map support endpoints
+
+These authenticated customer endpoints support an OpenStreetMap/Leaflet user
+interface without exposing geocoding traffic directly from the browser:
+
+- `GET /api/maps/search?q=Vavuniya` - Search through the configured
+  Nominatim-compatible provider.
+- `GET /api/maps/reverse?latitude=8.7514&longitude=80.4971` - Convert a selected
+  coordinate to an address.
+- `POST /api/maps/route-preview` - Return the shortest route distance,
+  estimated duration, GeoJSON line, and estimated fare without creating a
+  ride.
+
+Search and reverse requests are cached and serialized by the backend. Do not
+implement keystroke-by-keystroke autocomplete against the public Nominatim
+service.
 
 ## Ride endpoints
 
@@ -194,6 +220,8 @@ Server events:
 - `new_ride_request`
 - `ride_status_changed`
 - `new_message`
+- `rider_approval_updated`
+- `ride_force_cancelled`
 
 Socket rooms and messages are restricted to the authenticated customer and
 assigned rider. Socket authentication verifies the account still exists, is
@@ -226,7 +254,11 @@ All endpoints below require an authenticated `ADMIN` account:
 
 - `GET /api/admin/users`
 - `PATCH /api/admin/users/:userId/status`
+- `GET /api/admin/riders`
+- `PATCH /api/admin/riders/:riderUserId/approval`
 - `GET /api/admin/rides`
+- `GET /api/admin/rides/:rideId/messages`
+- `PATCH /api/admin/rides/:rideId/cancel`
 - `GET /api/admin/cancellations`
 - `GET /api/admin/payments`
 - `PATCH /api/admin/payments/:paymentId`
@@ -263,10 +295,33 @@ Chat-access decision:
 }
 ```
 
-Every administrator mutation requires a reason and creates a durable audit log.
+Rider approval decision:
+
+```json
+{
+  "decision": "APPROVE",
+  "reason": "Vehicle and rider documents verified"
+}
+```
+
+Viewing a conversation requires a reason query parameter, for example
+`?reason=Investigating%20a%20safety%20report&limit=50`. The audit record stores
+the access reason and result count, but not message text.
+
+Administrator force cancellation request:
+
+```json
+{
+  "reason": "Safety intervention by operations"
+}
+```
+
+Every sensitive administrator operation requires a reason and creates a durable audit log.
 Approving chat access grants both ride participants exactly 24 hours of sending
-access. Administrators can monitor ride history but cannot rewrite ride status
-or historical lifecycle timestamps.
+access. Force cancellation is limited to active rides, preserves historical
+lifecycle timestamps, resolves a pending mutual-cancellation request as
+`ADMIN_CANCELLED`, releases the rider, and does not consume either
+participant's cancellation allowance.
 
 ## Customer and rider history endpoints
 
