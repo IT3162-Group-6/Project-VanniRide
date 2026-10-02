@@ -1,7 +1,7 @@
 # Vanni Ride Canonical Integration Contract
 
 Status: Approved for implementation  
-Contract version: 1.0  
+Contract version: 1.1
 Authority: Vanni Ride Pre-Development Master Specification plus confirmed team decisions
 
 ## 1. Purpose
@@ -9,7 +9,8 @@ Authority: Vanni Ride Pre-Development Master Specification plus confirmed team d
 This document is the single contract for integrating the Vanni Ride backend and
 MongoDB work. Where an older branch, document, model, validator, API example, or
 Postman request disagrees with this contract, this contract takes precedence on
-the `backend-integration` branch.
+the `frontend-backend-integration` branch. The approved frontend integration
+details are defined in `frontend-backend-integration-contract.md`.
 
 Database documents use `snake_case`. API request and response bodies use
 `camelCase`. Backend mapping code is responsible for converting between them.
@@ -27,8 +28,12 @@ Database documents use `snake_case`. API request and response bodies use
 - Delivery categories: `FOOD`, `WATER`, `PARCEL`
 - `PARCEL` is displayed to users as "Other/Parcel".
 - Rider ratings are included in version one.
-- Live GPS tracking, card payments, files, images, voice, and video chat are out
-  of scope.
+- Live pickup/destination selection and road-route display use OpenStreetMap,
+  a Nominatim-compatible geocoder, Leaflet, and the existing OSRM-compatible
+  backend adapter.
+- Rider vehicle information and administrator approval are included.
+- Live continuous GPS tracking, card payments, files, images, voice, and video
+  chat are out of scope.
 
 ## 3. Roles and Permissions
 
@@ -47,7 +52,9 @@ Database documents use `snake_case`. API request and response bodies use
 ### Rider
 
 - Register, log in, log out, and manage their profile.
-- Set availability to `AVAILABLE` or `UNAVAILABLE` while not handling a ride.
+- Supply vehicle information and receive administrator approval before working.
+- Set availability to `AVAILABLE` or `UNAVAILABLE` while approved and not
+  handling a ride.
 - View available ride requests only while `AVAILABLE`.
 - Accept a request atomically; ignoring a request is the version-one reject
   behavior and creates no database record.
@@ -62,8 +69,11 @@ Database documents use `snake_case`. API request and response bodies use
 - View users, riders, rides, payments, cancellations, ratings, and statistics.
 - Suspend and reactivate accounts.
 - Review post-completion chat access requests.
+- Approve or reject rider vehicle profiles.
+- View ride conversations through a reasoned and audited admin endpoint.
+- Force-cancel an active ride through a reasoned and audited safety operation.
 - Correct documented payment disputes.
-- Cannot rewrite the normal ride lifecycle or historical ride records.
+- Cannot rewrite completed or already-cancelled historical ride records.
 - Additional admin functionality may be added only after a future team decision.
 
 ## 4. Canonical Status Values
@@ -94,6 +104,15 @@ remains `STARTED` until the cancellation request is resolved.
 
 Accepting a ride changes `AVAILABLE` to `BUSY`. Completion or final cancellation
 changes `BUSY` back to `AVAILABLE`.
+
+### Rider approval
+
+- `PENDING`
+- `APPROVED`
+- `REJECTED`
+
+Only an approved rider with an active account may become available or accept a
+ride.
 
 ### Payment
 
@@ -130,8 +149,18 @@ Required fields:
 
 - `user_id`: unique reference to `users._id`
 - `availability_status`: `AVAILABLE`, `UNAVAILABLE`, or `BUSY`
+- `vehicle`: required object containing `type`, `model`,
+  `registration_number`, and `color`
+- `approval_status`: `PENDING`, `APPROVED`, or `REJECTED`
+- `review_reason`: string or `null`
+- `reviewed_by`: admin user reference or `null`
+- `reviewed_at`: date or `null`
 - `created_at`: date
 - `updated_at`: date
+
+Vehicle registration numbers are normalized and unique. New riders start
+`PENDING` and `UNAVAILABLE`. Changing approved vehicle information resets the
+rider to `PENDING` and `UNAVAILABLE`.
 
 ### `rides`
 
@@ -200,8 +229,8 @@ Required fields:
 - `ride_id`: unique reference to `rides._id`
 - `cancelled_by`: user who initiated the final cancellation
 - `reason`: non-empty string, maximum 500 characters
-- `previous_status`: `REQUESTED`, `ACCEPTED`, or `STARTED`
-- `cancellation_mode`: `IMMEDIATE`, `MUTUAL`, or `AUTO_TIMEOUT`
+- `previous_status`: `REQUESTED`, `ACCEPTED`, `ARRIVED`, or `STARTED`
+- `cancellation_mode`: `IMMEDIATE`, `MUTUAL`, `AUTO_TIMEOUT`, or `ADMIN_FORCE`
 - `cancelled_at`: date
 
 ### `cancellation_requests`
@@ -260,15 +289,17 @@ Message history is never deleted when access expires.
 
 ### `admin_audit_logs`
 
-Every administrator mutation is recorded as an append-only audit entry.
+Every administrator mutation and sensitive conversation view is recorded as an
+append-only audit entry.
 
 Required fields:
 
 - `admin_id`: administrator user reference
-- `action`: `USER_STATUS_CHANGED`, `PAYMENT_CORRECTED`, or
-  `CHAT_ACCESS_REVIEWED`
-- `target_type`: `USER`, `PAYMENT`, or `CHAT_ACCESS_REQUEST`
-- `target_id`: changed document reference
+- `action`: `USER_STATUS_CHANGED`, `PAYMENT_CORRECTED`,
+  `CHAT_ACCESS_REVIEWED`, `RIDER_APPROVAL_REVIEWED`,
+  `RIDE_MESSAGES_VIEWED`, or `RIDE_FORCE_CANCELLED`
+- `target_type`: `USER`, `PAYMENT`, `CHAT_ACCESS_REQUEST`, `RIDER`, or `RIDE`
+- `target_id`: targeted document reference
 - `reason`: non-empty administrative reason, maximum 500 characters
 - `before`: object containing the relevant values before the change
 - `after`: object containing the relevant values after the change
@@ -296,6 +327,10 @@ Required fields:
 The timeout must be recoverable after a server restart; it cannot depend only on
 an in-memory timer.
 
+An administrator force-cancellation is a separate, audited safety operation. It
+may cancel any active status without participant confirmation, never consumes a
+participant allowance, and cannot alter a completed or cancelled ride.
+
 ### Rolling cancellation allowance
 
 - A user may initiate at most five final cancellations in a rolling 60-minute
@@ -311,13 +346,20 @@ an in-memory timer.
 - API responses expose `limit`, `used`, `remaining`, `pendingReservations`, and
   `resetsAt` for the earliest finalized cancellation leaving the window.
 - Customers must be able to view their remaining allowance.
+- An administrator force-cancellation never consumes either participant's
+  allowance.
 
 ## 7. Routing and Fare Contract
 
 - The customer supplies pickup and destination addresses and coordinates.
+- The frontend selects those coordinates with an attributed Leaflet map using
+  OpenStreetMap tiles. Deliberate address search and reverse geocoding pass
+  through a configurable, throttled, cached backend adapter. Public Nominatim
+  is not used for search-as-you-type autocomplete.
 - The backend requests alternative road routes from an OSRM-compatible routing
   provider through a configurable adapter and uses the shortest distance among
-  the routes returned by that provider.
+  the routes returned by that provider. Route preview also returns estimated
+  duration and GeoJSON route geometry for display.
 - Straight-line distance must not be silently used as a fallback.
 - If the routing provider cannot calculate a route, the request returns a
   service-unavailable error and does not create a ride.
@@ -348,6 +390,9 @@ ride and its pending payment record.
   message history remains readable.
 - Messages created through either the HTTP endpoint or Socket.IO emit the same
   `new_message` payload to the ride room.
+- An administrator may view a paginated ride conversation only through the
+  reasoned, audited admin endpoint. Viewing does not permit the admin to send a
+  message or change participant chat access.
 
 ## 9. Canonical HTTP API
 
@@ -366,6 +411,7 @@ created through protected setup tooling.
 
 - `GET /api/users/profile`
 - `PUT /api/users/profile`
+- `PUT /api/users/rider/profile`
 - `PATCH /api/users/rider/availability`
 - `GET /api/users/cancellation-allowance`
 
@@ -417,7 +463,11 @@ reported separately as pending receipts.
 
 - `GET /api/admin/users`
 - `PATCH /api/admin/users/:userId/status`
+- `GET /api/admin/riders`
+- `PATCH /api/admin/riders/:riderUserId/approval`
 - `GET /api/admin/rides`
+- `GET /api/admin/rides/:rideId/messages`
+- `PATCH /api/admin/rides/:rideId/cancel`
 - `GET /api/admin/cancellations`
 - `GET /api/admin/payments`
 - `PATCH /api/admin/payments/:paymentId`
@@ -433,6 +483,20 @@ status. Payment corrections apply only to completed rides and may correct the
 stored amount and/or `PENDING`/`PAID` status without rewriting the ride fare or
 lifecycle. A chat-access approval lasts exactly 24 hours. Each mutation stores
 an `admin_audit_logs` entry containing its before/after values.
+
+Admin conversation viewing also requires a non-empty audit reason. Admin force
+cancellation is limited to active statuses, records `ADMIN_FORCE`, resolves any
+pending mutual request without charging the participant allowance, releases the
+rider appropriately, and cannot alter completed or already-cancelled rides.
+
+### Map services
+
+- `GET /api/maps/search`
+- `GET /api/maps/reverse`
+- `POST /api/maps/route-preview`
+
+Map search is deliberate rather than autocomplete. Route preview performs no
+database write; ride creation independently recalculates distance and fare.
 
 ## 10. API Data and Error Standards
 
@@ -503,6 +567,8 @@ Server events:
 - `cancellation_requested`
 - `cancellation_resolved`
 - `chat_access_updated`
+- `rider_approval_updated`
+- `ride_force_cancelled`
 
 Room membership never replaces authorization checks against MongoDB.
 
@@ -511,6 +577,8 @@ Room membership never replaces authorization checks against MongoDB.
 - Unique `users.email`
 - Unique `riders.user_id`
 - `riders.availability_status`
+- `riders.approval_status`
+- Unique normalized `riders.vehicle.registration_number`
 - `rides.customer_id + rides.request_type + rides.status`
 - `rides.rider_id + rides.status`
 - `rides.status + rides.requested_at`
@@ -530,8 +598,8 @@ Room membership never replaces authorization checks against MongoDB.
 
 ## 13. Integration and Definition of Done
 
-Work is integrated on `backend-integration`. Teammate source branches are not
-modified. A feature is done only when:
+Work is integrated on `frontend-backend-integration`. Teammate source branches
+are not modified. A feature is done only when:
 
 1. Its implementation follows this contract.
 2. Unit/API tests pass.
