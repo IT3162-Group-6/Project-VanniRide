@@ -1,32 +1,34 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
-import PaymentCard from '../../components/PaymentCard';
 import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppState';
-import { paymentsApi } from '../../services/api';
+import { ridesApi } from '../../services/api';
 
 export default function Profile() {
-  const { user, updateUser, logout, refresh } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const { showToast } = useAppState();
   const navigate = useNavigate();
-  const [methods, setMethods] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [allowance, setAllowance] = useState(null);
+  const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ name: user.name, phone: user.phone || '', faculty: user.faculty || '' });
+  const [form, setForm] = useState({ name: user.name, phone: user.phone || '' });
 
-  useEffect(() => { paymentsApi.methods(user.id).then(setMethods); }, [user.id]);
+  useEffect(() => {
+    Promise.all([ridesApi.history(), ridesApi.cancellationAllowance()])
+      .then(([history, cancellationAllowance]) => {
+        setSummary(history.summary);
+        setAllowance(cancellationAllowance);
+      })
+      .catch((requestError) => setError(requestError.message));
+  }, [user.id]);
 
   async function save(e) {
     e.preventDefault();
     await updateUser(form);
     setEditing(false);
     showToast('Profile updated');
-  }
-
-  async function topUp(amount) {
-    await paymentsApi.topUp(user.id, amount);
-    await refresh();
-    showToast(`LKR ${amount.toFixed(2)} added to your wallet`);
   }
 
   return (
@@ -36,7 +38,7 @@ export default function Profile() {
           <div className="avatar avatar-lg">{user.name[0]}</div>
           <div>
             <b>{user.name}</b>
-            <span>{user.faculty || 'Student'} · Customer</span>
+            <span>Customer</span>
           </div>
           <button className="icon-btn" onClick={() => setEditing((v) => !v)} aria-label="Edit"><Icon name="edit" /></button>
         </div>
@@ -49,17 +51,13 @@ export default function Profile() {
             <div className="field"><label>Phone</label>
               <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
-            <div className="field"><label>Faculty</label>
-              <input value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} />
-            </div>
             <button className="btn btn-primary btn-block" type="submit">Save changes</button>
           </form>
         ) : (
           <div className="kv">
             <div><span>Email</span><b>{user.email}</b></div>
             <div><span>Phone</span><b>{user.phone || '—'}</b></div>
-            <div><span>Faculty</span><b>{user.faculty || '—'}</b></div>
-            <div><span>Joined</span><b>{user.joined}</b></div>
+            <div><span>Joined</span><b>{user.joined ? new Date(user.joined).toLocaleDateString() : '—'}</b></div>
           </div>
         )}
 
@@ -70,18 +68,20 @@ export default function Profile() {
 
       <div>
         <div className="card wallet-card">
-          <div className="card-head"><h3>Wallet Balance</h3></div>
-          <b>LKR {Number(user.wallet || 0).toFixed(2)}</b>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-primary btn-block btn-sm" onClick={() => topUp(500)}>+ LKR 500</button>
-            <button className="btn btn-outline btn-block btn-sm" onClick={() => topUp(1000)}>+ LKR 1000</button>
-          </div>
+          <div className="card-head"><h3>Cancellation Allowance</h3></div>
+          <b>{allowance ? `${allowance.remaining} of ${allowance.limit}` : '—'}</b>
+          <p className="muted">Available in the rolling one-hour window.</p>
+          {allowance?.resetsAt && <p className="muted">Next chance resets at {new Date(allowance.resetsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.</p>}
         </div>
 
         <div className="card" style={{ marginTop: 18 }}>
-          <div className="card-head"><h3>Payment Methods</h3></div>
-          {methods.map((m) => <PaymentCard key={m.id} method={m} />)}
-          {methods.length === 0 && <p className="muted">No saved payment methods.</p>}
+          <div className="card-head"><h3>Cash Payments</h3></div>
+          {error && <div className="alert alert-error">{error}</div>}
+          <div className="kv">
+            <div><span>Paid rides</span><b>{summary?.payments.paid ?? '—'}</b></div>
+            <div><span>Pending receipts</span><b>{summary?.payments.pending ?? '—'}</b></div>
+            <div><span>Total paid</span><b>LKR {Number(summary?.payments.totalPaidAmount || 0).toFixed(2)}</b></div>
+          </div>
         </div>
       </div>
     </div>

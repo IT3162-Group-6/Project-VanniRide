@@ -32,3 +32,16 @@ The fare step displays the backend's shortest-road distance, estimated time,
 route line, and cash fare. Ride creation sends only the selected request type,
 delivery category, and locations; the backend recalculates distance and fare so
 client values cannot be forged.
+
+## Customer ride and cash history
+
+Customer dashboard, active ride, history, and profile summaries use the real
+ride/history endpoints. Active rides poll for status changes and display the
+stored cash payment state. The old wallet panels now show paid and pending cash
+information plus the account's rolling one-hour cancellation allowance.
+
+Cancellation always requires a reason. Requested and accepted rides cancel
+immediately. Once a trip has started, the page displays the pending 15-minute
+mutual confirmation, lets the responding participant cancel or resume, and
+shows the remaining allowance. The arrived state follows the backend rule and
+does not offer cancellation.

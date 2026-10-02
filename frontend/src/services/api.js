@@ -125,6 +125,21 @@ const normalizeApiRide = (ride) =>
       }
     : null;
 
+const normalizeHistoryItem = (item) => ({
+  ...normalizeApiRide(item.ride),
+  rider: item.participant || null,
+  participant: item.participant || null,
+  payment: item.payment
+    ? {
+        ...item.payment,
+        method: String(item.payment.paymentMethod || '').toLowerCase(),
+        status: String(item.payment.paymentStatus || '').toLowerCase(),
+      }
+    : null,
+  cancellation: item.cancellation || null,
+  rating: item.rating || null,
+});
+
 /* ---------------- mock store ---------------- */
 const delay = (ms = 260) => new Promise((r) => setTimeout(r, ms));
 const uid = (p) => p + Math.random().toString(36).slice(2, 8);
@@ -339,6 +354,12 @@ export const authApi = {
    ============================================================ */
 export const ridesApi = {
   async list({ customerId, riderId, status, available } = {}) {
+    if (!USE_MOCK_AUTH && customerId) {
+      const response = await http('/rides');
+      let rides = (response.data?.rides || []).map(normalizeApiRide);
+      if (status) rides = rides.filter((ride) => ride.status === status);
+      return rides;
+    }
     if (!USE_MOCK_DATA) return http('/rides', { params: { customerId, riderId, status, available } });
     await delay(200);
     const d = db();
@@ -416,6 +437,68 @@ export const ridesApi = {
   },
 
   async cancel(rideId) { return ridesApi.updateStatus(rideId, RIDE_STATUS.CANCELLED); },
+
+  async cancelWithReason(rideId, reason) {
+    const response = await http(`/rides/${rideId}/cancel`, {
+      method: 'PATCH',
+      body: { reason },
+    });
+    return {
+      ride: normalizeApiRide(response.data?.ride),
+      cancellationRequest: response.data?.cancellationRequest || null,
+      cancellationAllowance: response.data?.cancellationAllowance || null,
+      pendingConfirmation: Boolean(response.data?.cancellationRequest),
+      message: response.message,
+    };
+  },
+
+  async getCancellationRequest(rideId) {
+    try {
+      const response = await http(`/rides/${rideId}/cancellation-request`);
+      return response.data?.cancellationRequest || null;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  },
+
+  async respondToCancellation(rideId, decision) {
+    const response = await http(`/rides/${rideId}/cancellation-request`, {
+      method: 'PATCH',
+      body: { decision },
+    });
+    return {
+      ride: normalizeApiRide(response.data?.ride),
+      cancellationRequest: response.data?.cancellationRequest || null,
+      cancellationAllowance: response.data?.cancellationAllowance || null,
+      message: response.message,
+    };
+  },
+
+  async history() {
+    const response = await http('/users/history');
+    return {
+      summary: response.data?.summary || null,
+      rides: (response.data?.history || []).map(normalizeHistoryItem),
+    };
+  },
+
+  async cancellationAllowance() {
+    const response = await http('/users/cancellation-allowance');
+    return response.data?.cancellationAllowance || null;
+  },
+
+  async payment(rideId) {
+    const response = await http(`/rides/${rideId}/payment`);
+    const payment = response.data?.payment;
+    return payment
+      ? {
+          ...payment,
+          method: String(payment.paymentMethod || '').toLowerCase(),
+          status: String(payment.paymentStatus || '').toLowerCase(),
+        }
+      : null;
+  },
 
   async rate(rideId, rating) {
     if (!USE_MOCK_DATA) return http(`/rides/${rideId}/rate`, { method: 'POST', body: { rating } });

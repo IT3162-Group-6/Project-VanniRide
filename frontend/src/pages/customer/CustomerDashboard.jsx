@@ -11,10 +11,26 @@ export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [rides, setRides] = useState([]);
   const [active, setActive] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [allowance, setAllowance] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    ridesApi.list({ customerId: user.id }).then(setRides);
-    ridesApi.active({ customerId: user.id }).then(setActive);
+    let alive = true;
+    Promise.all([ridesApi.history(), ridesApi.cancellationAllowance()])
+      .then(([history, cancellationAllowance]) => {
+        if (!alive) return;
+        setRides(history.rides);
+        setSummary(history.summary);
+        setAllowance(cancellationAllowance);
+        setActive(
+          history.rides.find((ride) =>
+            ['pending', 'accepted', 'ontheway', 'picked'].includes(ride.status)
+          ) || null
+        );
+      })
+      .catch((requestError) => alive && setError(requestError.message));
+    return () => { alive = false; };
   }, [user.id]);
 
   const hour = new Date().getHours();
@@ -42,6 +58,8 @@ export default function CustomerDashboard() {
         </button>
       </div>
 
+      {error && <div className="alert alert-error">{error}</div>}
+
       {active && (
         <div className="track-banner" style={{ cursor: 'pointer' }} onClick={() => navigate('/customer/active')}>
           <Icon name="route" />
@@ -53,25 +71,32 @@ export default function CustomerDashboard() {
       )}
 
       <div className="stat-grid">
-        <div className="stat-card"><span>Total rides</span><b>{rides.length}</b></div>
-        <div className="stat-card"><span>Completed</span><b>{completed.length}</b></div>
-        <div className="stat-card"><span>Spent</span><b>LKR {completed.reduce((s, r) => s + r.fare, 0)}</b></div>
+        <div className="stat-card"><span>Total rides</span><b>{summary?.rides.total ?? rides.length}</b></div>
+        <div className="stat-card"><span>Completed</span><b>{summary?.rides.completed ?? completed.length}</b></div>
+        <div className="stat-card"><span>Cash paid</span><b>LKR {Number(summary?.payments.totalPaidAmount || 0).toFixed(2)}</b></div>
       </div>
 
       <div className="dash-grid">
         <div className="card">
           <div className="card-head"><h3>Recent Requests</h3><Link to="/customer/history">View All</Link></div>
           {rides.slice(0, 4).map((r) => (
-            <RideCard key={r.id} ride={r} person="rider" to="/customer/active" />
+            <RideCard
+              key={r.id}
+              ride={r}
+              person="rider"
+              to={['pending', 'accepted', 'ontheway', 'picked'].includes(r.status) ? '/customer/active' : '/customer/history'}
+            />
           ))}
           {rides.length === 0 && <p className="muted">No requests yet.</p>}
         </div>
 
         <div>
           <div className="card wallet-card">
-            <div className="card-head"><h3>Wallet Balance</h3></div>
-            <b>LKR {Number(user.wallet || 0).toFixed(2)}</b>
-            <Link to="/customer/profile" className="btn btn-primary btn-block btn-sm">Add Money</Link>
+            <div className="card-head"><h3>Cancellation Allowance</h3></div>
+            <b>{allowance ? `${allowance.remaining} of ${allowance.limit}` : '—'}</b>
+            <p className="muted" style={{ margin: '0 0 12px' }}>Remaining in the rolling one-hour window</p>
+            <div className="fare-row"><span>Pending cash payments</span><span>{summary?.payments.pending ?? 0}</span></div>
+            <Link to="/customer/history" className="btn btn-primary btn-block btn-sm" style={{ marginTop: 12 }}>View payment history</Link>
           </div>
           <div className="card" style={{ marginTop: 18 }}>
             <div className="card-head"><h3>Quick Links</h3></div>

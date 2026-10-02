@@ -277,3 +277,104 @@ test('uses backend map results and creates a ride without trusting client fare v
   assert.equal(Object.hasOwn(createBody, 'estimatedFare'), false);
   assert.equal(Object.hasOwn(createBody, 'distanceKm'), false);
 });
+
+test('loads customer history, cash status, allowance, and mutual cancellation APIs', async () => {
+  localStorage.setItem('vr_token', 'customer-history-token');
+  const requests = [];
+  global.fetch = async (url, options) => {
+    const request = { url: String(url), options };
+    requests.push(request);
+    if (request.url.endsWith('/users/history')) {
+      return jsonResponse({
+        success: true,
+        data: {
+          summary: {
+            rides: { total: 1, active: 1, completed: 0, cancelled: 0 },
+            payments: { paid: 0, pending: 1, totalPaidAmount: 0 },
+          },
+          history: [
+            {
+              ride: {
+                id: 'ride-history-1',
+                rideType: 'TRANSPORT',
+                pickupLocation: { address: 'A' },
+                destination: { address: 'B' },
+                distanceKm: 2,
+                estimatedFare: 360,
+                status: 'STARTED',
+                requestedAt: '2026-10-02T00:00:00.000Z',
+              },
+              participant: { id: 'rider-1', name: 'Rider', phone: '0700000005' },
+              payment: { amount: 360, paymentMethod: 'CASH', paymentStatus: 'PENDING' },
+              cancellation: null,
+              rating: null,
+            },
+          ],
+        },
+      });
+    }
+    if (request.url.endsWith('/users/cancellation-allowance')) {
+      return jsonResponse({
+        success: true,
+        data: { cancellationAllowance: { limit: 5, used: 1, remaining: 4 } },
+      });
+    }
+    if (request.url.endsWith('/rides/ride-history-1/payment')) {
+      return jsonResponse({
+        success: true,
+        data: {
+          payment: { id: 'payment-1', amount: 360, paymentMethod: 'CASH', paymentStatus: 'PENDING' },
+        },
+      });
+    }
+    if (request.url.endsWith('/rides/ride-history-1/cancel')) {
+      return jsonResponse({
+        success: true,
+        message: 'Cancellation confirmation requested from the other participant',
+        data: {
+          cancellationRequest: {
+            id: 'cancel-request-1',
+            rideId: 'ride-history-1',
+            respondingUserId: 'rider-1',
+            status: 'PENDING',
+          },
+          cancellationAllowance: { limit: 5, used: 2, remaining: 3 },
+        },
+      }, 202);
+    }
+    if (request.url.endsWith('/rides/ride-history-1/cancellation-request')) {
+      return jsonResponse({
+        success: true,
+        message: 'Ride will resume',
+        data: {
+          ride: {
+            id: 'ride-history-1',
+            rideType: 'TRANSPORT',
+            pickupLocation: { address: 'A' },
+            destination: { address: 'B' },
+            status: 'STARTED',
+          },
+          cancellationRequest: { id: 'cancel-request-1', status: 'RESUMED' },
+        },
+      });
+    }
+    throw new Error(`Unexpected request: ${request.url}`);
+  };
+
+  const history = await ridesApi.history();
+  const allowance = await ridesApi.cancellationAllowance();
+  const payment = await ridesApi.payment('ride-history-1');
+  const cancellation = await ridesApi.cancelWithReason('ride-history-1', 'Plans changed');
+  const resumed = await ridesApi.respondToCancellation('ride-history-1', 'RESUME');
+
+  assert.equal(history.rides[0].status, 'picked');
+  assert.equal(history.rides[0].payment.status, 'pending');
+  assert.equal(history.rides[0].rider.name, 'Rider');
+  assert.equal(allowance.remaining, 4);
+  assert.equal(payment.method, 'cash');
+  assert.equal(cancellation.pendingConfirmation, true);
+  assert.equal(cancellation.cancellationAllowance.remaining, 3);
+  assert.equal(resumed.ride.status, 'picked');
+  assert.deepEqual(JSON.parse(requests[3].options.body), { reason: 'Plans changed' });
+  assert.deepEqual(JSON.parse(requests[4].options.body), { decision: 'RESUME' });
+});
