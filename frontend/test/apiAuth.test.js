@@ -8,9 +8,16 @@ global.localStorage = {
   removeItem: (key) => storage.delete(key),
 };
 
-const { ApiError, authApi, getToken, mapApi, riderApi, ridesApi } = await import(
-  '../src/services/api.js'
-);
+const {
+  ApiError,
+  authApi,
+  chatApi,
+  getToken,
+  mapApi,
+  ratingApi,
+  riderApi,
+  ridesApi,
+} = await import('../src/services/api.js');
 
 const jsonResponse = (body, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -401,4 +408,54 @@ test('connects rider availability, requests, lifecycle, earnings, vehicle, and c
   assert.equal((await ridesApi.updateStatus('r1', 'ontheway')).apiStatus, 'ARRIVED');
   assert.equal((await ridesApi.confirmCashPayment('r1')).status, 'paid');
   assert.equal(JSON.parse(requests[5].options.body).status, 'ARRIVED');
+});
+
+test('connects ride chat, access requests, and rider ratings', async () => {
+  localStorage.setItem('vr_token', 'chat-token');
+  const requests = [];
+  global.fetch = async (url, options) => {
+    const request = { url: String(url), options };
+    requests.push(request);
+    if (request.url.endsWith('/rides/r1/messages') && options.method === 'GET') {
+      return jsonResponse({
+        success: true,
+        data: {
+          messages: [{ id: 'm1', messageText: 'Hello', sentAt: '2026-10-02T09:00:00.000Z' }],
+          chatAccess: { canSend: true, mode: 'ACTIVE_RIDE' },
+        },
+      });
+    }
+    if (request.url.endsWith('/rides/r1/messages')) {
+      return jsonResponse({
+        success: true,
+        data: { message: { id: 'm2', messageText: 'Found it', sentAt: '2026-10-02T09:01:00.000Z' } },
+      }, 201);
+    }
+    if (request.url.endsWith('/rides/r1/chat-access-requests')) {
+      return jsonResponse({ success: true, data: { chatAccessRequest: { id: 'a1', status: 'PENDING' } } }, 201);
+    }
+    if (request.url.endsWith('/rides/r1/rating')) {
+      return jsonResponse({ success: true, data: { rating: { id: 'rate1', rating: 5, review: 'Safe ride' } } }, 201);
+    }
+    if (request.url.endsWith('/riders/rider-1/ratings')) {
+      return jsonResponse({ success: true, data: { summary: { totalRatings: 1, averageRating: 5 }, ratings: [{ id: 'rate1', rating: 5 }] } });
+    }
+    throw new Error(`Unexpected request ${request.url}`);
+  };
+
+  const conversation = await chatApi.list('r1');
+  const message = await chatApi.send('r1', 'customer-1', 'Found it');
+  const accessRequest = await chatApi.requestAccess('r1', 'Lost item');
+  const rating = await ridesApi.rate('r1', { rating: 5, review: 'Safe ride' });
+  const riderRatings = await ratingApi.forRider('rider-1');
+
+  assert.equal(conversation.messages[0].text, 'Hello');
+  assert.equal(conversation.access.mode, 'ACTIVE_RIDE');
+  assert.equal(message.text, 'Found it');
+  assert.equal(accessRequest.status, 'PENDING');
+  assert.equal(rating.rating, 5);
+  assert.equal(riderRatings.summary.averageRating, 5);
+  assert.deepEqual(JSON.parse(requests[1].options.body), { messageText: 'Found it' });
+  assert.deepEqual(JSON.parse(requests[2].options.body), { reason: 'Lost item' });
+  assert.deepEqual(JSON.parse(requests[3].options.body), { rating: 5, review: 'Safe ride' });
 });

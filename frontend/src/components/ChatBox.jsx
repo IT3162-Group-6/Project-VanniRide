@@ -8,7 +8,7 @@ const time = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', mi
  * messages: [{ id, senderId, text, at }]
  * meId:     current user id (decides left/right bubble)
  */
-export default function ChatBox({ title, subtitle, initial = '', messages = [], meId, onSend, loading = false }) {
+export default function ChatBox({ title, subtitle, initial = '', messages = [], meId, onSend, loading = false, disabled = false, error = '' }) {
   const [text, setText] = useState('');
   const bodyRef = useRef(null);
 
@@ -16,12 +16,14 @@ export default function ChatBox({ title, subtitle, initial = '', messages = [], 
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [messages]);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     const t = text.trim();
     if (!t) return;
-    onSend?.(t);
-    setText('');
+    try {
+      await onSend?.(t);
+      setText('');
+    } catch { /* parent displays the API error */ }
   }
 
   const avatarChar = initial || title?.[0] || '?';
@@ -54,6 +56,7 @@ export default function ChatBox({ title, subtitle, initial = '', messages = [], 
       </div>
 
       <form className="chat-input" onSubmit={submit}>
+        {error && <div className="chat-inline-error">{error}</div>}
         <div className="chat-field">
           <input
             type="text"
@@ -61,10 +64,11 @@ export default function ChatBox({ title, subtitle, initial = '', messages = [], 
             autoComplete="off"
             value={text}
             onChange={(e) => setText(e.target.value)}
+            disabled={disabled}
           />
           <span className="chat-clip"><Icon name="share" size={17} /></span>
         </div>
-        <button type="submit" aria-label="Send"><Icon name="send" size={18} /></button>
+        <button type="submit" aria-label="Send" disabled={disabled}><Icon name="send" size={18} /></button>
       </form>
     </div>
   );

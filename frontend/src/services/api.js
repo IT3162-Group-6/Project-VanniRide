@@ -565,6 +565,13 @@ export const ridesApi = {
   },
 
   async rate(rideId, rating) {
+    if (!USE_MOCK_AUTH) {
+      const payload = typeof rating === 'object' ? rating : { rating };
+      const response = await http(`/rides/${rideId}/rating`, {
+        method: 'POST', body: payload,
+      });
+      return response.data?.rating;
+    }
     if (!USE_MOCK_DATA) return http(`/rides/${rideId}/rate`, { method: 'POST', body: { rating } });
     await delay(150);
     const d = db();
@@ -580,11 +587,27 @@ export const ridesApi = {
    ============================================================ */
 export const chatApi = {
   async list(rideId) {
+    if (!USE_MOCK_AUTH) {
+      const response = await http(`/rides/${rideId}/messages`);
+      return {
+        messages: (response.data?.messages || []).map((message) => ({
+          ...message, text: message.messageText, at: message.sentAt,
+        })),
+        access: response.data?.chatAccess || { canSend: false, mode: 'READ_ONLY' },
+      };
+    }
     if (!USE_MOCK_DATA) return http(`/rides/${rideId}/messages`);
     await delay(120);
     return db().messages.filter((m) => m.rideId === rideId);
   },
   async send(rideId, senderId, text) {
+    if (!USE_MOCK_AUTH) {
+      const response = await http(`/rides/${rideId}/messages`, {
+        method: 'POST', body: { messageText: text },
+      });
+      const message = response.data?.message;
+      return { ...message, text: message.messageText, at: message.sentAt };
+    }
     if (!USE_MOCK_DATA) return http(`/rides/${rideId}/messages`, { method: 'POST', body: { senderId, text } });
     await delay(100);
     const d = db();
@@ -592,6 +615,22 @@ export const chatApi = {
     d.messages.push(msg);
     save(d);
     return msg;
+  },
+  async requestAccess(rideId, reason) {
+    const response = await http(`/rides/${rideId}/chat-access-requests`, {
+      method: 'POST', body: { reason },
+    });
+    return response.data?.chatAccessRequest;
+  },
+};
+
+export const ratingApi = {
+  async forRider(riderId) {
+    const response = await http(`/riders/${riderId}/ratings`);
+    return {
+      summary: response.data?.summary || null,
+      ratings: response.data?.ratings || [],
+    };
   },
 };
 
@@ -666,4 +705,4 @@ export const adminApi = {
   },
 };
 
-export default { authApi, riderApi, mapApi, ridesApi, chatApi, paymentsApi, adminApi };
+export default { authApi, riderApi, mapApi, ridesApi, chatApi, ratingApi, paymentsApi, adminApi };

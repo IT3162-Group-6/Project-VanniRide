@@ -5,7 +5,7 @@ import RideCard from '../../components/RideCard';
 import RiderArt from '../../components/RiderArt';
 import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppState';
-import { riderApi, ridesApi } from '../../services/api';
+import { ratingApi, riderApi, ridesApi } from '../../services/api';
 
 export default function RiderDashboard() {
   const { user, setRiderAvailability } = useAuth();
@@ -15,6 +15,7 @@ export default function RiderDashboard() {
   const [mine, setMine] = useState([]);
   const [active, setActive] = useState(null);
   const [earnings, setEarnings] = useState(null);
+  const [rating, setRating] = useState(null);
   const [error, setError] = useState('');
   const approved = user.riderProfile?.approvalStatus === 'approved';
 
@@ -23,11 +24,13 @@ export default function RiderDashboard() {
       approved && user.online ? ridesApi.list({ available: true }) : Promise.resolve([]),
       ridesApi.history(),
       riderApi.earnings(),
-    ]).then(([openRides, history, earningsResult]) => {
+      ratingApi.forRider(user.id),
+    ]).then(([openRides, history, earningsResult, ratingResult]) => {
       setAvailable(openRides);
       setMine(history.rides);
       setActive(history.rides.find((ride) => ['accepted', 'ontheway', 'picked'].includes(ride.status)) || null);
       setEarnings(earningsResult.summary);
+      setRating(ratingResult.summary);
     }).catch((requestError) => setError(requestError.message));
   }, [approved, user.id, user.online]);
 
@@ -66,7 +69,7 @@ export default function RiderDashboard() {
       <div className="stat-grid">
         <div className="stat-card"><span>Confirmed earnings</span><b>LKR {Number(earnings?.totalEarnings || 0).toLocaleString()}</b></div>
         <div className="stat-card"><span>Completed rides</span><b>{completed.length}</b></div>
-        <div className="stat-card"><span>Rating</span><b>{mine.length ? 'See history' : '—'}</b></div>
+        <div className="stat-card"><span>Rating</span><b>{rating?.averageRating ? `${rating.averageRating}★` : '—'}</b></div>
         <div className="stat-card"><span>Open requests</span><b>{available.length}</b></div>
       </div>
 

@@ -968,6 +968,20 @@ test('gates post-completion chat behind a customer request and active approval',
   assert.equal(requestResult.statusCode, 201);
   assert.equal(requestResult.body.data.chatAccessRequest.status, 'PENDING');
 
+  const pendingHistory = await invokeController(
+    chatController.getMessages,
+    makeRequest({
+      user: { id: customerId.toString(), role: 'CUSTOMER' },
+      params: { rideId: ride._id.toString() },
+    })
+  );
+  assert.equal(pendingHistory.body.data.chatAccess.canSend, false);
+  assert.equal(pendingHistory.body.data.chatAccess.mode, 'READ_ONLY');
+  assert.equal(
+    pendingHistory.body.data.chatAccess.pendingRequest.status,
+    'PENDING'
+  );
+
   await assert.rejects(
     invokeController(
       chatController.sendMessage,
@@ -1013,6 +1027,20 @@ test('gates post-completion chat behind a customer request and active approval',
   );
   assert.equal(riderMessage.statusCode, 201);
 
+  const approvedHistory = await invokeController(
+    chatController.getMessages,
+    makeRequest({
+      user: { id: riderUserId.toString(), role: 'RIDER' },
+      params: { rideId: ride._id.toString() },
+    })
+  );
+  assert.equal(approvedHistory.body.data.chatAccess.canSend, true);
+  assert.equal(
+    approvedHistory.body.data.chatAccess.mode,
+    'POST_COMPLETION_APPROVAL'
+  );
+  assert.ok(approvedHistory.body.data.chatAccess.approvedUntil);
+
   await ChatAccessRequest.updateOne(
     { _id: requestResult.body.data.chatAccessRequest.id },
     { $set: { approved_until: new Date(Date.now() - 1000) } }
@@ -1041,6 +1069,8 @@ test('gates post-completion chat behind a customer request and active approval',
     })
   );
   assert.equal(history.body.results, 2);
+  assert.equal(history.body.data.chatAccess.canSend, false);
+  assert.equal(history.body.data.chatAccess.mode, 'READ_ONLY');
 });
 
 test('allows one customer rating per completed ride and summarizes the rider', async () => {

@@ -56,3 +56,17 @@ completion. Vehicle changes return the rider to pending approval.
 
 Rider history and dashboard earnings use confirmed backend cash payments;
 pending cash receipts are shown separately and can be confirmed from history.
+
+## Chat and rider ratings
+
+Customer and rider chat pages now load their real ride conversations and poll
+for new messages. Messaging is enabled for accepted, arrived, and started rides.
+Completed conversations remain readable, but become writable only while an
+administrator-approved post-completion access window is active. A customer can
+submit the access reason from the completed conversation, including for a lost
+item, and both participants see whether the request is still pending.
+
+After a completed ride, the customer history page accepts one one-to-five-star
+rider rating with an optional review. The rider dashboard shows the backend's
+current average and total rating count. These additions reuse the existing
+history and chat layouts without changing the frontend theme.

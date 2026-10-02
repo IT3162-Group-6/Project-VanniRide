@@ -367,9 +367,18 @@ ul{margin:0;padding:0;list-style:none}
 .msg-in{background:var(--mint-100);align-self:flex-start;border-bottom-left-radius:4px}
 .msg-out{background:var(--green-600);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
 .msg time{display:block;font-size:.68rem;opacity:.65;margin-top:4px}
-.chat-input{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line)}
+.chat-input{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line);position:relative}
 .chat-input input{flex:1;border:1px solid var(--line);border-radius:999px;padding:11px 18px;font-family:inherit}
 .chat-input button{width:42px;height:42px;border-radius:50%;background:var(--green-600);color:#fff;border:none;cursor:pointer;flex:0 0 auto}
+.chat-input input:disabled,.chat-input button:disabled{cursor:not-allowed;opacity:.6}
+.chat-inline-error{position:absolute;left:16px;right:16px;bottom:calc(100% + 6px);padding:7px 10px;background:var(--red-bg);color:var(--red-ink);border-radius:var(--radius-sm);font-size:.76rem}
+.chat-ride-picker{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.chat-ride-picker label{color:var(--ink-soft);font-size:.82rem;font-weight:700}
+.chat-ride-picker select{min-width:240px;border:1px solid var(--line);border-radius:var(--radius-sm);padding:9px 12px;background:#fff;color:var(--ink);font-family:inherit}
+.chat-access-card{margin-bottom:12px;padding:14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--mint-50)}
+.chat-access-card>b{display:block;color:var(--green-800);margin-bottom:5px}
+.chat-access-card p{margin:5px 0;color:var(--ink-soft);font-size:.84rem}
+.chat-access-card input{width:100%;margin:7px 0;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-family:inherit}
 
 /* ============ Empty states ============ */
 .empty{text-align:center;padding:50px 20px;color:var(--ink-soft)}
@@ -662,6 +671,12 @@ h1,h2,h3,h4{letter-spacing:-.015em}
 .history-entry:last-child{border-bottom:0}
 .history-entry .req-row{border-bottom:0}
 .history-entry-meta{display:flex;flex-wrap:wrap;gap:6px 16px;padding:0 12px 12px 50px;color:var(--ink-soft);font-size:.76rem}
+.rating-panel{margin:0 12px 14px 50px;padding:12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--mint-50)}
+.rating-panel>label{display:block;margin-bottom:7px;color:var(--green-800);font-size:.82rem;font-weight:700}
+.rating-stars{display:flex;gap:5px;margin-bottom:8px}
+.rating-stars button{padding:2px;border:0;background:transparent;color:#b9c3bb;font-size:1.4rem;line-height:1;cursor:pointer}
+.rating-stars button.selected{color:#e5a50a}
+.rating-panel>input{width:100%;margin-bottom:9px;border:1px solid var(--line);border-radius:var(--radius-sm);padding:9px 11px;font-family:inherit}
 .cancellation-panel{margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--mint-50)}
 .cancellation-panel>b{display:block;color:var(--green-800);margin-bottom:5px}
 .cancellation-panel>p{margin:4px 0;font-size:.86rem}

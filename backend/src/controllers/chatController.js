@@ -42,11 +42,34 @@ exports.getMessages = catchAsync(async (req, res) => {
   const messages = await Message.find({ ride_id: ride._id })
     .sort({ sent_at: 1 })
     .lean();
+  const activeAccess =
+    ride.status === 'COMPLETED' ? await findActiveChatAccess(ride._id) : null;
+  const pendingRequest = await ChatAccessRequest.findOne({
+    ride_id: ride._id,
+    status: 'PENDING',
+  }).lean();
+  const activeRideCanSend = ['ACCEPTED', 'ARRIVED', 'STARTED'].includes(
+    ride.status
+  );
 
   res.status(200).json({
     success: true,
     results: messages.length,
-    data: { messages: messages.map(serializeMessage) },
+    data: {
+      messages: messages.map(serializeMessage),
+      chatAccess: {
+        canSend: activeRideCanSend || Boolean(activeAccess),
+        mode: activeRideCanSend
+          ? 'ACTIVE_RIDE'
+          : activeAccess
+            ? 'POST_COMPLETION_APPROVAL'
+            : 'READ_ONLY',
+        pendingRequest: pendingRequest
+          ? serializeChatAccessRequest(pendingRequest)
+          : null,
+        approvedUntil: activeAccess?.approved_until || null,
+      },
+    },
   });
 });
 

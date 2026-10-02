@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Icon from '../../components/Icon';
 import RideCard from '../../components/RideCard';
 import { ridesApi } from '../../services/api';
+import { useAppState } from '../../context/AppState';
 
 const TABS = [
   { key: 'all', label: 'All' },
@@ -10,11 +11,13 @@ const TABS = [
 ];
 
 export default function RideHistory() {
+  const { showToast } = useAppState();
   const [rides, setRides] = useState([]);
   const [summary, setSummary] = useState(null);
   const [tab, setTab] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [drafts, setDrafts] = useState({});
 
   useEffect(() => {
     ridesApi.history()
@@ -30,6 +33,16 @@ export default function RideHistory() {
     () => (tab === 'all' ? rides : rides.filter((r) => r.status === tab)),
     [rides, tab],
   );
+
+  async function submitRating(rideId) {
+    const draft = drafts[rideId] || {};
+    if (!draft.rating) { setError('Choose a rating from 1 to 5.'); return; }
+    try {
+      const rating = await ridesApi.rate(rideId, { rating: Number(draft.rating), review: draft.review || '' });
+      setRides((current) => current.map((ride) => ride.id === rideId ? { ...ride, rating } : ride));
+      showToast('Rider rating submitted'); setError('');
+    } catch (requestError) { setError(requestError.message); }
+  }
 
   return (
     <div className="card">
@@ -64,6 +77,14 @@ export default function RideHistory() {
             {ride.cancellation && <span>Cancelled: {ride.cancellation.reason}</span>}
             {ride.rating && <span>Your rating: {ride.rating.rating}★</span>}
           </div>
+          {ride.status === 'completed' && ride.rider && !ride.rating && (
+            <div className="rating-panel">
+              <label>Rate your rider</label>
+              <div className="rating-stars">{[1,2,3,4,5].map((value)=><button type="button" key={value} className={(drafts[ride.id]?.rating||0)>=value?'selected':''} onClick={()=>setDrafts({...drafts,[ride.id]:{...drafts[ride.id],rating:value}})}>★</button>)}</div>
+              <input placeholder="Optional review" maxLength={1000} value={drafts[ride.id]?.review||''} onChange={(event)=>setDrafts({...drafts,[ride.id]:{...drafts[ride.id],review:event.target.value}})}/>
+              <button className="btn btn-outline btn-sm" onClick={()=>submitRating(ride.id)}>Submit rating</button>
+            </div>
+          )}
         </div>
       ))}
       {!loading && shown.length === 0 && (
