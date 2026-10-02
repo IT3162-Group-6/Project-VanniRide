@@ -8,7 +8,7 @@ global.localStorage = {
   removeItem: (key) => storage.delete(key),
 };
 
-const { ApiError, authApi, getToken } = await import(
+const { ApiError, authApi, getToken, mapApi, ridesApi } = await import(
   '../src/services/api.js'
 );
 
@@ -181,4 +181,99 @@ test('clears an expired token and reports useful connection errors', async () =>
     authApi.login({ email: 'a@example.com', password: 'secret12' }),
     (error) => error instanceof ApiError && error.status === 0
   );
+});
+
+test('uses backend map results and creates a ride without trusting client fare values', async () => {
+  localStorage.setItem('vr_token', 'customer-map-token');
+  const requests = [];
+  global.fetch = async (url, options) => {
+    const request = { url: String(url), options };
+    requests.push(request);
+    if (request.url.includes('/maps/search')) {
+      return jsonResponse({
+        success: true,
+        data: {
+          places: [
+            {
+              displayName: 'University of Vavuniya',
+              latitude: 8.7581,
+              longitude: 80.4982,
+              providerPlaceId: '1',
+            },
+          ],
+        },
+      });
+    }
+    if (request.url.includes('/maps/reverse')) {
+      return jsonResponse({
+        success: true,
+        data: {
+          place: {
+            displayName: 'Vavuniya Town',
+            latitude: 8.7514,
+            longitude: 80.4971,
+          },
+        },
+      });
+    }
+    if (request.url.endsWith('/maps/route-preview')) {
+      return jsonResponse({
+        success: true,
+        data: {
+          routePreview: {
+            distanceKm: 0.75,
+            durationMinutes: 2,
+            estimatedFare: 260,
+            routeGeometry: { type: 'LineString', coordinates: [] },
+          },
+        },
+      });
+    }
+    return jsonResponse({
+      success: true,
+      data: {
+        ride: {
+          id: 'ride-1',
+          rideType: 'TRANSPORT',
+          pickupLocation: routePayload.pickupLocation,
+          destination: routePayload.destination,
+          distanceKm: 0.75,
+          estimatedFare: 260,
+          status: 'REQUESTED',
+          requestedAt: '2026-10-02T00:00:00.000Z',
+        },
+      },
+    }, 201);
+  };
+
+  const routePayload = {
+    rideType: 'TRANSPORT',
+    deliveryCategory: null,
+    pickupLocation: {
+      address: 'University of Vavuniya',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Vavuniya Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+  };
+  const places = await mapApi.search('Vavuniya');
+  const place = await mapApi.reverse(8.7514, 80.4971);
+  const preview = await mapApi.previewRoute(routePayload);
+  const ride = await ridesApi.create(routePayload);
+
+  assert.equal(places[0].displayName, 'University of Vavuniya');
+  assert.equal(place.displayName, 'Vavuniya Town');
+  assert.equal(preview.estimatedFare, 260);
+  assert.equal(ride.status, 'pending');
+  assert.equal(ride.apiStatus, 'REQUESTED');
+  assert.equal(ride.pickup, 'University of Vavuniya');
+  assert.equal(requests[0].options.headers.Authorization, 'Bearer customer-map-token');
+  const createBody = JSON.parse(requests[3].options.body);
+  assert.deepEqual(createBody, routePayload);
+  assert.equal(Object.hasOwn(createBody, 'estimatedFare'), false);
+  assert.equal(Object.hasOwn(createBody, 'distanceKm'), false);
 });

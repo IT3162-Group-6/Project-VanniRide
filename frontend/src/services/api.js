@@ -101,6 +101,30 @@ const normalizeApiUser = (user, riderProfile = null) => {
   };
 };
 
+const FRONTEND_RIDE_STATUS = Object.freeze({
+  REQUESTED: RIDE_STATUS.PENDING,
+  ACCEPTED: RIDE_STATUS.ACCEPTED,
+  ARRIVED: RIDE_STATUS.ONTHEWAY,
+  STARTED: RIDE_STATUS.PICKED,
+  COMPLETED: RIDE_STATUS.COMPLETED,
+  CANCELLED: RIDE_STATUS.CANCELLED,
+});
+
+const normalizeApiRide = (ride) =>
+  ride
+    ? {
+        ...ride,
+        apiStatus: ride.status,
+        status: FRONTEND_RIDE_STATUS[ride.status] || String(ride.status).toLowerCase(),
+        type: ride.rideType === 'DELIVERY' ? 'delivery' : 'ride',
+        pickup: ride.pickupLocation?.address || '',
+        dropoff: ride.destination?.address || '',
+        fare: ride.estimatedFare,
+        createdAt: ride.requestedAt,
+        rider: ride.assignedRider || null,
+      }
+    : null;
+
 /* ---------------- mock store ---------------- */
 const delay = (ms = 260) => new Promise((r) => setTimeout(r, ms));
 const uid = (p) => p + Math.random().toString(36).slice(2, 8);
@@ -162,6 +186,31 @@ export function estimateFare(distanceKm) {
     total: FARE_RULES.base + distanceCost + FARE_RULES.demand,
   };
 }
+
+/* ============================================================
+   MAP SEARCH / ROUTING
+   ============================================================ */
+export const mapApi = {
+  async search(query) {
+    const response = await http('/maps/search', { params: { q: query } });
+    return response.data?.places || [];
+  },
+
+  async reverse(latitude, longitude) {
+    const response = await http('/maps/reverse', {
+      params: { latitude, longitude },
+    });
+    return response.data?.place || null;
+  },
+
+  async previewRoute(payload) {
+    const response = await http('/maps/route-preview', {
+      method: 'POST',
+      body: payload,
+    });
+    return response.data?.routePreview;
+  },
+};
 
 /* ============================================================
    AUTH
@@ -317,6 +366,10 @@ export const ridesApi = {
   },
 
   async create(payload) {
+    if (!USE_MOCK_AUTH) {
+      const response = await http('/rides', { method: 'POST', body: payload });
+      return normalizeApiRide(response.data?.ride);
+    }
     if (!USE_MOCK_DATA) return http('/rides', { method: 'POST', body: payload });
     await delay();
     const d = db();
@@ -466,4 +519,4 @@ export const adminApi = {
   },
 };
 
-export default { authApi, ridesApi, chatApi, paymentsApi, adminApi };
+export default { authApi, mapApi, ridesApi, chatApi, paymentsApi, adminApi };
