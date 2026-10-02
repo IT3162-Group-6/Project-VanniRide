@@ -2,14 +2,16 @@
    services/api.js
    Single place for all data access.
 
-   Right now it runs on a MOCK backend backed by localStorage so
-   the whole UI works without a server. When your real backend is
-   ready, set USE_MOCK = false and point BASE_URL at it — every
-   exported function already has the right shape.
+   Authentication uses the real backend by default. The remaining
+   screen adapters stay on the local demo store until their integration
+   phases are completed, and can be switched independently with Vite env.
    ============================================================ */
 
-const USE_MOCK = true;
-const BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000/api';
+const USE_MOCK_AUTH = import.meta.env?.VITE_USE_MOCK_AUTH === 'true';
+const USE_MOCK_DATA = import.meta.env?.VITE_USE_MOCK_DATA !== 'false';
+const BASE_URL = String(
+  import.meta.env?.VITE_API_URL || 'http://localhost:5000/api'
+).replace(/\/$/, '');
 
 const TOKEN_KEY = 'vr_token';
 const DB_KEY = 'vr_db';
@@ -26,23 +28,78 @@ export const RIDE_STATUS = {
 /* ---------------- token helpers ---------------- */
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
+export const isMockAuth = () => USE_MOCK_AUTH;
 
-/* ---------------- real HTTP client (used when USE_MOCK = false) ---------------- */
-async function http(path, { method = 'GET', body, params } = {}) {
+/* ---------------- shared real HTTP client ---------------- */
+export class ApiError extends Error {
+  constructor(message, status = 0, details = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.details = details;
+  }
+}
+
+export async function http(path, { method = 'GET', body, params, signal } = {}) {
   const url = new URL(BASE_URL + path);
   if (params) Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v));
-  const res = await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const token = getToken();
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: {
+        Accept: 'application/json',
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    throw new ApiError('Unable to connect to the Vanni Ride server. Please try again.', 0);
+  }
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.message || `Request failed (${res.status})`);
+  if (!res.ok) {
+    throw new ApiError(
+      data?.message || `Request failed (${res.status})`,
+      res.status,
+      data
+    );
+  }
   return data;
 }
+
+const normalizeRiderProfile = (profile) =>
+  profile
+    ? {
+        ...profile,
+        approvalStatus: String(profile.approvalStatus || 'PENDING').toLowerCase(),
+        availabilityStatus: String(
+          profile.availabilityStatus || 'UNAVAILABLE'
+        ).toLowerCase(),
+      }
+    : null;
+
+const normalizeApiUser = (user, riderProfile = null) => {
+  if (!user) return null;
+  const normalizedRider = normalizeRiderProfile(riderProfile);
+  const vehicle = normalizedRider?.vehicle;
+  return {
+    ...user,
+    role: String(user.role || '').toLowerCase(),
+    status: String(user.accountStatus || user.status || '').toLowerCase(),
+    joined: user.createdAt || user.joined || null,
+    riderProfile: normalizedRider,
+    vehicle: vehicle
+      ? `${vehicle.model} · ${vehicle.registrationNumber}`
+      : user.vehicle,
+    online: normalizedRider
+      ? normalizedRider.availabilityStatus === 'available'
+      : user.online,
+  };
+};
 
 /* ---------------- mock store ---------------- */
 const delay = (ms = 260) => new Promise((r) => setTimeout(r, ms));
@@ -111,7 +168,19 @@ export function estimateFare(distanceKm) {
    ============================================================ */
 export const authApi = {
   async login({ email, password }) {
-    if (!USE_MOCK) return http('/auth/login', { method: 'POST', body: { email, password } });
+    if (!USE_MOCK_AUTH) {
+      const response = await http('/auth/login', {
+        method: 'POST',
+        body: { email: String(email).trim(), password },
+      });
+      setToken(response.token);
+      const riderProfile = normalizeRiderProfile(response.data?.riderProfile);
+      return {
+        token: response.token,
+        riderProfile,
+        user: normalizeApiUser(response.data?.user, riderProfile),
+      };
+    }
     await delay();
     const d = db();
     const user = d.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase() && u.password === password);
@@ -120,8 +189,27 @@ export const authApi = {
     return { user: publicUser(user), token: getToken() };
   },
 
-  async register({ name, email, password, role = 'customer', phone = '' }) {
-    if (!USE_MOCK) return http('/auth/register', { method: 'POST', body: { name, email, password, role, phone } });
+  async register({ name, email, password, role = 'customer', phone = '', vehicle }) {
+    if (!USE_MOCK_AUTH) {
+      const response = await http('/auth/register', {
+        method: 'POST',
+        body: {
+          name: String(name).trim(),
+          email: String(email).trim(),
+          phone: String(phone).trim(),
+          password,
+          role: String(role).toUpperCase(),
+          ...(String(role).toLowerCase() === 'rider' ? { vehicle } : {}),
+        },
+      });
+      setToken(response.token);
+      const riderProfile = normalizeRiderProfile(response.data?.riderProfile);
+      return {
+        token: response.token,
+        riderProfile,
+        user: normalizeApiUser(response.data?.user, riderProfile),
+      };
+    }
     await delay();
     const d = db();
     if (d.users.some((u) => u.email.toLowerCase() === String(email).toLowerCase())) {
@@ -143,7 +231,22 @@ export const authApi = {
   },
 
   async me() {
-    if (!USE_MOCK) return http('/auth/me');
+    if (!USE_MOCK_AUTH) {
+      if (!getToken()) return null;
+      try {
+        const response = await http('/users/profile');
+        return normalizeApiUser(
+          response.data?.user,
+          response.data?.riderProfile
+        );
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
+          setToken(null);
+          return null;
+        }
+        throw error;
+      }
+    }
     const t = getToken();
     if (!t) return null;
     const d = db();
@@ -151,7 +254,16 @@ export const authApi = {
   },
 
   async updateProfile(userId, patch) {
-    if (!USE_MOCK) return http(`/users/${userId}`, { method: 'PATCH', body: patch });
+    if (!USE_MOCK_AUTH) {
+      const body = {};
+      if (patch.name !== undefined) body.name = patch.name;
+      if (patch.phone !== undefined) body.phone = patch.phone;
+      const response = await http('/users/profile', {
+        method: 'PUT',
+        body,
+      });
+      return normalizeApiUser(response.data?.user);
+    }
     await delay(180);
     const d = db();
     const u = d.users.find((x) => x.id === userId);
@@ -160,7 +272,17 @@ export const authApi = {
     return publicUser(u);
   },
 
-  logout() { setToken(null); },
+  async logout() {
+    if (USE_MOCK_AUTH) {
+      setToken(null);
+      return;
+    }
+    try {
+      if (getToken()) await http('/auth/logout', { method: 'POST' });
+    } finally {
+      setToken(null);
+    }
+  },
 };
 
 /* ============================================================
@@ -168,7 +290,7 @@ export const authApi = {
    ============================================================ */
 export const ridesApi = {
   async list({ customerId, riderId, status, available } = {}) {
-    if (!USE_MOCK) return http('/rides', { params: { customerId, riderId, status, available } });
+    if (!USE_MOCK_DATA) return http('/rides', { params: { customerId, riderId, status, available } });
     await delay(200);
     const d = db();
     let out = d.rides.slice();
@@ -180,7 +302,7 @@ export const ridesApi = {
   },
 
   async get(id) {
-    if (!USE_MOCK) return http(`/rides/${id}`);
+    if (!USE_MOCK_DATA) return http(`/rides/${id}`);
     await delay(150);
     const d = db();
     const ride = d.rides.find((r) => r.id === id);
@@ -195,7 +317,7 @@ export const ridesApi = {
   },
 
   async create(payload) {
-    if (!USE_MOCK) return http('/rides', { method: 'POST', body: payload });
+    if (!USE_MOCK_DATA) return http('/rides', { method: 'POST', body: payload });
     await delay();
     const d = db();
     const ride = {
@@ -212,7 +334,7 @@ export const ridesApi = {
   },
 
   async accept(rideId, riderId) {
-    if (!USE_MOCK) return http(`/rides/${rideId}/accept`, { method: 'POST', body: { riderId } });
+    if (!USE_MOCK_DATA) return http(`/rides/${rideId}/accept`, { method: 'POST', body: { riderId } });
     await delay();
     const d = db();
     const ride = d.rides.find((r) => r.id === rideId);
@@ -225,7 +347,7 @@ export const ridesApi = {
   },
 
   async updateStatus(rideId, status) {
-    if (!USE_MOCK) return http(`/rides/${rideId}/status`, { method: 'PATCH', body: { status } });
+    if (!USE_MOCK_DATA) return http(`/rides/${rideId}/status`, { method: 'PATCH', body: { status } });
     await delay(180);
     const d = db();
     const ride = d.rides.find((r) => r.id === rideId);
@@ -243,7 +365,7 @@ export const ridesApi = {
   async cancel(rideId) { return ridesApi.updateStatus(rideId, RIDE_STATUS.CANCELLED); },
 
   async rate(rideId, rating) {
-    if (!USE_MOCK) return http(`/rides/${rideId}/rate`, { method: 'POST', body: { rating } });
+    if (!USE_MOCK_DATA) return http(`/rides/${rideId}/rate`, { method: 'POST', body: { rating } });
     await delay(150);
     const d = db();
     const ride = d.rides.find((r) => r.id === rideId);
@@ -258,12 +380,12 @@ export const ridesApi = {
    ============================================================ */
 export const chatApi = {
   async list(rideId) {
-    if (!USE_MOCK) return http(`/rides/${rideId}/messages`);
+    if (!USE_MOCK_DATA) return http(`/rides/${rideId}/messages`);
     await delay(120);
     return db().messages.filter((m) => m.rideId === rideId);
   },
   async send(rideId, senderId, text) {
-    if (!USE_MOCK) return http(`/rides/${rideId}/messages`, { method: 'POST', body: { senderId, text } });
+    if (!USE_MOCK_DATA) return http(`/rides/${rideId}/messages`, { method: 'POST', body: { senderId, text } });
     await delay(100);
     const d = db();
     const msg = { id: uid('m'), rideId, senderId, text, at: new Date().toISOString() };
@@ -278,12 +400,12 @@ export const chatApi = {
    ============================================================ */
 export const paymentsApi = {
   async methods(userId) {
-    if (!USE_MOCK) return http('/payments/methods', { params: { userId } });
+    if (!USE_MOCK_DATA) return http('/payments/methods', { params: { userId } });
     await delay(150);
     return db().payments.filter((p) => p.userId === userId);
   },
   async topUp(userId, amount) {
-    if (!USE_MOCK) return http('/payments/topup', { method: 'POST', body: { userId, amount } });
+    if (!USE_MOCK_DATA) return http('/payments/topup', { method: 'POST', body: { userId, amount } });
     await delay();
     const d = db();
     const u = d.users.find((x) => x.id === userId);
@@ -292,7 +414,7 @@ export const paymentsApi = {
     return publicUser(u);
   },
   async setPrimary(userId, methodId) {
-    if (!USE_MOCK) return http(`/payments/methods/${methodId}/primary`, { method: 'POST' });
+    if (!USE_MOCK_DATA) return http(`/payments/methods/${methodId}/primary`, { method: 'POST' });
     await delay(120);
     const d = db();
     d.payments.filter((p) => p.userId === userId).forEach((p) => { p.primary = p.id === methodId; });
@@ -306,13 +428,13 @@ export const paymentsApi = {
    ============================================================ */
 export const adminApi = {
   async users(role) {
-    if (!USE_MOCK) return http('/admin/users', { params: { role } });
+    if (!USE_MOCK_DATA) return http('/admin/users', { params: { role } });
     await delay(180);
     const list = db().users.map(publicUser);
     return role ? list.filter((u) => u.role === role) : list;
   },
   async setUserStatus(userId, status) {
-    if (!USE_MOCK) return http(`/admin/users/${userId}/status`, { method: 'PATCH', body: { status } });
+    if (!USE_MOCK_DATA) return http(`/admin/users/${userId}/status`, { method: 'PATCH', body: { status } });
     await delay(150);
     const d = db();
     const u = d.users.find((x) => x.id === userId);
@@ -321,13 +443,13 @@ export const adminApi = {
     return publicUser(u);
   },
   async rides() {
-    if (!USE_MOCK) return http('/admin/rides');
+    if (!USE_MOCK_DATA) return http('/admin/rides');
     await delay(180);
     const d = db();
     return d.rides.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((r) => hydrate(r, d));
   },
   async stats() {
-    if (!USE_MOCK) return http('/admin/stats');
+    if (!USE_MOCK_DATA) return http('/admin/stats');
     await delay(180);
     const d = db();
     const completed = d.rides.filter((r) => r.status === RIDE_STATUS.COMPLETED);

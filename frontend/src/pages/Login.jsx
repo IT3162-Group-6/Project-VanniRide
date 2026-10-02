@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, HOME_BY_ROLE } from '../context/AuthContext';
 import { useAppState } from '../context/AppState';
+import { isMockAuth } from '../services/api';
 
 const DEMO = [
   { role: 'Customer', email: 'customer@vau.ac.lk' },
@@ -63,20 +64,22 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="demo-box">
-          <b>Demo accounts</b>
-          <span>Password for all: <code>123456</code></span>
-          <div className="demo-list">
-            {DEMO.map((d) => (
-              <button
-                key={d.email} type="button" className="chip chip-btn"
-                onClick={() => setForm({ email: d.email, password: '123456' })}
-              >
-                {d.role}
-              </button>
-            ))}
+        {isMockAuth() && (
+          <div className="demo-box">
+            <b>Demo accounts</b>
+            <span>Password for all: <code>123456</code></span>
+            <div className="demo-list">
+              {DEMO.map((d) => (
+                <button
+                  key={d.email} type="button" className="chip chip-btn"
+                  onClick={() => setForm({ email: d.email, password: '123456' })}
+                >
+                  {d.role}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="auth-foot">
           New here? <Link to="/register">Create an account</Link>

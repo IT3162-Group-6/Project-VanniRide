@@ -7,11 +7,23 @@ export default function Register() {
   const { register } = useAuth();
   const { showToast } = useAppState();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', role: 'customer' });
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: 'customer',
+    vehicle: { type: '', model: '', registrationNumber: '', color: '' },
+  });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const setVehicle = (key) => (e) =>
+    setForm({
+      ...form,
+      vehicle: { ...form.vehicle, [key]: e.target.value },
+    });
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -47,7 +59,7 @@ export default function Register() {
           </div>
           <div className="field">
             <label>Phone number</label>
-            <input type="tel" placeholder="07X XXX XXXX" value={form.phone} onChange={set('phone')} />
+            <input type="tel" placeholder="07X XXX XXXX" required value={form.phone} onChange={set('phone')} />
           </div>
           <div className="field">
             <label>Password</label>
@@ -69,6 +81,27 @@ export default function Register() {
               </button>
             ))}
           </div>
+
+          {form.role === 'rider' && (
+            <>
+              <div className="field">
+                <label>Vehicle type</label>
+                <input type="text" placeholder="e.g. Motorcycle" required value={form.vehicle.type} onChange={setVehicle('type')} />
+              </div>
+              <div className="field">
+                <label>Vehicle model</label>
+                <input type="text" placeholder="e.g. Honda Dio" required value={form.vehicle.model} onChange={setVehicle('model')} />
+              </div>
+              <div className="field">
+                <label>Registration number</label>
+                <input type="text" placeholder="e.g. NP-ABC-1234" required value={form.vehicle.registrationNumber} onChange={setVehicle('registrationNumber')} />
+              </div>
+              <div className="field">
+                <label>Vehicle colour</label>
+                <input type="text" placeholder="e.g. Black" required value={form.vehicle.color} onChange={setVehicle('color')} />
+              </div>
+            </>
+          )}
 
           <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
             {busy ? 'Creating account…' : 'Sign up'}
