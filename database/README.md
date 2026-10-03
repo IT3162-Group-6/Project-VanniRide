@@ -122,7 +122,20 @@ mongosh database\sample-data\seed-data.js
 
 This inserts sample users, rider data, ride data, payment data, messages, and a rating.
 
-The script checks for existing sample data before inserting new records.
+The script checks for existing sample data before inserting new records. If the
+accounts already exist, it safely refreshes their demo password and active
+status without duplicating ride history.
+
+Local test credentials:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Customer | `customer@test.com` | `VanniRideDemo123!` |
+| Rider | `rider@test.com` | `VanniRideDemo123!` |
+| Administrator | `admin@test.com` | `VanniRideDemo123!` |
+
+These credentials are deliberately for local testing only. Never seed them in
+a production database.
 
 ### 6. Run Common Queries
 

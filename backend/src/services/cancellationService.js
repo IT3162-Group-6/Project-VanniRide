@@ -303,8 +303,14 @@ const resumeStartedRide = async ({ requestId, respondingUserId, now }) => {
   );
   if (!cancellationRequest) return null;
 
+  const ride = await Ride.findById(cancellationRequest.ride_id);
+  if (!ride) {
+    throw new AppError('The ride linked to this cancellation no longer exists', 409);
+  }
+
   return {
     cancellationRequest,
+    ride,
     allowance: await getCancellationAllowance(
       cancellationRequest.requested_by,
       now

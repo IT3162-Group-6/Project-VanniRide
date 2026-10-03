@@ -431,7 +431,8 @@ created through protected setup tooling.
 
 For a `REQUESTED` or `ACCEPTED` ride, the cancel endpoint returns the final
 cancelled ride. For a `STARTED` ride, it returns HTTP 202 with the pending
-cancellation request.
+cancellation request. Resolving that request returns the current ride for both
+decisions; `RESUME` returns the unchanged `STARTED` ride.
 
 ### Payment
 

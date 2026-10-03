@@ -1,8 +1,23 @@
 use("vanniRideDB");
 
+// Password for local team testing only: VanniRideDemo123!
+// This is a real bcrypt hash so the seeded accounts can use the login API.
+const demoPasswordHash =
+  "$2b$12$AanNYPoHFHij7L6.KiEI5ubaRILAr6.tlywjFEba3yULIbpecp8Qq";
+
 // Prevent duplicate seed data
 if (db.users.findOne({ email: "customer@test.com" })) {
-  print("Seed data already exists. No new sample data inserted.");
+  db.users.updateMany(
+    { email: { $in: ["customer@test.com", "rider@test.com", "admin@test.com"] } },
+    {
+      $set: {
+        password_hash: demoPasswordHash,
+        account_status: "ACTIVE",
+        updated_at: new Date()
+      }
+    }
+  );
+  print("Existing demo account passwords and statuses were refreshed.");
 } else {
 
   // CUSTOMER
@@ -10,7 +25,7 @@ if (db.users.findOne({ email: "customer@test.com" })) {
     name: "Test Customer",
     email: "customer@test.com",
     phone: "0771234567",
-    password_hash: "TEMP_PASSWORD",
+    password_hash: demoPasswordHash,
     role: "CUSTOMER",
     account_status: "ACTIVE",
     token_version: 0,
@@ -25,7 +40,7 @@ if (db.users.findOne({ email: "customer@test.com" })) {
     name: "Test Admin",
     email: "admin@test.com",
     phone: "0700000000",
-    password_hash: "TEMP_PASSWORD",
+    password_hash: demoPasswordHash,
     role: "ADMIN",
     account_status: "ACTIVE",
     token_version: 0,
@@ -40,7 +55,7 @@ if (db.users.findOne({ email: "customer@test.com" })) {
     name: "Test Rider",
     email: "rider@test.com",
     phone: "0777654321",
-    password_hash: "TEMP_PASSWORD",
+    password_hash: demoPasswordHash,
     role: "RIDER",
     account_status: "ACTIVE",
     token_version: 0,
@@ -142,3 +157,7 @@ if (db.users.findOne({ email: "customer@test.com" })) {
 
   print("VanniRide sample data inserted successfully.");
 }
+
+print("Demo login: customer@test.com / VanniRideDemo123!");
+print("Demo login: rider@test.com / VanniRideDemo123!");
+print("Demo login: admin@test.com / VanniRideDemo123!");

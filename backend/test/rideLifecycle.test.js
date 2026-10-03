@@ -6,6 +6,7 @@ const path = require('path');
 process.env.ROUTING_BASE_URL =
   process.env.ROUTING_BASE_URL || 'http://routing.test';
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Server: SocketServer } = require('socket.io');
 const { io: createSocketClient } = require('socket.io-client');
@@ -1755,6 +1756,18 @@ test('keeps the Postman collection synchronized with every implemented API route
   assert.deepEqual(collectedRoutes.sort(), implementedRoutes.sort());
 });
 
+test('ships usable local demo credentials instead of placeholder password hashes', async () => {
+  const seedPath = path.resolve(
+    __dirname,
+    '../../database/sample-data/seed-data.js'
+  );
+  const seedSource = fs.readFileSync(seedPath, 'utf8');
+  const hash = seedSource.match(/\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}/)?.[0];
+  assert.ok(hash, 'The database seed must contain a bcrypt password hash');
+  assert.equal(seedSource.includes('TEMP_PASSWORD'), false);
+  assert.equal(await bcrypt.compare('VanniRideDemo123!', hash), true);
+});
+
 test('enforces bearer authentication, stored roles, account status, and token revocation', async () => {
   assert.ok(env.jwtSecret, 'JWT_SECRET must be configured for security tests');
   const customerId = new mongoose.Types.ObjectId();
@@ -1809,6 +1822,142 @@ test('enforces bearer authentication, stored roles, account status, and token re
       { $set: { account_status: 'ACTIVE' }, $inc: { token_version: 1 } }
     );
     assert.equal((await get('/api/users/profile', customerToken)).status, 401);
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});
+
+test('completes the customer, rider, and administrator journey through HTTP APIs', async () => {
+  assert.ok(env.jwtSecret, 'JWT_SECRET must be configured for journey tests');
+  const password = 'JourneyPassword123!';
+  const admin = await User.create({
+    name: 'Journey Admin',
+    email: 'journey-admin@example.com',
+    phone: '0700001700',
+    password_hash: await bcrypt.hash(password, 4),
+    role: 'ADMIN',
+    account_status: 'ACTIVE',
+    token_version: 0,
+  });
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const request = async (method, endpoint, token, body) => {
+    const response = await originalFetch(`${baseUrl}${endpoint}`, {
+      method,
+      headers: {
+        Accept: 'application/json',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: response.status, body: await response.json() };
+  };
+
+  try {
+    const customerRegistration = await request('POST', '/api/auth/register', null, {
+      name: 'Journey Customer',
+      email: 'journey-customer@example.com',
+      phone: '0700001701',
+      password,
+      role: 'CUSTOMER',
+    });
+    const riderRegistration = await request('POST', '/api/auth/register', null, {
+      name: 'Journey Rider',
+      email: 'journey-rider@example.com',
+      phone: '0700001702',
+      password,
+      role: 'RIDER',
+      vehicle: {
+        type: 'Motorcycle',
+        model: 'Honda Dio',
+        registrationNumber: 'NP-JOURNEY-17',
+        color: 'Black',
+      },
+    });
+    assert.equal(customerRegistration.status, 201);
+    assert.equal(riderRegistration.status, 201);
+    const customerToken = customerRegistration.body.token;
+    const riderToken = riderRegistration.body.token;
+    const riderUserId = riderRegistration.body.data.user.id;
+
+    const adminLogin = await request('POST', '/api/auth/login', null, {
+      email: admin.email,
+      password,
+    });
+    assert.equal(adminLogin.status, 200);
+    const adminToken = adminLogin.body.token;
+
+    const approval = await request(
+      'PATCH',
+      `/api/admin/riders/${riderUserId}/approval`,
+      adminToken,
+      { decision: 'APPROVE', reason: 'Journey test documents verified' }
+    );
+    assert.equal(approval.body.data.riderProfile.approvalStatus, 'APPROVED');
+    const availability = await request(
+      'PATCH',
+      '/api/users/rider/availability',
+      riderToken,
+      { availabilityStatus: 'AVAILABLE' }
+    );
+    assert.equal(availability.body.data.riderProfile.availabilityStatus, 'AVAILABLE');
+
+    const rideRequest = await request('POST', '/api/rides', customerToken, {
+      rideType: 'TRANSPORT',
+      pickupLocation: { address: 'University Gate', latitude: 8.7581, longitude: 80.4982 },
+      destination: { address: 'Vavuniya Town', latitude: 8.7514, longitude: 80.4971 },
+    });
+    assert.equal(rideRequest.status, 201);
+    const rideId = rideRequest.body.data.ride.id;
+    const available = await request('GET', '/api/rides/available', riderToken);
+    assert.equal(available.body.data.rides.some((ride) => ride.id === rideId), true);
+    const accepted = await request('PATCH', `/api/rides/${rideId}/accept`, riderToken);
+    assert.equal(accepted.body.data.ride.status, 'ACCEPTED');
+
+    const message = await request('POST', `/api/rides/${rideId}/messages`, customerToken, {
+      messageText: 'I am waiting at the gate.',
+    });
+    assert.equal(message.status, 201);
+    for (const status of ['ARRIVED', 'STARTED']) {
+      const transition = await request('PATCH', `/api/rides/${rideId}/status`, riderToken, { status });
+      assert.equal(transition.body.data.ride.status, status);
+    }
+
+    const cancellation = await request('PATCH', `/api/rides/${rideId}/cancel`, customerToken, {
+      reason: 'Checking the mutual cancellation flow',
+    });
+    assert.equal(cancellation.status, 202);
+    const resumed = await request('PATCH', `/api/rides/${rideId}/cancellation-request`, riderToken, {
+      decision: 'RESUME',
+    });
+    assert.equal(resumed.body.data.ride.status, 'STARTED');
+    assert.equal(resumed.body.data.cancellationAllowance.remaining, 5);
+
+    const completed = await request('PATCH', `/api/rides/${rideId}/status`, riderToken, {
+      status: 'COMPLETED',
+    });
+    assert.equal(completed.body.data.ride.status, 'COMPLETED');
+    const payment = await request('PATCH', `/api/rides/${rideId}/payment`, riderToken);
+    assert.equal(payment.body.data.payment.paymentStatus, 'PAID');
+    const rating = await request('POST', `/api/rides/${rideId}/rating`, customerToken, {
+      rating: 5,
+      review: 'Safe journey',
+    });
+    assert.equal(rating.body.data.rating.rating, 5);
+
+    const customerHistory = await request('GET', '/api/users/history', customerToken);
+    const riderHistory = await request('GET', '/api/users/history', riderToken);
+    const riderEarnings = await request('GET', '/api/users/rider/earnings', riderToken);
+    const statistics = await request('GET', '/api/admin/statistics', adminToken);
+    assert.equal(customerHistory.body.data.history[0].ride.status, 'COMPLETED');
+    assert.equal(riderHistory.body.data.summary.payments.totalPaidAmount, 260);
+    assert.equal(riderEarnings.body.data.summary.totalEarnings, 260);
+    assert.equal(statistics.body.data.statistics.rides.completed, 1);
+    assert.equal(statistics.body.data.statistics.payments.paid, 1);
   } finally {
     await new Promise((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve()))

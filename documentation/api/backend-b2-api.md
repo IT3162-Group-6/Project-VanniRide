@@ -166,6 +166,10 @@ cancelled automatically. Each account may initiate at most five cancellations
 in a rolling one-hour window; the current allowance is available from
 `GET /api/users/cancellation-allowance`.
 
+Both `CANCEL` and `RESUME` responses include the current serialized ride. A
+resumed ride is returned with status `STARTED`, allowing clients to refresh
+their state without making a second ride request.
+
 ## Cash payment endpoints
 
 Every new ride receives a payment record with:
