@@ -18,6 +18,12 @@ build
 .env
 .env.local
 
+# Local integration references and generated artifacts
+/instructions/
+/manual-test-ui/
+/output/
+/tmp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

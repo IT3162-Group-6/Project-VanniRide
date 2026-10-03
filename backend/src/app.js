@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
+const config = require('./config/env');
 const AppError = require('./utils/appError');
 const errorHandler = require('./middlewares/errorMiddleware');
 const authRoutes = require('./routes/authRoutes');
@@ -14,9 +16,27 @@ const mapRoutes = require('./routes/mapRoutes');
 const app = express();
 
 // Middlewares
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || config.corsOrigins.includes(origin.replace(/\/$/, ''))) {
+      callback(null, true);
+      return;
+    }
+    callback(new AppError('This browser origin is not allowed', 403));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
+};
+app.disable('x-powered-by');
+app.use(cors(corsOptions));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  next();
+});
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Base Route
 app.get('/', (req, res) => {
@@ -28,9 +48,11 @@ app.get('/', (req, res) => {
 
 // Health Check Route
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Server is up and running!',
+  const databaseReady = mongoose.connection.readyState === 1;
+  res.status(databaseReady ? 200 : 503).json({
+    success: databaseReady,
+    message: databaseReady ? 'Server is ready' : 'Server is not ready',
+    data: { database: databaseReady ? 'connected' : 'disconnected' },
   });
 });
 
@@ -53,3 +75,4 @@ app.use((req, res, next) => {
 app.use(errorHandler);
 
 module.exports = app;
+module.exports.corsOptions = corsOptions;

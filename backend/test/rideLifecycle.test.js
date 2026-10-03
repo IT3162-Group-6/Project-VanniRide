@@ -1768,6 +1768,28 @@ test('ships usable local demo credentials instead of placeholder password hashes
   assert.equal(await bcrypt.compare('VanniRideDemo123!', hash), true);
 });
 
+test('rejects unsafe production configuration before server startup', () => {
+  assert.throws(
+    () => env.validateRuntimeConfig({
+      ...env,
+      nodeEnv: 'production',
+      mongoUri: 'mongodb://database/vanniRideDB',
+      jwtSecret: 'replace_with_a_long_random_secret',
+      corsOrigins: ['https://app.example.com'],
+      corsOriginsConfigured: false,
+    }),
+    /Production JWT_SECRET.*CORS_ORIGINS/
+  );
+  assert.doesNotThrow(() => env.validateRuntimeConfig({
+    ...env,
+    nodeEnv: 'production',
+    mongoUri: 'mongodb://database/vanniRideDB',
+    jwtSecret: '7wSx6Jq9uMd4Kr2Nv8Pa5Bc1Tf3Hg0Zy',
+    corsOrigins: ['https://app.example.com'],
+    corsOriginsConfigured: true,
+  }));
+});
+
 test('enforces bearer authentication, stored roles, account status, and token revocation', async () => {
   assert.ok(env.jwtSecret, 'JWT_SECRET must be configured for security tests');
   const customerId = new mongoose.Types.ObjectId();
@@ -1800,6 +1822,21 @@ test('enforces bearer authentication, stored roles, account status, and token re
     });
 
   try {
+    const allowedOrigin = await originalFetch(`${baseUrl}/health`, {
+      headers: { Origin: 'http://localhost:5173' },
+    });
+    assert.equal(allowedOrigin.status, 200);
+    assert.equal(
+      allowedOrigin.headers.get('access-control-allow-origin'),
+      'http://localhost:5173'
+    );
+    assert.equal(allowedOrigin.headers.get('x-powered-by'), null);
+    assert.equal(allowedOrigin.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(allowedOrigin.headers.get('x-frame-options'), 'DENY');
+    const deniedOrigin = await originalFetch(`${baseUrl}/health`, {
+      headers: { Origin: 'https://untrusted.example' },
+    });
+    assert.equal(deniedOrigin.status, 403);
     assert.equal((await get('/api/users/profile')).status, 401);
     assert.equal(
       (await get('/api/admin/users', forgedAdminToken)).status,

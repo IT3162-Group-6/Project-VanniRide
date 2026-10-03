@@ -1,6 +1,12 @@
 require('dotenv').config();
 
-module.exports = {
+const parseOrigins = (value) =>
+  String(value || '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+const config = {
   port: process.env.PORT || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
   mongoUri: process.env.MONGODB_URI,
@@ -26,4 +32,43 @@ module.exports = {
   cancellationSweepIntervalMs: Number(
     process.env.CANCELLATION_SWEEP_INTERVAL_MS || 30000
   ),
+  corsOrigins: parseOrigins(process.env.CORS_ORIGINS).length
+    ? parseOrigins(process.env.CORS_ORIGINS)
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  corsOriginsConfigured: Boolean(String(process.env.CORS_ORIGINS || '').trim()),
 };
+
+const validateRuntimeConfig = (candidate = config) => {
+  const errors = [];
+  if (!candidate.mongoUri) errors.push('MONGODB_URI is required');
+  if (!candidate.jwtSecret) errors.push('JWT_SECRET is required');
+  if (!['development', 'test', 'production'].includes(candidate.nodeEnv)) {
+    errors.push('NODE_ENV must be development, test, or production');
+  }
+  if (!Number.isInteger(Number(candidate.port)) || Number(candidate.port) < 1) {
+    errors.push('PORT must be a positive integer');
+  }
+  if (
+    !Number.isFinite(candidate.cancellationSweepIntervalMs) ||
+    candidate.cancellationSweepIntervalMs < 1000
+  ) {
+    errors.push('CANCELLATION_SWEEP_INTERVAL_MS must be at least 1000');
+  }
+  if (candidate.nodeEnv === 'production') {
+    if (
+      String(candidate.jwtSecret || '').length < 32 ||
+      /replace|secret|example/i.test(String(candidate.jwtSecret || ''))
+    ) {
+      errors.push('Production JWT_SECRET must be a non-placeholder value of at least 32 characters');
+    }
+    if (!candidate.corsOriginsConfigured || candidate.corsOrigins.length === 0) {
+      errors.push('CORS_ORIGINS must be explicitly configured in production');
+    }
+  }
+  if (errors.length) {
+    throw new Error(`Invalid runtime configuration: ${errors.join('; ')}`);
+  }
+  return candidate;
+};
+
+module.exports = { ...config, validateRuntimeConfig };

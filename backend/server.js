@@ -1,4 +1,5 @@
 const http = require('http');
+const mongoose = require('mongoose');
 const { Server: SocketServer } = require('socket.io');
 const app = require('./src/app');
 const config = require('./src/config/env');
@@ -16,17 +17,40 @@ process.on('uncaughtException', (err) => {
 });
 
 let server;
+let io;
+let stopCancellationWorker;
+let shuttingDown = false;
+
+const shutdown = async (signal, exitCode = 0) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`Received ${signal}; shutting down safely.`);
+  stopCancellationWorker?.();
+  io?.disconnectSockets(true);
+  if (server?.listening) {
+    await new Promise((resolve) => server.close(resolve));
+  }
+  await mongoose.disconnect();
+  process.exit(exitCode);
+};
 
 const startServer = async () => {
+  config.validateRuntimeConfig();
   await connectDatabase(config.mongoUri);
 
   server = http.createServer(app);
-  const io = new SocketServer(server, {
-    cors: { origin: '*' },
+  io = new SocketServer(server, {
+    cors: {
+      origin: config.corsOrigins,
+      methods: ['GET', 'POST'],
+    },
   });
   app.set('io', io);
   initializeSocketHandler(io, config);
-  startCancellationWorker(io, config.cancellationSweepIntervalMs);
+  stopCancellationWorker = startCancellationWorker(
+    io,
+    config.cancellationSweepIntervalMs
+  );
 
   server.listen(config.port, () => {
     console.log(
@@ -41,13 +65,12 @@ startServer().catch((err) => {
   process.exit(1);
 });
 
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
+process.once('SIGINT', () => void shutdown('SIGINT'));
+
 // Catch unhandled rejections (Asynchronous / Promise errors)
 process.on('unhandledRejection', (err) => {
   console.error('UNHANDLED REJECTION! 💥 Shutting down...');
   console.error(err.name, err.message);
-  if (server) {
-    server.close(() => process.exit(1));
-  } else {
-    process.exit(1);
-  }
+  void shutdown('unhandled rejection', 1);
 });
