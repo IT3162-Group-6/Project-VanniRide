@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../../components/StatusBadge';
 import { adminApi } from '../../services/api';
 
-const TABS = ['all', 'pending', 'ontheway', 'completed', 'cancelled'];
+const TABS = ['all', 'pending', 'accepted', 'ontheway', 'picked', 'completed', 'cancelled'];
 const when = (iso) => new Date(iso).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 export default function Rides() {
@@ -11,8 +11,9 @@ export default function Rides() {
   const [rides, setRides] = useState([]);
   const [tab, setTab] = useState('all');
   const [q, setQ] = useState('');
+  const [error, setError] = useState('');
 
-  useEffect(() => { adminApi.rides().then(setRides); }, []);
+  useEffect(() => { adminApi.rides().then(setRides).catch((e) => setError(e.message)); }, []);
 
   const shown = useMemo(() => rides
     .filter((r) => (tab === 'all' ? true : r.status === tab))
@@ -22,6 +23,7 @@ export default function Rides() {
   return (
     <div className="card">
       <div className="card-head"><h3>Rides ({rides.length})</h3></div>
+      {error && <div className="alert alert-error">{error}</div>}
 
       <div className="toolbar">
         <div className="tabs">

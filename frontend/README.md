@@ -70,3 +70,12 @@ After a completed ride, the customer history page accepts one one-to-five-star
 rider rating with an optional review. The rider dashboard shows the backend's
 current average and total rating count. These additions reuse the existing
 history and chat layouts without changing the frontend theme.
+
+## Administrator operations
+
+Administrator dashboards now use the protected backend data instead of the
+browser demo store. Administrators can approve or reject rider applications,
+suspend or reactivate accounts, review post-completion chat requests, inspect a
+ride conversation with an audited reason, and force-cancel active rides. The
+ride details page also supports audited corrections to completed-ride cash
+payments. Dashboard totals come from the backend statistics endpoint.

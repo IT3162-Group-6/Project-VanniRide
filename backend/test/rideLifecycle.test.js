@@ -1405,6 +1405,20 @@ test('audits bounded admin management, dispute, approval, and statistics operati
   assert.equal(emittedChatUpdates[0].event, 'chat_access_updated');
   assert.equal(emittedChatUpdates[0].payload.status, 'APPROVED');
 
+  const adminRides = await invokeController(
+    adminController.getAllRides,
+    makeRequest({ user: adminUser })
+  );
+  const serializedCompletedRide = adminRides.body.data.rides.find(
+    (ride) => ride.id === completedRide._id.toString()
+  );
+  assert.equal(serializedCompletedRide.customer.name, 'Managed Customer');
+  assert.equal(serializedCompletedRide.assignedRider.name, 'Managed Rider');
+  assert.match(
+    serializedCompletedRide.assignedRider.vehicle,
+    /^Test Model · TEST-\d+$/
+  );
+
   const listChecks = [
     [adminController.getAllUsers, 'users', 3],
     [adminController.getAllRides, 'rides', 2],

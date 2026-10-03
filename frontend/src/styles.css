@@ -328,6 +328,9 @@ ul{margin:0;padding:0;list-style:none}
 .fare-summary{display:flex;gap:24px;margin-bottom:18px}
 .fare-summary div span{display:block;color:var(--ink-soft);font-size:.78rem}
 .fare-summary div b{font-size:1.1rem}
+.admin-action-panel{margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--mint-50)}
+.admin-action-panel input{width:100%;margin:7px 0 10px;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-family:inherit}
+.admin-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 
 /* ============ Tracking ============ */
 .track-banner{

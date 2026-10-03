@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppState';
-import { adminApi, resetDemoData } from '../../services/api';
+import { adminApi, isMockAuth, resetDemoData } from '../../services/api';
 
 export default function Profile() {
   const { user, updateUser, logout } = useAuth();
@@ -68,7 +68,7 @@ export default function Profile() {
           ) : <p className="muted">Loading…</p>}
         </div>
 
-        <div className="card" style={{ marginTop: 18 }}>
+        {isMockAuth() && <div className="card" style={{ marginTop: 18 }}>
           <div className="card-head"><h3>Demo Data</h3></div>
           <p className="muted">Local demo data is stored in your browser. Reset it to restore the seeded users and rides.</p>
           <button
@@ -77,7 +77,7 @@ export default function Profile() {
           >
             Reset demo data
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );

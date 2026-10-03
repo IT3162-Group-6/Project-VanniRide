@@ -7,12 +7,32 @@ import { adminApi } from '../../services/api';
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [rides, setRides] = useState([]);
+  const [chatRequests, setChatRequests] = useState([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    adminApi.stats().then(setStats);
-    adminApi.rides().then(setRides);
+    Promise.all([adminApi.stats(), adminApi.rides(), adminApi.chatAccessRequests()])
+      .then(([statistics, rideList, requests]) => {
+        setStats(statistics);
+        setRides(rideList);
+        setChatRequests(requests);
+      })
+      .catch((requestError) => setError(requestError.message));
   }, []);
 
+  async function reviewChat(request, decision) {
+    const action = decision === 'APPROVE' ? 'approving' : 'rejecting';
+    const reason = window.prompt(`Reason for ${action} this request:`);
+    if (!reason?.trim()) return;
+    try {
+      const updated = await adminApi.reviewChatAccess(request.id, decision, reason.trim());
+      setChatRequests((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setStats((current) => ({ ...current, pendingChatRequests: Math.max(0, current.pendingChatRequests - 1) }));
+      setError('');
+    } catch (requestError) { setError(requestError.message); }
+  }
+
+  if (error && !stats) return <div className="alert alert-error">{error}</div>;
   if (!stats) return <p className="muted">Loading…</p>;
 
   return (
@@ -45,6 +65,29 @@ export default function AdminDashboard() {
             <Link to="/admin/rides"><Icon name="car" size={16} /> All Rides</Link>
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="card-head"><h3>Post-completion chat requests</h3><span>{stats.pendingChatRequests} pending</span></div>
+        {error && <div className="alert alert-error">{error}</div>}
+        {chatRequests.filter((request) => request.status === 'PENDING').map((request) => {
+          const ride = rides.find((item) => item.id === request.rideId);
+          return (
+            <div className="req-row" key={request.id}>
+              <span className="avatar avatar-sm"><Icon name="chat" size={16} /></span>
+              <div className="req-meta">
+                <b>{ride ? `${ride.pickup} → ${ride.dropoff}` : `Ride ${request.rideId}`}</b>
+                <span>{request.reason}</span>
+              </div>
+              <div className="req-actions">
+                <Link className="btn btn-ghost btn-sm" to={`/admin/rides/${request.rideId}`}>View chat</Link>
+                <button className="btn btn-primary btn-sm" onClick={() => reviewChat(request, 'APPROVE')}>Approve</button>
+                <button className="btn btn-outline btn-sm" onClick={() => reviewChat(request, 'REJECT')}>Reject</button>
+              </div>
+            </div>
+          );
+        })}
+        {chatRequests.every((request) => request.status !== 'PENDING') && <p className="muted">No pending chat access requests.</p>}
       </div>
     </>
   );

@@ -10,6 +10,7 @@ global.localStorage = {
 
 const {
   ApiError,
+  adminApi,
   authApi,
   chatApi,
   getToken,
@@ -458,4 +459,47 @@ test('connects ride chat, access requests, and rider ratings', async () => {
   assert.deepEqual(JSON.parse(requests[1].options.body), { messageText: 'Found it' });
   assert.deepEqual(JSON.parse(requests[2].options.body), { reason: 'Lost item' });
   assert.deepEqual(JSON.parse(requests[3].options.body), { rating: 5, review: 'Safe ride' });
+});
+
+test('connects administrator management, review, audit, and statistics APIs', async () => {
+  localStorage.setItem('vr_token', 'admin-token');
+  const requests = [];
+  global.fetch = async (url, options) => {
+    const request = { url: String(url), options }; requests.push(request);
+    const path = new URL(request.url).pathname;
+    if (path.endsWith('/admin/users') && options.method === 'GET') return jsonResponse({ success: true, data: { users: [{ id: 'u1', name: 'Rider', email: 'r@example.com', role: 'RIDER', accountStatus: 'ACTIVE' }] } });
+    if (path.endsWith('/admin/users/u1/status')) return jsonResponse({ success: true, data: { user: { id: 'u1', name: 'Rider', email: 'r@example.com', role: 'RIDER', accountStatus: 'SUSPENDED' } } });
+    if (path.endsWith('/admin/riders') && options.method === 'GET') return jsonResponse({ success: true, data: { riders: [{ id: 'rp1', userId: 'u1', approvalStatus: 'PENDING', availabilityStatus: 'UNAVAILABLE', vehicle: { model: 'Dio', registrationNumber: 'NP-1' }, user: { id: 'u1', name: 'Rider', email: 'r@example.com', role: 'RIDER', accountStatus: 'ACTIVE' } }] } });
+    if (path.endsWith('/admin/riders/u1/approval')) return jsonResponse({ success: true, data: { riderProfile: { id: 'rp1', userId: 'u1', approvalStatus: 'APPROVED', availabilityStatus: 'UNAVAILABLE' } } });
+    if (path.endsWith('/admin/rides') && options.method === 'GET') return jsonResponse({ success: true, data: { rides: [{ id: 'ride1', customerId: 'c1', rideType: 'TRANSPORT', pickupLocation: { address: 'A' }, destination: { address: 'B' }, distanceKm: 2, estimatedFare: 300, status: 'STARTED', requestedAt: '2026-10-03T00:00:00.000Z', customer: { id: 'c1', name: 'Customer' }, assignedRider: { id: 'u1', name: 'Rider' } }] } });
+    if (path.endsWith('/admin/rides/ride1/messages')) return jsonResponse({ success: true, data: { messages: [{ id: 'm1', sender: { id: 'c1', name: 'Customer', role: 'CUSTOMER' }, messageText: 'Help', sentAt: '2026-10-03T00:01:00.000Z' }] } });
+    if (path.endsWith('/admin/rides/ride1/cancel')) return jsonResponse({ success: true, data: { ride: { id: 'ride1', customerId: 'c1', rideType: 'TRANSPORT', pickupLocation: { address: 'A' }, destination: { address: 'B' }, distanceKm: 2, estimatedFare: 300, status: 'CANCELLED', requestedAt: '2026-10-03T00:00:00.000Z' } } });
+    if (path.endsWith('/admin/payments/p1')) return jsonResponse({ success: true, data: { payment: { id: 'p1', rideId: 'ride1', amount: 300, paymentStatus: 'PAID' } } });
+    if (path.endsWith('/admin/payments')) return jsonResponse({ success: true, data: { payments: [{ id: 'p1', rideId: 'ride1', amount: 300, paymentStatus: 'PENDING' }] } });
+    if (path.endsWith('/admin/ratings')) return jsonResponse({ success: true, data: { ratings: [{ id: 'rate1', rideId: 'ride1', rating: 5 }] } });
+    if (path.endsWith('/admin/chat-access-requests/a1')) return jsonResponse({ success: true, data: { chatAccessRequest: { id: 'a1', rideId: 'ride1', status: 'APPROVED' } } });
+    if (path.endsWith('/admin/chat-access-requests')) return jsonResponse({ success: true, data: { chatAccessRequests: [{ id: 'a1', rideId: 'ride1', status: 'PENDING' }] } });
+    if (path.endsWith('/admin/statistics')) return jsonResponse({ success: true, data: { statistics: { users: { customers: 2, riders: 1, admins: 1 }, rides: { total: 4, active: 1, completed: 2, cancelled: 1 }, payments: { totalPaidAmount: 600, pending: 1 }, riderApprovals: { pending: 1 }, chatAccessRequests: { pending: 1 }, ratings: { averageRating: 5 } } } });
+    throw new Error(`Unexpected request ${request.url}`);
+  };
+
+  assert.equal((await adminApi.users('rider'))[0].status, 'active');
+  assert.equal((await adminApi.riders())[0].riderProfile.approvalStatus, 'pending');
+  assert.equal((await adminApi.setUserStatus('u1', 'suspended', 'Policy')).status, 'suspended');
+  assert.equal((await adminApi.reviewRider('u1', 'APPROVE', 'Documents valid')).approvalStatus, 'approved');
+  const rides = await adminApi.rides();
+  assert.equal(rides[0].status, 'picked');
+  assert.equal(rides[0].customer.name, 'Customer');
+  assert.equal((await adminApi.messages('ride1', 'Safety review'))[0].text, 'Help');
+  assert.equal((await adminApi.forceCancel('ride1', 'Safety concern')).status, 'cancelled');
+  assert.equal((await adminApi.payments())[0].paymentStatus, 'PENDING');
+  assert.equal((await adminApi.correctPayment('p1', { amount: 300, paymentStatus: 'PAID', reason: 'Receipt' })).paymentStatus, 'PAID');
+  assert.equal((await adminApi.ratings())[0].rating, 5);
+  assert.equal((await adminApi.chatAccessRequests())[0].status, 'PENDING');
+  assert.equal((await adminApi.reviewChatAccess('a1', 'APPROVE', 'Lost item')).status, 'APPROVED');
+  assert.equal((await adminApi.stats()).pendingChatRequests, 1);
+
+  assert.deepEqual(JSON.parse(requests[2].options.body), { accountStatus: 'SUSPENDED', reason: 'Policy' });
+  assert.deepEqual(JSON.parse(requests[3].options.body), { decision: 'APPROVE', reason: 'Documents valid' });
+  assert.ok(requests[5].url.includes('reason=Safety+review'));
 });

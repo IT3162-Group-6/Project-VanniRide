@@ -143,6 +143,19 @@ const serializeAdminMessage = (message, sender) => ({
   sentAt: message.sent_at,
 });
 
+const serializeAdminParticipant = (user, rider = null) =>
+  user
+    ? {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        vehicle: rider?.vehicle
+          ? `${rider.vehicle.model} · ${rider.vehicle.registration_number}`
+          : null,
+      }
+    : null;
+
 exports.getAllUsers = catchAsync(async (req, res) => {
   const users = await User.find().sort({ created_at: -1 });
   return res.status(200).json({
@@ -352,10 +365,39 @@ exports.updateUserStatus = catchAsync(async (req, res) => {
 
 exports.getAllRides = catchAsync(async (req, res) => {
   const rides = await Ride.find().sort({ requested_at: -1 }).lean();
+  const userIds = [
+    ...new Set(
+      rides.flatMap((ride) =>
+        [ride.customer_id, ride.rider_id]
+          .filter(Boolean)
+          .map((id) => id.toString())
+      )
+    ),
+  ];
+  const [users, riders] = await Promise.all([
+    User.find({ _id: { $in: userIds } }).lean(),
+    Rider.find({ user_id: { $in: userIds } }).lean(),
+  ]);
+  const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+  const ridersByUserId = new Map(
+    riders.map((rider) => [rider.user_id.toString(), rider])
+  );
+  const serializedRides = rides.map((ride) => ({
+    ...serializeRide(ride),
+    customer: serializeAdminParticipant(
+      usersById.get(ride.customer_id.toString())
+    ),
+    assignedRider: ride.rider_id
+      ? serializeAdminParticipant(
+          usersById.get(ride.rider_id.toString()),
+          ridersByUserId.get(ride.rider_id.toString())
+        )
+      : null,
+  }));
   return res.status(200).json({
     success: true,
     results: rides.length,
-    data: { rides: rides.map(serializeRide) },
+    data: { rides: serializedRides },
   });
 });
 

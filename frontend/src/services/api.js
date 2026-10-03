@@ -114,6 +114,7 @@ const normalizeApiRide = (ride) =>
   ride
     ? {
         ...ride,
+        code: ride.code || `VR-${String(ride.id || '').slice(-6).toUpperCase()}`,
         apiStatus: ride.status,
         status: FRONTEND_RIDE_STATUS[ride.status] || String(ride.status).toLowerCase(),
         type: ride.rideType === 'DELIVERY' ? 'delivery' : 'ride',
@@ -667,12 +668,23 @@ export const paymentsApi = {
    ============================================================ */
 export const adminApi = {
   async users(role) {
+    if (!USE_MOCK_AUTH) {
+      const response = await http('/admin/users');
+      const users = (response.data?.users || []).map((user) => normalizeApiUser(user));
+      return role ? users.filter((user) => user.role === role) : users;
+    }
     if (!USE_MOCK_DATA) return http('/admin/users', { params: { role } });
     await delay(180);
     const list = db().users.map(publicUser);
     return role ? list.filter((u) => u.role === role) : list;
   },
-  async setUserStatus(userId, status) {
+  async setUserStatus(userId, status, reason = 'Administrative account review') {
+    if (!USE_MOCK_AUTH) {
+      const response = await http(`/admin/users/${userId}/status`, {
+        method: 'PATCH', body: { accountStatus: String(status).toUpperCase(), reason },
+      });
+      return normalizeApiUser(response.data?.user);
+    }
     if (!USE_MOCK_DATA) return http(`/admin/users/${userId}/status`, { method: 'PATCH', body: { status } });
     await delay(150);
     const d = db();
@@ -681,14 +693,87 @@ export const adminApi = {
     save(d);
     return publicUser(u);
   },
+  async riders(approvalStatus) {
+    const response = await http('/admin/riders', { params: { approvalStatus } });
+    return (response.data?.riders || []).map((profile) => ({
+      ...normalizeApiUser(profile.user, profile),
+      riderProfile: normalizeRiderProfile(profile),
+    }));
+  },
+  async reviewRider(riderUserId, decision, reason) {
+    const response = await http(`/admin/riders/${riderUserId}/approval`, {
+      method: 'PATCH', body: { decision, reason },
+    });
+    return normalizeRiderProfile(response.data?.riderProfile);
+  },
   async rides() {
+    if (!USE_MOCK_AUTH) {
+      const response = await http('/admin/rides');
+      return (response.data?.rides || []).map(normalizeApiRide);
+    }
     if (!USE_MOCK_DATA) return http('/admin/rides');
     await delay(180);
     const d = db();
     return d.rides.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((r) => hydrate(r, d));
   },
+  async messages(rideId, reason) {
+    const response = await http(`/admin/rides/${rideId}/messages`, {
+      params: { reason, limit: 100 },
+    });
+    return (response.data?.messages || []).map((message) => ({
+      ...message, text: message.messageText, at: message.sentAt,
+    }));
+  },
+  async forceCancel(rideId, reason) {
+    const response = await http(`/admin/rides/${rideId}/cancel`, {
+      method: 'PATCH', body: { reason },
+    });
+    return normalizeApiRide(response.data?.ride);
+  },
+  async payments() {
+    const response = await http('/admin/payments');
+    return response.data?.payments || [];
+  },
+  async correctPayment(paymentId, changes) {
+    const response = await http(`/admin/payments/${paymentId}`, {
+      method: 'PATCH', body: changes,
+    });
+    return response.data?.payment;
+  },
+  async ratings() {
+    const response = await http('/admin/ratings');
+    return response.data?.ratings || [];
+  },
+  async chatAccessRequests() {
+    const response = await http('/admin/chat-access-requests');
+    return response.data?.chatAccessRequests || [];
+  },
+  async reviewChatAccess(requestId, decision, reason) {
+    const response = await http(`/admin/chat-access-requests/${requestId}`, {
+      method: 'PATCH', body: { decision, reason },
+    });
+    return response.data?.chatAccessRequest;
+  },
   async stats() {
-    if (!USE_MOCK_DATA) return http('/admin/stats');
+    if (!USE_MOCK_AUTH) {
+      const response = await http('/admin/statistics');
+      const stats = response.data?.statistics || {};
+      return {
+        customers: stats.users?.customers || 0,
+        riders: stats.users?.riders || 0,
+        admins: stats.users?.admins || 0,
+        pendingRiders: stats.riderApprovals?.pending || 0,
+        totalRides: stats.rides?.total || 0,
+        activeRides: stats.rides?.active || 0,
+        completedRides: stats.rides?.completed || 0,
+        cancelledRides: stats.rides?.cancelled || 0,
+        revenue: stats.payments?.totalPaidAmount || 0,
+        pendingPayments: stats.payments?.pending || 0,
+        pendingChatRequests: stats.chatAccessRequests?.pending || 0,
+        averageRating: stats.ratings?.averageRating || null,
+      };
+    }
+    if (!USE_MOCK_DATA) return http('/admin/statistics');
     await delay(180);
     const d = db();
     const completed = d.rides.filter((r) => r.status === RIDE_STATUS.COMPLETED);
