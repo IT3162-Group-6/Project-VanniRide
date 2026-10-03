@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import ChatBox from '../../components/ChatBox';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,8 @@ import { ridesApi, chatApi } from '../../services/api';
 
 export default function Chat() {
   const { user } = useAuth(); const { showToast } = useAppState(); const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedRideId = searchParams.get('rideId');
   const [rides, setRides] = useState([]); const [rideId, setRideId] = useState('');
   const [messages, setMessages] = useState([]); const [access, setAccess] = useState(null);
   const [reason, setReason] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(true);
@@ -15,8 +17,8 @@ export default function Chat() {
 
   useEffect(() => { ridesApi.history().then((history) => {
     const eligible = history.rides.filter((item) => item.rider && ['accepted','ontheway','picked','completed'].includes(item.status));
-    setRides(eligible); setRideId(eligible[0]?.id || '');
-  }).catch((e) => setError(e.message)).finally(() => setLoading(false)); }, []);
+    setRides(eligible); setRideId(eligible.find((item) => item.id === selectedRideId)?.id || eligible[0]?.id || '');
+  }).catch((e) => setError(e.message)).finally(() => setLoading(false)); }, [selectedRideId]);
 
   const loadMessages = useCallback(async () => {
     if (!rideId) return;

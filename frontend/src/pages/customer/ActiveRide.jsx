@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import MapArt from '../../components/MapArt';
 import StatusBadge from '../../components/StatusBadge';
@@ -24,6 +24,8 @@ export default function ActiveRide() {
   const { user } = useAuth();
   const { showToast } = useAppState();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedRideId = searchParams.get('rideId');
   const [ride, setRide] = useState(null);
   const [payment, setPayment] = useState(null);
   const [allowance, setAllowance] = useState(null);
@@ -39,9 +41,13 @@ export default function ActiveRide() {
         ridesApi.list({ customerId: user.id }),
         ridesApi.cancellationAllowance(),
       ]);
-      const currentRide = rides.find((item) =>
+      const activeRides = rides.filter((item) =>
         ['pending', 'accepted', 'ontheway', 'picked'].includes(item.status)
-      ) || null;
+      );
+      const currentRide =
+        activeRides.find((item) => item.id === selectedRideId) ||
+        activeRides[0] ||
+        null;
       setRide(currentRide);
       setAllowance(currentAllowance);
       if (!currentRide) {
@@ -63,7 +69,7 @@ export default function ActiveRide() {
     } finally {
       setLoading(false);
     }
-  }, [user.id]);
+  }, [selectedRideId, user.id]);
 
   useEffect(() => {
     const initial = setTimeout(() => void load(), 0);
@@ -89,8 +95,7 @@ export default function ActiveRide() {
         setCancellationRequest(result.cancellationRequest);
         showToast('Waiting up to 15 minutes for the rider to respond.');
       } else {
-        setRide(null);
-        setPayment(null);
+        await load();
         showToast('Request cancelled');
       }
     } catch (requestError) {
@@ -109,8 +114,7 @@ export default function ActiveRide() {
       setAllowance(result.cancellationAllowance || allowance);
       showToast(result.message);
       if (result.ride?.status === RIDE_STATUS.CANCELLED) {
-        setRide(null);
-        setPayment(null);
+        await load();
       } else {
         await load();
       }
@@ -173,7 +177,7 @@ export default function ActiveRide() {
             <div className="rider-card">
               <div className="avatar" style={{ background: 'var(--mint-100)', color: 'var(--green-700)' }}>{ride.rider.name[0]}</div>
               <div><b>{ride.rider.name}</b><span>Assigned rider · {ride.rider.phone}</span></div>
-              <Link to="/customer/chat" className="icon-btn" aria-label="Chat"><Icon name="chat" /></Link>
+              <Link to={`/customer/chat?rideId=${ride.id}`} className="icon-btn" aria-label="Chat"><Icon name="chat" /></Link>
               <a href={`tel:${ride.rider.phone}`} className="icon-btn icon-btn-call" aria-label="Call"><Icon name="phone" /></a>
             </div>
           ) : (

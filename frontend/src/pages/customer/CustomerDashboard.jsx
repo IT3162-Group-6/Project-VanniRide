@@ -10,7 +10,7 @@ export default function CustomerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [rides, setRides] = useState([]);
-  const [active, setActive] = useState(null);
+  const [activeRides, setActiveRides] = useState([]);
   const [summary, setSummary] = useState(null);
   const [allowance, setAllowance] = useState(null);
   const [error, setError] = useState('');
@@ -23,10 +23,10 @@ export default function CustomerDashboard() {
         setRides(history.rides);
         setSummary(history.summary);
         setAllowance(cancellationAllowance);
-        setActive(
-          history.rides.find((ride) =>
+        setActiveRides(
+          history.rides.filter((ride) =>
             ['pending', 'accepted', 'ontheway', 'picked'].includes(ride.status)
-          ) || null
+          )
         );
       })
       .catch((requestError) => alive && setError(requestError.message));
@@ -60,15 +60,15 @@ export default function CustomerDashboard() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      {active && (
-        <div className="track-banner" style={{ cursor: 'pointer' }} onClick={() => navigate('/customer/active')}>
-          <Icon name="route" />
+      {activeRides.map((active) => (
+        <div key={active.id} className="track-banner" style={{ cursor: 'pointer' }} onClick={() => navigate(`/customer/active?rideId=${active.id}`)}>
+          <Icon name={active.type === 'delivery' ? 'package' : 'route'} />
           <div>
-            Ride in progress
+            {active.type === 'delivery' ? 'Delivery' : 'Ride'} in progress
             <span>{active.pickup} → {active.dropoff} · tap to track</span>
           </div>
         </div>
-      )}
+      ))}
 
       <div className="stat-grid">
         <div className="stat-card"><span>Total rides</span><b>{summary?.rides.total ?? rides.length}</b></div>
@@ -84,7 +84,7 @@ export default function CustomerDashboard() {
               key={r.id}
               ride={r}
               person="rider"
-              to={['pending', 'accepted', 'ontheway', 'picked'].includes(r.status) ? '/customer/active' : '/customer/history'}
+              to={['pending', 'accepted', 'ontheway', 'picked'].includes(r.status) ? `/customer/active?rideId=${r.id}` : '/customer/history'}
             />
           ))}
           {rides.length === 0 && <p className="muted">No requests yet.</p>}

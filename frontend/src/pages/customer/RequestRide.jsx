@@ -309,7 +309,7 @@ export default function RequestRide() {
           <div className="success-icon"><Icon name="check" size={28} /></div>
           <h3>Request confirmed!</h3>
           <p>Request {createdRide?.id ? `#${createdRide.id.slice(-6)}` : ''} is waiting for a rider.</p>
-          <button className="btn btn-primary btn-block" onClick={() => navigate('/customer/active')}>Track Request</button>
+          <button className="btn btn-primary btn-block" onClick={() => navigate(`/customer/active?rideId=${createdRide?.id || ''}`)}>Track Request</button>
           <button className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={() => navigate('/customer/dashboard')}>Back to dashboard</button>
         </div>
       )}

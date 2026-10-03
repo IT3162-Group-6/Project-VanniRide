@@ -100,6 +100,11 @@ mongosh database\setup\indexes.js
 
 This creates the indexes used by the database.
 
+The index script is safe to rerun during upgrades. If it finds a legacy index
+with the correct fields but weaker options, it checks for duplicate data before
+replacing that index. It stops with an explanatory error instead of silently
+removing a conflicting unique constraint when duplicates exist.
+
 Indexes are used to:
 
 - prevent duplicate user emails

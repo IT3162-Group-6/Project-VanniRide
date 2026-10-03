@@ -197,6 +197,12 @@ printResults(
         foreignField: "_id",
         as: "customer_details"
       }
+    },
+    {
+      $project: {
+        "customer_details.password_hash": 0,
+        "customer_details.token_version": 0
+      }
     }
   ])
 );
@@ -213,6 +219,12 @@ printResults(
         localField: "rider_id",
         foreignField: "_id",
         as: "rider_details"
+      }
+    },
+    {
+      $project: {
+        "rider_details.password_hash": 0,
+        "rider_details.token_version": 0
       }
     }
   ])
