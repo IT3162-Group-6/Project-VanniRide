@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { authApi, riderApi } from '../services/api';
+import { AUTH_EXPIRED_EVENT, authApi, riderApi } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -16,11 +16,20 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let alive = true;
+    const handleExpiredSession = () => {
+      if (!alive) return;
+      setUser(null);
+      setAuthError('Your session has ended. Please sign in again.');
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession);
     authApi.me()
       .then((u) => alive && setUser(u))
       .catch((error) => alive && setAuthError(error.message))
       .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession);
+    };
   }, []);
 
   const login = useCallback(async (credentials) => {

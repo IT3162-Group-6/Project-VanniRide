@@ -4,11 +4,13 @@ import Icon from '../../components/Icon';
 import MapArt from '../../components/MapArt';
 import StatusBadge from '../../components/StatusBadge';
 import { useAppState } from '../../context/AppState';
+import { useAuth } from '../../context/AuthContext';
 import { ridesApi } from '../../services/api';
 
 export default function RequestDetails() {
   const { id } = useParams();
   const { showToast } = useAppState();
+  const { refresh } = useAuth();
   const navigate = useNavigate();
   const [ride, setRide] = useState(null);
   const [error, setError] = useState('');
@@ -22,6 +24,7 @@ export default function RequestDetails() {
     setBusy(true);
     try {
       await ridesApi.accept(ride.id);
+      try { await refresh(); } catch { /* the accepted ride remains authoritative */ }
       showToast('Request accepted — head to the pickup point');
       navigate('/rider/active');
     } catch (e) {

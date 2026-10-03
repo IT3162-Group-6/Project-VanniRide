@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import MapArt from '../../components/MapArt';
@@ -14,7 +14,7 @@ const NEXT = {
 };
 
 export default function ActiveRide() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const { showToast } = useAppState();
   const navigate = useNavigate();
   const [ride, setRide] = useState(null);
@@ -25,20 +25,37 @@ export default function ActiveRide() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const activeRideRef = useRef(null);
 
-  useEffect(() => {
-    ridesApi.active({ riderId: user.id }).then(async (activeRide) => {
+  const load = useCallback(async () => {
+    try {
+      const activeRide = await ridesApi.active({ riderId: user.id });
+      if (!activeRide) {
+        if (activeRideRef.current) void refresh().catch(() => {});
+        activeRideRef.current = null;
+        setRide((current) => current?.status === RIDE_STATUS.COMPLETED ? current : null);
+        setRequest(null);
+        setError('');
+        return;
+      }
+      activeRideRef.current = activeRide.id;
       setRide(activeRide);
-      if (activeRide) {
         const [cash, limit, pending] = await Promise.all([
           ridesApi.payment(activeRide.id),
           ridesApi.cancellationAllowance(),
           activeRide.apiStatus === 'STARTED' ? ridesApi.getCancellationRequest(activeRide.id) : null,
         ]);
         setPayment(cash); setAllowance(limit); setRequest(pending);
-      }
-    }).catch((requestError) => setError(requestError.message)).finally(() => setLoading(false));
-  }, [user.id]);
+      setError('');
+    } catch (requestError) { setError(requestError.message); }
+    finally { setLoading(false); }
+  }, [refresh, user.id]);
+
+  useEffect(() => {
+    const initial = setTimeout(() => void load(), 0);
+    const timer = setInterval(() => void load(), 5000);
+    return () => { clearTimeout(initial); clearInterval(timer); };
+  }, [load]);
 
   async function advance() {
     setBusy(true); setError('');
@@ -46,6 +63,7 @@ export default function ActiveRide() {
       const step = NEXT[ride.status];
       const updated = await ridesApi.updateStatus(ride.id, step.to);
       setRide(updated);
+      if (step.to === RIDE_STATUS.COMPLETED) void refresh().catch(() => {});
       showToast(step.to === RIDE_STATUS.COMPLETED ? 'Ride completed — confirm the cash receipt' : 'Status updated');
     } catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
@@ -67,7 +85,7 @@ export default function ActiveRide() {
       const result = await ridesApi.cancelWithReason(ride.id, reason.trim());
       setAllowance(result.cancellationAllowance || allowance);
       if (result.cancellationRequest) { setRequest(result.cancellationRequest); showToast('Waiting for customer confirmation'); }
-      else { setRide(null); showToast('Ride cancelled'); }
+      else { setRide(null); void refresh().catch(() => {}); showToast('Ride cancelled'); }
       setReason('');
     } catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
@@ -78,7 +96,7 @@ export default function ActiveRide() {
     try {
       const result = await ridesApi.respondToCancellation(ride.id, decision);
       setRequest(null); showToast(result.message);
-      if (result.ride?.status === RIDE_STATUS.CANCELLED) setRide(null);
+      if (result.ride?.status === RIDE_STATUS.CANCELLED) { setRide(null); void refresh().catch(() => {}); }
     } catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   }

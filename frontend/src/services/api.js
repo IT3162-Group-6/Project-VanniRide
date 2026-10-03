@@ -2,19 +2,19 @@
    services/api.js
    Single place for all data access.
 
-   Authentication uses the real backend by default. The remaining
-   screen adapters stay on the local demo store until their integration
-   phases are completed, and can be switched independently with Vite env.
+   The application uses the real backend by default. The local demo store is
+   retained only for an explicitly enabled browser-only demonstration mode.
    ============================================================ */
 
 const USE_MOCK_AUTH = import.meta.env?.VITE_USE_MOCK_AUTH === 'true';
-const USE_MOCK_DATA = import.meta.env?.VITE_USE_MOCK_DATA !== 'false';
+const USE_MOCK_DATA = import.meta.env?.VITE_USE_MOCK_DATA === 'true';
 const BASE_URL = String(
   import.meta.env?.VITE_API_URL || 'http://localhost:5000/api'
 ).replace(/\/$/, '');
 
 const TOKEN_KEY = 'vr_token';
 const DB_KEY = 'vr_db';
+export const AUTH_EXPIRED_EVENT = 'vanni-ride:auth-expired';
 
 export const RIDE_STATUS = {
   PENDING: 'pending',
@@ -62,8 +62,18 @@ export async function http(path, { method = 'GET', body, params, signal } = {}) 
   }
   const data = await res.json().catch(() => null);
   if (!res.ok) {
+    const message = data?.message || `Request failed (${res.status})`;
+    const sessionInvalid =
+      (res.status === 401 && path !== '/auth/login') ||
+      (res.status === 403 && message === 'This account is suspended');
+    if (sessionInvalid) {
+      setToken(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+      }
+    }
     throw new ApiError(
-      data?.message || `Request failed (${res.status})`,
+      message,
       res.status,
       data
     );

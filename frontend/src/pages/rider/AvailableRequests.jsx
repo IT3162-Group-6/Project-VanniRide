@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Icon from '../../components/Icon';
 import RideCard from '../../components/RideCard';
 import { ridesApi } from '../../services/api';
@@ -15,9 +15,18 @@ export default function AvailableRequests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    ridesApi.list({ available: true }).then(setRides).catch((requestError) => setError(requestError.message)).finally(() => setLoading(false));
+  const load = useCallback(() => {
+    ridesApi.list({ available: true })
+      .then((items) => { setRides(items); setError(''); })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const initial = setTimeout(load, 0);
+    const timer = setInterval(load, 5000);
+    return () => { clearTimeout(initial); clearInterval(timer); };
+  }, [load]);
 
   const shown = tab === 'all' ? rides : rides.filter((r) => r.type === tab);
 

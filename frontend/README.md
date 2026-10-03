@@ -79,3 +79,13 @@ suspend or reactivate accounts, review post-completion chat requests, inspect a
 ride conversation with an audited reason, and force-cancel active rides. The
 ride details page also supports audited corrections to completed-ride cash
 payments. Dashboard totals come from the backend statistics endpoint.
+
+## Integration hardening
+
+Protected API failures now clear invalid or suspended sessions and return the
+user to authentication instead of leaving a stale signed-in interface. Rider
+availability refreshes after acceptance, completion, and cancellation; busy
+riders cannot manually change availability. Active rider pages and available
+request lists poll for server changes, so mutual cancellation requests,
+automatic cancellation, and rides accepted by somebody else become visible
+without a manual reload.

@@ -18,6 +18,7 @@ export default function RiderDashboard() {
   const [rating, setRating] = useState(null);
   const [error, setError] = useState('');
   const approved = user.riderProfile?.approvalStatus === 'approved';
+  const riderBusy = user.riderProfile?.availabilityStatus === 'busy';
 
   useEffect(() => {
     Promise.all([
@@ -52,9 +53,9 @@ export default function RiderDashboard() {
       <div className="greeting-card">
         <div>
           <h2>Hi {user.name.split(' ')[0]}!</h2>
-          <p>{user.online ? 'You are online and receiving requests.' : 'You are offline right now.'}</p>
-          <button disabled={!approved} className={`btn ${user.online ? 'btn-outline' : 'btn-primary'} btn-sm`} style={{ marginTop: 12 }} onClick={toggleOnline}>
-            {user.online ? 'Go offline' : 'Go online'}
+          <p>{riderBusy ? 'You are currently handling a ride.' : user.online ? 'You are online and receiving requests.' : 'You are offline right now.'}</p>
+          <button disabled={!approved || riderBusy} className={`btn ${user.online ? 'btn-outline' : 'btn-primary'} btn-sm`} style={{ marginTop: 12 }} onClick={toggleOnline}>
+            {riderBusy ? 'Busy' : user.online ? 'Go offline' : 'Go online'}
           </button>
         </div>
         <div className="greeting-side">

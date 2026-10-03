@@ -189,6 +189,24 @@ test('clears an expired token and reports useful connection errors', async () =>
     authApi.login({ email: 'a@example.com', password: 'secret12' }),
     (error) => error instanceof ApiError && error.status === 0
   );
+
+  localStorage.setItem('vr_token', 'revoked-token');
+  global.fetch = async () =>
+    jsonResponse({ success: false, message: 'This session is no longer valid' }, 401);
+  await assert.rejects(
+    ridesApi.history(),
+    (error) => error instanceof ApiError && error.status === 401
+  );
+  assert.equal(getToken(), null);
+
+  localStorage.setItem('vr_token', 'suspended-token');
+  global.fetch = async () =>
+    jsonResponse({ success: false, message: 'This account is suspended' }, 403);
+  await assert.rejects(
+    ridesApi.history(),
+    (error) => error instanceof ApiError && error.status === 403
+  );
+  assert.equal(getToken(), null);
 });
 
 test('uses backend map results and creates a ride without trusting client fare values', async () => {

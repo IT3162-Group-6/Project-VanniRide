@@ -11,9 +11,10 @@ export default function Profile() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [editing, setEditing] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({ name: user.name, phone: user.phone || '' });
 
-  useEffect(() => { adminApi.stats().then(setStats); }, []);
+  useEffect(() => { adminApi.stats().then(setStats).catch((requestError) => setError(requestError.message)); }, []);
 
   async function save(e) {
     e.preventDefault();
@@ -58,6 +59,7 @@ export default function Profile() {
       <div>
         <div className="card">
           <div className="card-head"><h3>Platform Snapshot</h3></div>
+          {error && <div className="alert alert-error">{error}</div>}
           {stats ? (
             <div className="kv">
               <div><span>Customers</span><b>{stats.customers}</b></div>

@@ -16,6 +16,7 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: user.name, phone: user.phone || '', vehicle: { type: vehicle.type || '', model: vehicle.model || '', registrationNumber: vehicle.registrationNumber || '', color: vehicle.color || '' } });
   const approved = user.riderProfile?.approvalStatus === 'approved';
+  const riderBusy = user.riderProfile?.availabilityStatus === 'busy';
 
   useEffect(() => { riderApi.earnings().then((result) => setEarnings(result.summary)).catch((requestError) => setError(requestError.message)); }, []);
   const setVehicle = (key) => (event) => setForm({ ...form, vehicle: { ...form.vehicle, [key]: event.target.value } });
@@ -53,6 +54,6 @@ export default function Profile() {
     </form> : <div className="kv"><div><span>Email</span><b>{user.email}</b></div><div><span>Phone</span><b>{user.phone}</b></div><div><span>Vehicle</span><b>{vehicle.model || '—'} · {vehicle.registrationNumber || '—'}</b></div><div><span>Approval</span><b><StatusBadge status={user.riderProfile?.approvalStatus}/></b></div><div><span>Review note</span><b>{user.riderProfile?.reviewReason || '—'}</b></div></div>}
     <button className="btn btn-ghost btn-block" style={{marginTop:18}} onClick={() => { logout(); navigate('/login'); }}>Log out</button>
   </div><div><div className="card wallet-card"><div className="card-head"><h3>Confirmed Earnings</h3></div><b>LKR {Number(earnings?.totalEarnings || 0).toLocaleString()}</b><p className="muted">Pending cash: LKR {Number(earnings?.pendingReceiptAmount || 0).toLocaleString()}</p></div>
-    <div className="card" style={{marginTop:18}}><div className="card-head"><h3>Availability</h3></div><div className="pay-card"><div className="fi"><Icon name="bike" /></div><div className="pay-meta"><b>{user.online ? 'Online' : 'Offline'}</b><span>{approved ? (user.online ? 'Receiving requests' : 'Not receiving requests') : 'Requires administrator approval'}</span></div><button className="btn btn-outline btn-sm" disabled={!approved} onClick={toggleAvailability}>{user.online ? 'Go offline' : 'Go online'}</button></div></div>
+    <div className="card" style={{marginTop:18}}><div className="card-head"><h3>Availability</h3></div><div className="pay-card"><div className="fi"><Icon name="bike" /></div><div className="pay-meta"><b>{riderBusy ? 'Busy' : user.online ? 'Online' : 'Offline'}</b><span>{approved ? (riderBusy ? 'An active ride controls availability' : user.online ? 'Receiving requests' : 'Not receiving requests') : 'Requires administrator approval'}</span></div><button className="btn btn-outline btn-sm" disabled={!approved || riderBusy} onClick={toggleAvailability}>{riderBusy ? 'Busy' : user.online ? 'Go offline' : 'Go online'}</button></div></div>
   </div></div>;
 }
