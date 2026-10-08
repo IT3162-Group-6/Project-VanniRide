@@ -52,7 +52,7 @@ export default function CustomerDashboard() {
           <div className="fi"><Icon name="car" /></div>
           <div><b>Ride</b><span>Book a ride</span></div>
         </button>
-        <button className="action-tile" onClick={() => navigate('/customer/request?type=delivery')}>
+        <button className="action-tile" onClick={() => navigate('/request-delivery')}>
           <div className="fi"><Icon name="package" /></div>
           <div><b>Delivery</b><span>Send a delivery</span></div>
         </button>

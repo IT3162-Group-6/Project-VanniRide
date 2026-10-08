@@ -6,6 +6,7 @@ export const NAV_BY_ROLE = {
   customer: [
     { to: '/customer/dashboard', icon: 'grid', label: 'Dashboard' },
     { to: '/customer/request', icon: 'plus', label: 'Request a Ride' },
+    { to: '/request-delivery', icon: 'package', label: 'Request a Delivery' },
     { to: '/customer/active', icon: 'route', label: 'Active Ride' },
     { to: '/customer/chat', icon: 'chat', label: 'Messages' },
     { to: '/customer/history', icon: 'list', label: 'Ride History' },

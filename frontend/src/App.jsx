@@ -20,6 +20,7 @@ import CustomerActiveRide from './pages/customer/ActiveRide';
 import CustomerChat from './pages/customer/Chat';
 import CustomerHistory from './pages/customer/RideHistory';
 import CustomerProfile from './pages/customer/Profile';
+import RequestDelivery from './pages/customer/RequestDelivery';
 
 // rider
 import RiderDashboard from './pages/rider/RiderDashboard';
@@ -64,6 +65,13 @@ export default function App() {
               <Route path="chat" element={<CustomerChat />} />
               <Route path="history" element={<CustomerHistory />} />
               <Route path="profile" element={<CustomerProfile />} />
+            </Route>
+
+            <Route
+              path="/request-delivery"
+              element={<ProtectedRoute roles={['customer']}><AppLayout /></ProtectedRoute>}
+            >
+              <Route index element={<RequestDelivery />} />
             </Route>
 
             {/* ---------- rider ---------- */}
