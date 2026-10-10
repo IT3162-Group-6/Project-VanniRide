@@ -43,6 +43,8 @@ export default function RequestDelivery() {
     pickupLocation: null,
     destination: null,
     packageWeight: '',
+    foodType: '',
+    waterAmount: '',
     receiverName: '',
     receiverPhone: '',
   });
@@ -101,9 +103,12 @@ export default function RequestDelivery() {
     });
     setSearchResults([]);
     setSearchQuery('');
+    if (activeLocation === 'pickup' && form.deliveryCategory !== 'WATER') {
+      setActiveLocation('destination');
+    }
   }
 
-  function useCurrentLocation() {
+  function useCurrentLocation(target = activeLocation) {
     setError('');
     if (!navigator.geolocation) {
       setError('Current location is not supported by this browser.');
@@ -112,11 +117,13 @@ export default function RequestDelivery() {
     setLocationBusy(true);
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        void resolvePoint('pickup', {
+        void resolvePoint(target, {
           latitude: coords.latitude,
           longitude: coords.longitude,
         });
-        setActiveLocation('destination');
+        if (target === 'pickup' && form.deliveryCategory !== 'WATER') {
+          setActiveLocation('destination');
+        }
       },
       () => {
         setLocationBusy(false);
@@ -128,7 +135,15 @@ export default function RequestDelivery() {
 
   const routePayload = () => {
     let noteText = '';
-    if (form.packageWeight) noteText += `Weight: ${form.packageWeight}kg. `;
+    
+    if (form.deliveryCategory === 'FOOD' && form.foodType) {
+      noteText += `Food Type: ${form.foodType}. `;
+    } else if (form.deliveryCategory === 'WATER' && form.waterAmount) {
+      noteText += `Amount of Water: ${form.waterAmount}. `;
+    } else if (form.deliveryCategory === 'PARCEL' && form.packageWeight) {
+      noteText += `Weight: ${form.packageWeight}kg. `;
+    }
+
     if (form.receiverName || form.receiverPhone) {
       noteText += `Receiver: ${form.receiverName} ${form.receiverPhone}`;
     }
@@ -175,18 +190,28 @@ export default function RequestDelivery() {
     }
   }
 
+  async function handleMapClick(point) {
+    const currentTarget = activeLocation;
+    await resolvePoint(currentTarget, point);
+    if (currentTarget === 'pickup' && form.deliveryCategory !== 'WATER') {
+      setActiveLocation('destination');
+    }
+  }
+
   const map = (
     <div className="map-box map-box-live">
       <LocationMap
-        pickup={form.pickupLocation}
+        pickup={form.deliveryCategory === 'WATER' ? null : form.pickupLocation}
         destination={form.destination}
         routeGeometry={preview?.routeGeometry}
-        onSelect={(point) => void resolvePoint(activeLocation, point)}
-        onMovePickup={(point) => void resolvePoint('pickup', point)}
-        onMoveDestination={(point) => void resolvePoint('destination', point)}
+        onSelect={handleMapClick}
+        onMovePickup={activeLocation === 'pickup' && form.deliveryCategory !== 'WATER' ? (point) => void resolvePoint('pickup', point) : undefined}
+        onMoveDestination={activeLocation === 'destination' ? (point) => void resolvePoint('destination', point) : undefined}
       />
       <div className="map-help">
-        Click the map to set the {activeLocation}. Drag a marker to correct it.
+        {form.deliveryCategory === 'WATER' 
+          ? 'Click or drag to set the delivery destination.' 
+          : (activeLocation === 'pickup' ? 'Click or drag to set the pickup.' : 'Click or drag to set the destination.')}
       </div>
     </div>
   );
@@ -211,20 +236,69 @@ export default function RequestDelivery() {
 
             <div className="field">
               <label>Delivery category</label>
-              <select
-                value={form.deliveryCategory}
-                onChange={(event) => setForm({ ...form, deliveryCategory: event.target.value })}
-              >
-                <option value="FOOD">Food</option>
-                <option value="WATER">Water</option>
-                <option value="PARCEL">Other / Parcel</option>
-              </select>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px', marginBottom: '4px' }}>
+                {[
+                  { value: 'FOOD', icon: 'food', label: 'Food' },
+                  { value: 'WATER', icon: 'water', label: 'Water' },
+                  { value: 'PARCEL', icon: 'package', label: 'Parcel' },
+                ].map(cat => (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => {
+                      if (form.deliveryCategory === cat.value) return;
+                      const updates = { deliveryCategory: cat.value };
+                      if (cat.value === 'WATER') {
+                        updates.pickupLocation = { address: 'Campus Water Depot', latitude: 8.7514, longitude: 80.4971 };
+                        setActiveLocation('destination');
+                      } else if (form.deliveryCategory === 'WATER') {
+                        updates.pickupLocation = null;
+                        setActiveLocation('pickup');
+                      }
+                      setForm({ ...form, ...updates });
+                    }}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '12px 4px',
+                      borderRadius: 'var(--radius-md, 8px)',
+                      border: `1px solid ${form.deliveryCategory === cat.value ? 'var(--green-600)' : 'var(--line)'}`,
+                      background: form.deliveryCategory === cat.value ? 'var(--green-600)' : '#fff',
+                      color: form.deliveryCategory === cat.value ? '#fff' : 'var(--ink-soft)',
+                      cursor: 'pointer',
+                      fontWeight: form.deliveryCategory === cat.value ? '600' : 'normal',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Icon name={cat.icon} size={22} />
+                    <span style={{ fontSize: '0.85rem' }}>{cat.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="field">
-              <label>Package Weight (kg)</label>
-              <input type="number" placeholder="e.g. 2" value={form.packageWeight} onChange={(e) => setForm({ ...form, packageWeight: e.target.value })} />
-            </div>
+            {form.deliveryCategory === 'FOOD' && (
+              <div className="field">
+                <label>Food Type</label>
+                <input type="text" placeholder="e.g., Rice & Curry, Short Eats, Lunch Box" value={form.foodType} onChange={(e) => setForm({ ...form, foodType: e.target.value })} />
+              </div>
+            )}
+            {form.deliveryCategory === 'WATER' && (
+              <div className="field">
+                <label>Amount of Water</label>
+                <input type="text" placeholder="e.g., 5L, 20L bottle, 2 bottles" value={form.waterAmount} onChange={(e) => setForm({ ...form, waterAmount: e.target.value })} />
+              </div>
+            )}
+            {form.deliveryCategory === 'PARCEL' && (
+              <div className="field">
+                <label>Package Weight (kg)</label>
+                <input type="number" placeholder="e.g. 2" value={form.packageWeight} onChange={(e) => setForm({ ...form, packageWeight: e.target.value })} />
+              </div>
+            )}
 
             <div className="field">
               <label>Receiver Name</label>
@@ -236,16 +310,20 @@ export default function RequestDelivery() {
               <input type="tel" placeholder="07X XXX XXXX" value={form.receiverPhone} onChange={(e) => setForm({ ...form, receiverPhone: e.target.value })} />
             </div>
 
-            <div className="location-toggle" role="group" aria-label="Location being selected">
-              <button type="button" className={activeLocation === 'pickup' ? 'active' : ''} onClick={() => setActiveLocation('pickup')}>Pickup</button>
-              <button type="button" className={activeLocation === 'destination' ? 'active' : ''} onClick={() => setActiveLocation('destination')}>Destination</button>
-            </div>
+            {form.deliveryCategory !== 'WATER' && (
+              <div className="location-toggle" role="group" aria-label="Location being selected">
+                <button type="button" className={activeLocation === 'pickup' ? 'active' : ''} onClick={() => setActiveLocation('pickup')}>Pickup</button>
+                <button type="button" className={activeLocation === 'destination' ? 'active' : ''} onClick={() => setActiveLocation('destination')}>Destination</button>
+              </div>
+            )}
 
-            <LocationSummary label="Pickup" location={form.pickupLocation} selected={activeLocation === 'pickup'} />
-            <LocationSummary label="Destination" location={form.destination} selected={activeLocation === 'destination'} />
+            {form.deliveryCategory !== 'WATER' && (
+              <LocationSummary label="Pickup" location={form.pickupLocation} selected={activeLocation === 'pickup'} />
+            )}
+            <LocationSummary label={form.deliveryCategory === 'WATER' ? "Delivery Destination" : "Destination"} location={form.destination} selected={activeLocation === 'destination' || form.deliveryCategory === 'WATER'} />
 
             <form className="location-search" onSubmit={searchPlaces}>
-              <input type="search" placeholder={`Search ${activeLocation}`} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
+              <input type="search" placeholder={`Search ${form.deliveryCategory === 'WATER' ? 'destination' : activeLocation}`} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
               <button className="btn btn-outline btn-sm" disabled={searchBusy}>{searchBusy ? 'Searching…' : 'Search'}</button>
             </form>
             {searchResults.length > 0 && (
@@ -258,9 +336,20 @@ export default function RequestDelivery() {
               </div>
             )}
 
-            <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={useCurrentLocation} disabled={locationBusy}>
-              <Icon name="pin" size={16} /> Use my current location as pickup
-            </button>
+            {form.deliveryCategory !== 'WATER' && activeLocation === 'pickup' ? (
+              <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => useCurrentLocation('pickup')} disabled={locationBusy}>
+                <Icon name="pin" size={16} /> Use my current location as pickup
+              </button>
+            ) : (
+              <>
+                <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={() => useCurrentLocation('destination')} disabled={locationBusy}>
+                  <Icon name="pin" size={16} /> Use my current location as destination
+                </button>
+                <div style={{ marginTop: 12, textAlign: 'center', fontSize: '0.9em', color: 'var(--text-muted, #666)' }}>
+                  <Icon name="map" size={16} /> Or choose destination on the map
+                </div>
+              </>
+            )}
 
             <button className="btn btn-primary btn-block" onClick={previewRoute} disabled={previewBusy || locationBusy} style={{ marginTop: 14 }}>
               {previewBusy ? 'Calculating road route…' : 'Next: Fare Estimate'}
