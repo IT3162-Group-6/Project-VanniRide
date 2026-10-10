@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import LocationMap from '../../components/LocationMap';
 import { useAppState } from '../../context/AppState';
@@ -24,7 +24,6 @@ function LocationSummary({ label, location, selected }) {
 }
 
 export default function RequestRide() {
-  const [params] = useSearchParams();
   const navigate = useNavigate();
   const { showToast } = useAppState();
   const [step, setStep] = useState(1);
@@ -39,20 +38,10 @@ export default function RequestRide() {
   const [preview, setPreview] = useState(null);
   const [createdRide, setCreatedRide] = useState(null);
   const [form, setForm] = useState({
-    rideType: params.get('type') === 'delivery' ? 'DELIVERY' : 'TRANSPORT',
-    deliveryCategory: 'PARCEL',
+    rideType: 'TRANSPORT',
     pickupLocation: null,
     destination: null,
   });
-
-  const setRideType = (rideType) => {
-    setForm((current) => ({
-      ...current,
-      rideType,
-      deliveryCategory: rideType === 'DELIVERY' ? current.deliveryCategory || 'PARCEL' : null,
-    }));
-    setPreview(null);
-  };
 
   const setLocation = (target, location) => {
     setForm((current) => ({
@@ -78,6 +67,14 @@ export default function RequestRide() {
       showToast('Address lookup was unavailable; coordinates were kept.');
     } finally {
       setLocationBusy(false);
+    }
+  }
+
+  async function handleMapClick(point) {
+    const currentTarget = activeLocation;
+    await resolvePoint(currentTarget, point);
+    if (currentTarget === 'pickup') {
+      setActiveLocation('destination');
     }
   }
 
@@ -108,6 +105,7 @@ export default function RequestRide() {
     });
     setSearchResults([]);
     setSearchQuery('');
+    if (activeLocation === 'pickup') setActiveLocation('destination');
   }
 
   function useCurrentLocation() {
@@ -135,7 +133,6 @@ export default function RequestRide() {
 
   const routePayload = () => ({
     rideType: form.rideType,
-    deliveryCategory: form.rideType === 'DELIVERY' ? form.deliveryCategory : null,
     pickupLocation: form.pickupLocation,
     destination: form.destination,
   });
@@ -179,12 +176,12 @@ export default function RequestRide() {
         pickup={form.pickupLocation}
         destination={form.destination}
         routeGeometry={preview?.routeGeometry}
-        onSelect={(point) => void resolvePoint(activeLocation, point)}
-        onMovePickup={(point) => void resolvePoint('pickup', point)}
-        onMoveDestination={(point) => void resolvePoint('destination', point)}
+        onSelect={handleMapClick}
+        onMovePickup={activeLocation === 'pickup' ? (point) => void resolvePoint('pickup', point) : undefined}
+        onMoveDestination={activeLocation === 'destination' ? (point) => void resolvePoint('destination', point) : undefined}
       />
       <div className="map-help">
-        Click the map to set the {activeLocation}. Drag a marker to correct it.
+        {activeLocation === 'pickup' ? 'Click or drag to set the pickup.' : 'Click or drag to set the destination.'}
       </div>
     </div>
   );
@@ -203,49 +200,21 @@ export default function RequestRide() {
         <div className="request-layout">
           <div className="card">
             <h3 style={{ marginBottom: 18 }}>
-              Create {form.rideType === 'TRANSPORT' ? 'Ride' : 'Delivery'} Request
+              Create Ride Request
             </h3>
             {error && <div className="alert alert-error">{error}</div>}
-
-            <label className="field-label">Request type</label>
-            <div className="ride-type-grid">
-              {[
-                { value: 'TRANSPORT', icon: 'bike', title: 'Ride', sub: 'Take me somewhere' },
-                { value: 'DELIVERY', icon: 'package', title: 'Delivery', sub: 'Move an item' },
-              ].map((type) => (
-                <button
-                  type="button"
-                  key={type.value}
-                  className={`ride-type ${form.rideType === type.value ? 'selected' : ''}`}
-                  onClick={() => setRideType(type.value)}
-                >
-                  <div className="fi" style={{ width: 34, height: 34 }}><Icon name={type.icon} /></div>
-                  <div><b>{type.title}</b><span>{type.sub}</span></div>
-                </button>
-              ))}
-            </div>
-
-            {form.rideType === 'DELIVERY' && (
-              <div className="field">
-                <label>Delivery category</label>
-                <select
-                  value={form.deliveryCategory}
-                  onChange={(event) => setForm({ ...form, deliveryCategory: event.target.value })}
-                >
-                  <option value="FOOD">Food</option>
-                  <option value="WATER">Water</option>
-                  <option value="PARCEL">Other / Parcel</option>
-                </select>
-              </div>
-            )}
 
             <div className="location-toggle" role="group" aria-label="Location being selected">
               <button type="button" className={activeLocation === 'pickup' ? 'active' : ''} onClick={() => setActiveLocation('pickup')}>Pickup</button>
               <button type="button" className={activeLocation === 'destination' ? 'active' : ''} onClick={() => setActiveLocation('destination')}>Destination</button>
             </div>
 
-            <LocationSummary label="Pickup" location={form.pickupLocation} selected={activeLocation === 'pickup'} />
-            <LocationSummary label="Destination" location={form.destination} selected={activeLocation === 'destination'} />
+            {activeLocation === 'pickup' && (
+              <LocationSummary label="Pickup" location={form.pickupLocation} selected={true} />
+            )}
+            {activeLocation === 'destination' && (
+              <LocationSummary label="Destination" location={form.destination} selected={true} />
+            )}
 
             <form className="location-search" onSubmit={searchPlaces}>
               <input type="search" placeholder={`Search ${activeLocation}`} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
@@ -261,11 +230,56 @@ export default function RequestRide() {
               </div>
             )}
 
-            <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={useCurrentLocation} disabled={locationBusy}>
-              <Icon name="pin" size={16} /> Use my current location as pickup
-            </button>
+            {activeLocation === 'pickup' ? (
+              <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={useCurrentLocation} disabled={locationBusy}>
+                <Icon name="pin" size={16} /> Use my current location as pickup
+              </button>
+            ) : (
+              <div style={{ marginTop: 12, textAlign: 'center', fontSize: '0.9em', color: 'var(--text-muted, #666)' }}>
+                <Icon name="map" size={16} /> Choose destination on the map
+              </div>
+            )}
 
-            <button className="btn btn-primary btn-block" onClick={previewRoute} disabled={previewBusy || locationBusy} style={{ marginTop: 14 }}>
+            {form.pickupLocation && form.destination && (
+              <div className="route-block" style={{ marginTop: 24, position: 'relative' }}>
+                <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: 'var(--green-900)' }}>Selected Route Summary</h4>
+                <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'absolute', left: 5, top: 18, bottom: 18, width: 2, background: 'transparent', borderLeft: '2px dashed var(--green-600)' }}></div>
+                  
+                  <div className="route-point" style={{ alignItems: 'center' }}>
+                    <div className="dot dot-start" style={{ position: 'relative', zIndex: 1, margin: 0 }}></div>
+                    <div style={{ flex: 1, marginLeft: 8 }}>
+                      <span style={{ fontWeight: 600 }}>Pickup</span>
+                      <b style={{ marginTop: 2 }}>{form.pickupLocation.address}</b>
+                    </div>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setActiveLocation('pickup')} aria-label="Change Pickup">
+                      <Icon name="edit" size={14} />
+                    </button>
+                  </div>
+
+                  <div className="route-point" style={{ alignItems: 'center', marginTop: 8 }}>
+                    <div className="dot dot-end" style={{ background: '#d32f2f', position: 'relative', zIndex: 1, margin: 0 }}></div>
+                    <div style={{ flex: 1, marginLeft: 8 }}>
+                      <span style={{ fontWeight: 600 }}>Destination</span>
+                      <b style={{ marginTop: 2 }}>{form.destination.address}</b>
+                    </div>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setActiveLocation('destination')} aria-label="Change Destination">
+                      <Icon name="edit" size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button 
+              className="btn btn-primary btn-block" 
+              onClick={previewRoute} 
+              disabled={previewBusy || locationBusy || !form.pickupLocation || !form.destination} 
+              style={{ 
+                marginTop: 14,
+                boxShadow: (form.pickupLocation && form.destination) ? '0 4px 14px rgba(30, 122, 61, 0.4)' : 'none',
+                transition: 'box-shadow 0.2s ease-in-out'
+              }}>
               {previewBusy ? 'Calculating road route…' : 'Next: Fare Estimate'}
             </button>
           </div>

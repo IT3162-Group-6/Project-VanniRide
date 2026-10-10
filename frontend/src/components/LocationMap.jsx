@@ -76,8 +76,10 @@ export default function LocationMap({
 
   const dragHandler = (callback) => ({
     dragend(event) {
-      const point = event.target.getLatLng();
-      callback({ latitude: point.lat, longitude: point.lng });
+      if (callback) {
+        const point = event.target.getLatLng();
+        callback({ latitude: point.lat, longitude: point.lng });
+      }
     },
   });
 
@@ -94,7 +96,7 @@ export default function LocationMap({
         <Marker
           position={[pickup.latitude, pickup.longitude]}
           icon={PICKUP_ICON}
-          draggable
+          draggable={!!onMovePickup}
           eventHandlers={dragHandler(onMovePickup)}
         />
       )}
@@ -102,7 +104,7 @@ export default function LocationMap({
         <Marker
           position={[destination.latitude, destination.longitude]}
           icon={DESTINATION_ICON}
-          draggable
+          draggable={!!onMoveDestination}
           eventHandlers={dragHandler(onMoveDestination)}
         />
       )}
