@@ -5,6 +5,14 @@ import LocationMap from '../../components/LocationMap';
 import { useAppState } from '../../context/AppState';
 import { mapApi, ridesApi } from '../../services/api';
 
+const FOOD_OUTLETS = [
+  { id: 'hostel', label: 'Hostel canteen', address: 'Hostel Canteen', latitude: 8.7520, longitude: 80.4980 },
+  { id: 'bs', label: 'BS canteen', address: 'BS Canteen', latitude: 8.7510, longitude: 80.4975 },
+  { id: 'rilwan', label: 'Rilwan', address: 'Rilwan', latitude: 8.7530, longitude: 80.4965 },
+  { id: 'rs', label: 'RS', address: 'RS', latitude: 8.7505, longitude: 80.4960 },
+  { id: 'other', label: 'Other (Manual Selection)', address: '', latitude: null, longitude: null },
+];
+
 const coordinateLabel = ({ latitude, longitude }) =>
   `${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}`;
 
@@ -47,13 +55,18 @@ export default function RequestDelivery() {
     waterAmount: '',
     receiverName: '',
     receiverPhone: '',
+    foodOutletId: '',
   });
 
   const setLocation = (target, location) => {
-    setForm((current) => ({
-      ...current,
-      [target === 'pickup' ? 'pickupLocation' : 'destination']: location,
-    }));
+    setForm((current) => {
+      const updates = { [target === 'pickup' ? 'pickupLocation' : 'destination']: location };
+      if (target === 'pickup' && current.deliveryCategory === 'FOOD') {
+        const matchedPreset = FOOD_OUTLETS.find(o => o.address === location?.address);
+        updates.foodOutletId = matchedPreset ? matchedPreset.id : 'other';
+      }
+      return { ...current, ...updates };
+    });
     setPreview(null);
   };
 
@@ -282,10 +295,45 @@ export default function RequestDelivery() {
             </div>
 
             {form.deliveryCategory === 'FOOD' && (
-              <div className="field">
-                <label>Food Type</label>
-                <input type="text" placeholder="e.g., Rice & Curry, Short Eats, Lunch Box" value={form.foodType} onChange={(e) => setForm({ ...form, foodType: e.target.value })} />
-              </div>
+              <>
+                <div className="field">
+                  <label>Food Type</label>
+                  <input type="text" placeholder="e.g., Rice & Curry, Short Eats, Lunch Box" value={form.foodType} onChange={(e) => setForm({ ...form, foodType: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label>Select Food Outlet</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                    {FOOD_OUTLETS.map(outlet => (
+                      <button
+                        key={outlet.id}
+                        type="button"
+                        onClick={() => {
+                          if (outlet.id !== 'other') {
+                            setLocation('pickup', { address: outlet.address, latitude: outlet.latitude, longitude: outlet.longitude });
+                            setActiveLocation('destination');
+                          } else {
+                            setLocation('pickup', null);
+                            setActiveLocation('pickup');
+                          }
+                        }}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '20px',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: `1px solid ${form.foodOutletId === outlet.id ? 'var(--green-600)' : 'var(--line)'}`,
+                          background: form.foodOutletId === outlet.id ? 'var(--green-600)' : '#fff',
+                          color: form.foodOutletId === outlet.id ? '#fff' : 'var(--ink-soft)',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        {outlet.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
             {form.deliveryCategory === 'WATER' && (
               <div className="field">
@@ -317,10 +365,12 @@ export default function RequestDelivery() {
               </div>
             )}
 
-            {form.deliveryCategory !== 'WATER' && (
-              <LocationSummary label="Pickup" location={form.pickupLocation} selected={activeLocation === 'pickup'} />
+            {form.deliveryCategory !== 'WATER' && activeLocation === 'pickup' && (
+              <LocationSummary label="Pickup" location={form.pickupLocation} selected={true} />
             )}
-            <LocationSummary label={form.deliveryCategory === 'WATER' ? "Delivery Destination" : "Destination"} location={form.destination} selected={activeLocation === 'destination' || form.deliveryCategory === 'WATER'} />
+            {(activeLocation === 'destination' || form.deliveryCategory === 'WATER') && (
+              <LocationSummary label={form.deliveryCategory === 'WATER' ? "Delivery Destination" : "Destination"} location={form.destination} selected={true} />
+            )}
 
             <form className="location-search" onSubmit={searchPlaces}>
               <input type="search" placeholder={`Search ${form.deliveryCategory === 'WATER' ? 'destination' : activeLocation}`} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
@@ -351,7 +401,48 @@ export default function RequestDelivery() {
               </>
             )}
 
-            <button className="btn btn-primary btn-block" onClick={previewRoute} disabled={previewBusy || locationBusy} style={{ marginTop: 14 }}>
+            {form.pickupLocation && form.destination && (
+              <div className="route-block" style={{ marginTop: 24, position: 'relative' }}>
+                <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: 'var(--green-900)' }}>Selected Route Summary</h4>
+                <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'absolute', left: 5, top: 18, bottom: 18, width: 2, background: 'transparent', borderLeft: '2px dashed var(--green-600)' }}></div>
+                  
+                  <div className="route-point" style={{ alignItems: 'center' }}>
+                    <div className="dot dot-start" style={{ position: 'relative', zIndex: 1, margin: 0 }}></div>
+                    <div style={{ flex: 1, marginLeft: 8 }}>
+                      <span style={{ fontWeight: 600 }}>{form.deliveryCategory === 'WATER' ? 'Supplier' : 'Pickup'}</span>
+                      <b style={{ marginTop: 2 }}>{form.pickupLocation.address}</b>
+                    </div>
+                    {form.deliveryCategory !== 'WATER' && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setActiveLocation('pickup')} aria-label="Change Pickup">
+                        <Icon name="edit" size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="route-point" style={{ alignItems: 'center', marginTop: 8 }}>
+                    <div className="dot dot-end" style={{ background: '#d32f2f', position: 'relative', zIndex: 1, margin: 0 }}></div>
+                    <div style={{ flex: 1, marginLeft: 8 }}>
+                      <span style={{ fontWeight: 600 }}>Destination</span>
+                      <b style={{ marginTop: 2 }}>{form.destination.address}</b>
+                    </div>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setActiveLocation('destination')} aria-label="Change Destination">
+                      <Icon name="edit" size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button 
+              className="btn btn-primary btn-block" 
+              onClick={previewRoute} 
+              disabled={previewBusy || locationBusy || !form.pickupLocation || !form.destination} 
+              style={{ 
+                marginTop: 14,
+                boxShadow: (form.pickupLocation && form.destination) ? '0 4px 14px rgba(30, 122, 61, 0.4)' : 'none',
+                transition: 'box-shadow 0.2s ease-in-out'
+              }}>
               {previewBusy ? 'Calculating road route…' : 'Next: Fare Estimate'}
             </button>
           </div>
