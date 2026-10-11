@@ -115,6 +115,8 @@
         { "name": "List My Rides", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/rides" } },
         { "name": "List Available Rides", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/available" } },
         { "name": "Get Ride", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}" } },
+        { "name": "Ignore Available Ride", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/ignore" } },
+        { "name": "Restore Ignored Ride", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/ignore" } },
         { "name": "Accept Ride", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/accept" } },
         {
           "name": "Advance Ride Status",

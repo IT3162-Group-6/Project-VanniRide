@@ -22,6 +22,7 @@ The database currently contains the following collections:
 - `ratings`
 - `chat_access_requests`
 - `admin_audit_logs`
+- `ignored_ride_requests`
 
 ## Folder Structure
 

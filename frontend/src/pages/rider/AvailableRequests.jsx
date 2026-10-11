@@ -14,6 +14,7 @@ export default function AvailableRequests() {
   const [tab, setTab] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [changingId, setChangingId] = useState(null);
 
   const load = useCallback(() => {
     ridesApi.list({ available: true })
@@ -30,6 +31,27 @@ export default function AvailableRequests() {
 
   const shown = tab === 'all' ? rides : rides.filter((r) => r.type === tab);
 
+  async function setIgnored(ride, ignored) {
+    setChangingId(ride.id);
+    try {
+      if (ignored) await ridesApi.ignore(ride.id);
+      else await ridesApi.restore(ride.id);
+      setRides((current) => {
+        const updated = current.map((item) =>
+          item.id === ride.id
+            ? { ...item, ignored, ignoredAt: ignored ? new Date().toISOString() : null }
+            : item
+        );
+        return updated.sort((left, right) => Number(left.ignored) - Number(right.ignored));
+      });
+      setError('');
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setChangingId(null);
+    }
+  }
+
   return (
     <div className="card">
       <div className="card-head"><h3>Available Requests</h3></div>
@@ -43,7 +65,22 @@ export default function AvailableRequests() {
 
       {loading && <p className="muted">Loading…</p>}
       {!loading && shown.map((r) => (
-        <RideCard key={r.id} ride={r} person="customer" to={`/rider/requests/${r.id}`} />
+        <RideCard
+          key={r.id}
+          ride={r}
+          person="customer"
+          to={`/rider/requests/${r.id}`}
+          muted={r.ignored}
+          actions={(
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setIgnored(r, !r.ignored)}
+              disabled={changingId === r.id}
+            >
+              {changingId === r.id ? 'Saving…' : r.ignored ? 'Restore' : 'Ignore'}
+            </button>
+          )}
+        />
       ))}
       {!loading && shown.length === 0 && (
         <div className="empty">

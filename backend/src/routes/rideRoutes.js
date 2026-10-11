@@ -9,6 +9,8 @@ router.post('/', rideController.requestRide);
 router.get('/available', rideController.getAvailableRides);
 router.get('/', rideController.getMyRides);
 router.get('/:rideId', rideController.getRideById);
+router.patch('/:rideId/ignore', rideController.ignoreRideRequest);
+router.delete('/:rideId/ignore', rideController.restoreRideRequest);
 router.patch('/:rideId/accept', rideController.acceptRide);
 router.patch('/:rideId/status', rideController.updateRideStatus);
 router.patch('/:rideId/cancel', rideController.cancelRide);

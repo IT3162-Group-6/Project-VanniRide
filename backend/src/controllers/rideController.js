@@ -2,6 +2,7 @@ const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const Ride = require('../models/rideModel');
 const Rider = require('../models/riderModel');
+const IgnoredRideRequest = require('../models/ignoredRideRequestModel');
 const CancellationRequest = require('../models/cancellationRequestModel');
 const Payment = require('../models/paymentModel');
 const User = require('../models/userModel');
@@ -304,10 +305,97 @@ exports.getAvailableRides = catchAsync(async (req, res) => {
     .sort({ requested_at: 1 })
     .lean();
 
+  const ignoredRequests = rides.length
+    ? await IgnoredRideRequest.find({
+        rider_id: userId,
+        ride_id: { $in: rides.map((ride) => ride._id) },
+      }).lean()
+    : [];
+  const ignoredByRideId = new Map(
+    ignoredRequests.map((request) => [request.ride_id.toString(), request])
+  );
+  const serializedRides = rides
+    .map((ride) => {
+      const ignoredRequest = ignoredByRideId.get(ride._id.toString());
+      return {
+        ...serializeRide(ride),
+        ignored: Boolean(ignoredRequest),
+        ignoredAt: ignoredRequest?.ignored_at || null,
+      };
+    })
+    .sort((left, right) => Number(left.ignored) - Number(right.ignored));
+
   res.status(200).json({
     success: true,
-    results: rides.length,
-    data: { rides: rides.map(serializeRide) },
+    results: serializedRides.length,
+    data: { rides: serializedRides },
+  });
+});
+
+exports.ignoreRideRequest = catchAsync(async (req, res) => {
+  const { userId } = getAuthenticatedUser(req, ['RIDER']);
+  validateRideId(req.params.rideId);
+
+  const [rider, ride] = await Promise.all([
+    Rider.findOne({ user_id: userId }).lean(),
+    Ride.findById(req.params.rideId).lean(),
+  ]);
+
+  if (!rider) {
+    throw new AppError('Rider profile not found', 404);
+  }
+  if (rider.approval_status !== 'APPROVED') {
+    throw new AppError(
+      `Rider approval is ${rider.approval_status.toLowerCase()}`,
+      403
+    );
+  }
+  if (rider.availability_status !== 'AVAILABLE') {
+    throw new AppError('Only available riders can ignore ride requests', 403);
+  }
+  if (!ride) {
+    throw new AppError('Ride not found', 404);
+  }
+  if (ride.status !== 'REQUESTED' || ride.rider_id) {
+    throw new AppError('This ride is no longer available', 409);
+  }
+
+  const ignoredRequest = await IgnoredRideRequest.findOneAndUpdate(
+    { rider_id: userId, ride_id: ride._id },
+    {
+      $setOnInsert: {
+        rider_id: userId,
+        ride_id: ride._id,
+        ignored_at: new Date(),
+      },
+    },
+    { upsert: true, returnDocument: 'after', runValidators: true }
+  );
+
+  res.status(200).json({
+    success: true,
+    message: 'Ride request moved to the ignored section',
+    data: {
+      rideId: ride._id.toString(),
+      ignored: true,
+      ignoredAt: ignoredRequest.ignored_at,
+    },
+  });
+});
+
+exports.restoreRideRequest = catchAsync(async (req, res) => {
+  const { userId } = getAuthenticatedUser(req, ['RIDER']);
+  validateRideId(req.params.rideId);
+
+  await IgnoredRideRequest.deleteOne({
+    rider_id: userId,
+    ride_id: req.params.rideId,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Ride request restored',
+    data: { rideId: req.params.rideId, ignored: false },
   });
 });
 

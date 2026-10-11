@@ -31,6 +31,7 @@ const adminRoutes = require('../src/routes/adminRoutes');
 const mapRoutes = require('../src/routes/mapRoutes');
 const Ride = require('../src/models/rideModel');
 const Rider = require('../src/models/riderModel');
+const IgnoredRideRequest = require('../src/models/ignoredRideRequestModel');
 const User = require('../src/models/userModel');
 const Cancellation = require('../src/models/cancellationModel');
 const CancellationRequest = require('../src/models/cancellationRequestModel');
@@ -132,6 +133,7 @@ test.beforeEach(async () => {
     Message.deleteMany({}),
     Rating.deleteMany({}),
     AdminAuditLog.deleteMany({}),
+    IgnoredRideRequest.deleteMany({}),
   ]);
 });
 
@@ -671,6 +673,93 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
     customerPaymentResult.body.data.payment.confirmedBy,
     riderUserId.toString()
   );
+});
+
+test('keeps ignored requests private to one rider and allows restoring them', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const riderUserId = new mongoose.Types.ObjectId();
+  const otherRiderUserId = new mongoose.Types.ObjectId();
+
+  await Rider.create([
+    approvedRider(riderUserId),
+    approvedRider(otherRiderUserId),
+  ]);
+  const ride = await Ride.create({
+    customer_id: customerId,
+    rider_id: null,
+    request_type: 'TRANSPORT',
+    delivery_category: null,
+    pickup_location: {
+      address: 'University of Vavuniya',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Vavuniya Town',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+    distance_km: 1,
+    fare_amount: 260,
+    status: 'REQUESTED',
+  });
+  const visibleRide = await Ride.create({
+    customer_id: new mongoose.Types.ObjectId(),
+    rider_id: null,
+    request_type: 'TRANSPORT',
+    delivery_category: null,
+    pickup_location: {
+      address: 'Vavuniya Bus Stand',
+      latitude: 8.754,
+      longitude: 80.497,
+    },
+    destination: {
+      address: 'University Park',
+      latitude: 8.76,
+      longitude: 80.5,
+    },
+    distance_km: 2,
+    fare_amount: 300,
+    status: 'REQUESTED',
+  });
+
+  const ignored = await invokeController(
+    rideController.ignoreRideRequest,
+    makeRequest({
+      user: { id: riderUserId.toString(), role: 'RIDER' },
+      params: { rideId: ride._id.toString() },
+    })
+  );
+  assert.equal(ignored.body.data.ignored, true);
+
+  const riderList = await invokeController(
+    rideController.getAvailableRides,
+    makeRequest({ user: { id: riderUserId.toString(), role: 'RIDER' } })
+  );
+  const otherRiderList = await invokeController(
+    rideController.getAvailableRides,
+    makeRequest({ user: { id: otherRiderUserId.toString(), role: 'RIDER' } })
+  );
+  assert.equal(riderList.body.data.rides[0].id, visibleRide._id.toString());
+  assert.equal(riderList.body.data.rides[1].ignored, true);
+  assert.ok(riderList.body.data.rides[1].ignoredAt);
+  assert.equal(otherRiderList.body.data.rides[0].ignored, false);
+
+  const restored = await invokeController(
+    rideController.restoreRideRequest,
+    makeRequest({
+      user: { id: riderUserId.toString(), role: 'RIDER' },
+      params: { rideId: ride._id.toString() },
+    })
+  );
+  assert.equal(restored.body.data.ignored, false);
+
+  const restoredList = await invokeController(
+    rideController.getAvailableRides,
+    makeRequest({ user: { id: riderUserId.toString(), role: 'RIDER' } })
+  );
+  assert.equal(restoredList.body.data.rides[0].ignored, false);
+  assert.equal(await IgnoredRideRequest.countDocuments({}), 0);
 });
 
 test('prevents customers and unrelated riders from confirming cash payment', async () => {
@@ -1752,7 +1841,7 @@ test('keeps the Postman collection synchronized with every implemented API route
   );
 
   assert.equal(new Set(collectedRoutes).size, collectedRoutes.length);
-  assert.equal(implementedRoutes.length, 43);
+  assert.equal(implementedRoutes.length, 45);
   assert.deepEqual(collectedRoutes.sort(), implementedRoutes.sort());
 });
 

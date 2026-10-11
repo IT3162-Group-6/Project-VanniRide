@@ -502,6 +502,8 @@ ul{margin:0;padding:0;list-style:none}
 /* ride rows */
 .req-row-link{cursor:pointer}
 .req-row-link:hover{background:var(--mint-50)}
+.req-row-muted{opacity:.55;background:var(--surface-soft, #f5f7f6)}
+.req-row-muted:hover{background:var(--surface-soft, #f5f7f6)}
 .req-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:auto}
 .req-fare{font-size:.86rem;white-space:nowrap}
 .req-actions{display:flex;gap:8px;margin-left:12px}

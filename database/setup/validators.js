@@ -380,4 +380,21 @@ db.runCommand({
   validationAction: "error"
 });
 
+db.runCommand({
+  collMod: "ignored_ride_requests",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["rider_id", "ride_id", "ignored_at"],
+      properties: {
+        rider_id: { bsonType: "objectId" },
+        ride_id: { bsonType: "objectId" },
+        ignored_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
 print("All Vanni Ride validators applied successfully.");

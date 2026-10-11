@@ -414,6 +414,8 @@ test('connects rider availability, requests, lifecycle, earnings, vehicle, and c
     if (request.url.endsWith('/users/rider/profile')) return jsonResponse({success:true,data:{riderProfile:{approvalStatus:'PENDING',availabilityStatus:'UNAVAILABLE',vehicle:{model:'Dio',registrationNumber:'NP-9'}},reapprovalTriggered:true}});
     if (request.url.endsWith('/users/rider/earnings')) return jsonResponse({success:true,data:{summary:{totalEarnings:500,pendingReceiptAmount:200},earnings:[]}});
     if (request.url.endsWith('/rides/available')) return jsonResponse({success:true,data:{rides:[{id:'r1',rideType:'TRANSPORT',pickupLocation:{address:'A'},destination:{address:'B'},status:'REQUESTED',estimatedFare:200}]}});
+    if (request.url.endsWith('/rides/r1/ignore') && options.method === 'PATCH') return jsonResponse({success:true,data:{rideId:'r1',ignored:true,ignoredAt:'2026-10-02T00:00:00.000Z'}});
+    if (request.url.endsWith('/rides/r1/ignore') && options.method === 'DELETE') return jsonResponse({success:true,data:{rideId:'r1',ignored:false}});
     if (request.url.endsWith('/rides/r1/accept')) return jsonResponse({success:true,data:{ride:{id:'r1',rideType:'TRANSPORT',pickupLocation:{address:'A'},destination:{address:'B'},status:'ACCEPTED',estimatedFare:200}}});
     if (request.url.endsWith('/rides/r1/status')) return jsonResponse({success:true,data:{ride:{id:'r1',rideType:'TRANSPORT',pickupLocation:{address:'A'},destination:{address:'B'},status:'ARRIVED',estimatedFare:200}}});
     if (request.url.endsWith('/rides/r1/payment')) return jsonResponse({success:true,data:{payment:{id:'p1',paymentMethod:'CASH',paymentStatus:'PAID',amount:200}}});
@@ -423,10 +425,13 @@ test('connects rider availability, requests, lifecycle, earnings, vehicle, and c
   assert.equal((await riderApi.updateVehicle({type:'Motorcycle',model:'Dio',registrationNumber:'NP-9',color:'Black'})).reapprovalTriggered, true);
   assert.equal((await riderApi.earnings()).summary.totalEarnings, 500);
   assert.equal((await ridesApi.list({available:true}))[0].status, 'pending');
+  assert.equal((await ridesApi.ignore('r1')).ignored, true);
+  assert.equal((await ridesApi.restore('r1')).ignored, false);
   assert.equal((await ridesApi.accept('r1')).status, 'accepted');
   assert.equal((await ridesApi.updateStatus('r1', 'ontheway')).apiStatus, 'ARRIVED');
   assert.equal((await ridesApi.confirmCashPayment('r1')).status, 'paid');
-  assert.equal(JSON.parse(requests[5].options.body).status, 'ARRIVED');
+  const statusRequest = requests.find((request) => request.url.endsWith('/rides/r1/status'));
+  assert.equal(JSON.parse(statusRequest.options.body).status, 'ARRIVED');
 });
 
 test('connects ride chat, access requests, and rider ratings', async () => {

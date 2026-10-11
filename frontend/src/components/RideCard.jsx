@@ -14,13 +14,13 @@ function when(iso) {
  * `person`  – 'rider' | 'customer' | null, which side to show under the title
  * `actions` – optional nodes rendered on the right
  */
-export default function RideCard({ ride, to, person = null, actions = null }) {
+export default function RideCard({ ride, to, person = null, actions = null, muted = false }) {
   const navigate = useNavigate();
   const other = person === 'rider' ? ride.rider : person === 'customer' ? ride.customer : null;
 
   return (
     <div
-      className={`req-row ${to ? 'req-row-link' : ''}`}
+      className={`req-row ${to ? 'req-row-link' : ''} ${muted ? 'req-row-muted' : ''}`}
       onClick={to ? () => navigate(to) : undefined}
     >
       <div className="req-icon"><Icon name={ride.type === 'delivery' ? 'package' : 'car'} /></div>

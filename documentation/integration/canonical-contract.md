@@ -306,6 +306,21 @@ Required fields:
 - `after`: object containing the relevant values after the change
 - `created_at`: date
 
+### `ignored_ride_requests`
+
+Stores a rider's personal decision to move an available request to the bottom of
+their list. Ignoring a request does not reject, cancel, or hide it from another
+rider.
+
+Required fields:
+
+- `rider_id`: the rider who ignored the request
+- `ride_id`: the still-available ride request
+- `ignored_at`: date
+
+The rider and ride pair is unique. Restoring the request removes this document,
+making the request appear normally and allowing the rider to accept it.
+
 ## 6. Cancellation Rules
 
 ### Before the ride starts
@@ -597,6 +612,8 @@ Room membership never replaces authorization checks against MongoDB.
 - `chat_access_requests.ride_id + chat_access_requests.approved_until`
 - `admin_audit_logs.admin_id + admin_audit_logs.created_at`
 - `admin_audit_logs.target_type + admin_audit_logs.target_id + admin_audit_logs.created_at`
+- Unique `ignored_ride_requests.rider_id + ignored_ride_requests.ride_id`
+- `ignored_ride_requests.rider_id + ignored_ride_requests.ignored_at`
 
 ## 13. Integration and Definition of Done
 

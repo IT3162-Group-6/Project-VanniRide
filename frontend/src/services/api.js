@@ -475,6 +475,38 @@ export const ridesApi = {
     return hydrate(ride, d);
   },
 
+  async ignore(rideId) {
+    if (!USE_MOCK_AUTH) {
+      const response = await http(`/rides/${rideId}/ignore`, { method: 'PATCH' });
+      return response.data;
+    }
+    if (!USE_MOCK_DATA) return http(`/rides/${rideId}/ignore`, { method: 'PATCH' });
+    await delay();
+    const d = db();
+    const ride = d.rides.find((item) => item.id === rideId);
+    if (!ride) throw new Error('Ride not found');
+    ride.ignored = true;
+    ride.ignoredAt = new Date().toISOString();
+    save(d);
+    return { rideId, ignored: true, ignoredAt: ride.ignoredAt };
+  },
+
+  async restore(rideId) {
+    if (!USE_MOCK_AUTH) {
+      const response = await http(`/rides/${rideId}/ignore`, { method: 'DELETE' });
+      return response.data;
+    }
+    if (!USE_MOCK_DATA) return http(`/rides/${rideId}/ignore`, { method: 'DELETE' });
+    await delay();
+    const d = db();
+    const ride = d.rides.find((item) => item.id === rideId);
+    if (!ride) throw new Error('Ride not found');
+    ride.ignored = false;
+    ride.ignoredAt = null;
+    save(d);
+    return { rideId, ignored: false };
+  },
+
   async updateStatus(rideId, status) {
     if (!USE_MOCK_AUTH) {
       const backendStatus = {

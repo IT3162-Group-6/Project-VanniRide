@@ -139,4 +139,11 @@ db.admin_audit_logs.createIndex({
   created_at: -1
 });
 
+ensureIndex(
+  "ignored_ride_requests",
+  { rider_id: 1, ride_id: 1 },
+  { unique: true }
+);
+db.ignored_ride_requests.createIndex({ rider_id: 1, ignored_at: 1 });
+
 print("All Vanni Ride indexes created successfully.");
