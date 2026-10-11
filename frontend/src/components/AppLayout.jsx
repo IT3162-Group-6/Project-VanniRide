@@ -27,8 +27,12 @@ const TITLES = {
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { pathname } = useLocation();
-  const title = TITLES[pathname] || (pathname.startsWith('/rider/requests/') ? 'Request Details'
+  const { pathname, search } = useLocation();
+  const requestTitle =
+    pathname === '/customer/request' && new URLSearchParams(search).get('type') === 'delivery'
+      ? 'Request a Delivery'
+      : null;
+  const title = requestTitle || TITLES[pathname] || (pathname.startsWith('/rider/requests/') ? 'Request Details'
     : pathname.startsWith('/admin/rides/') ? 'Ride Details' : 'Vanni Ride');
 
   return (

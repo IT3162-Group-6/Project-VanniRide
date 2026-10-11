@@ -41,7 +41,10 @@ const Message = require('../src/models/messageModel');
 const Rating = require('../src/models/ratingModel');
 const AdminAuditLog = require('../src/models/adminAuditLogModel');
 const initializeSocketHandler = require('../src/sockets/socketHandler');
-const { calculateFare } = require('../src/utils/fareCalculator');
+const {
+  calculateFare,
+  calculateFareBreakdown,
+} = require('../src/utils/fareCalculator');
 const {
   calculateRoadDistanceKm,
   calculateRoadRoute,
@@ -155,7 +158,17 @@ test('uses the shortest returned road route to estimate the fare', async () => {
 
   assert.equal(distanceKm, 0.75);
   assert.equal(calculateFare('TRANSPORT', distanceKm), 260);
-  assert.equal(calculateFare('DELIVERY', distanceKm), 210);
+  assert.deepEqual(
+    calculateFareBreakdown('DELIVERY', distanceKm, 'FOOD', {
+      food_order: { items: [{ quantity: 2 }, { quantity: 1 }] },
+    }),
+    {
+      baseFare: 150,
+      distanceCharge: 45,
+      handlingCharge: 75,
+      total: 270,
+    }
+  );
 });
 
 test('validates and preserves structured delivery order details', async () => {
@@ -217,6 +230,7 @@ test('validates and preserves structured delivery order details', async () => {
   );
 
   assert.equal(result.statusCode, 201);
+  assert.equal(result.body.data.ride.estimatedFare, 270);
   assert.equal(result.body.data.ride.deliveryDetails.receiverPhone, '0771234567');
   assert.equal(result.body.data.ride.deliveryDetails.foodOrder.items.length, 2);
   assert.equal(
@@ -332,6 +346,12 @@ test('returns map-ready road routes and caches geocoding provider results', asyn
   assert.equal(preview.statusCode, 200);
   assert.equal(preview.body.data.routePreview.distanceKm, 0.75);
   assert.equal(preview.body.data.routePreview.estimatedFare, 260);
+  assert.deepEqual(preview.body.data.routePreview.fareBreakdown, {
+    baseFare: 200,
+    distanceCharge: 60,
+    handlingCharge: 0,
+    total: 260,
+  });
   assert.equal(preview.body.data.routePreview.routeGeometry.type, 'LineString');
 });
 

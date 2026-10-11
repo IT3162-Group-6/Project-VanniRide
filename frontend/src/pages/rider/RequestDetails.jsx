@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
+import DeliveryDetailsDisplay from '../../components/DeliveryDetailsDisplay';
 import MapArt from '../../components/MapArt';
 import StatusBadge from '../../components/StatusBadge';
 import { useAppState } from '../../context/AppState';
@@ -58,6 +59,8 @@ export default function RequestDetails() {
           <div><span>Category</span><b>{ride.deliveryCategory || 'Transport'}</b></div>
           <div><span>Payment</span><b>Cash</b></div>
         </div>
+
+        <DeliveryDetailsDisplay ride={ride} />
 
         <label className="field-label" style={{ marginTop: 18 }}>Fare</label>
         <div className="fare-total"><span>Cash fare</span><span>LKR {Number(ride.fare).toFixed(2)}</span></div>

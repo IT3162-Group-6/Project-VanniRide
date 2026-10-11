@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
+import DeliveryDetailsDisplay from '../../components/DeliveryDetailsDisplay';
 import MapArt from '../../components/MapArt';
 import StatusBadge from '../../components/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
@@ -113,6 +114,7 @@ export default function ActiveRide() {
       {error && <div className="alert alert-error">{error}</div>}
       <div className="route-block"><div className="route-point"><span className="dot dot-start"/><div><b>{ride.pickup}</b><span>Pickup</span></div></div><div className="route-point"><span className="dot dot-end"/><div><b>{ride.dropoff}</b><span>Drop-off</span></div></div></div>
       <div className="rider-card"><div className="avatar">{ride.customer?.name?.[0]}</div><div><b>{ride.customer?.name}</b><span>{ride.customer?.phone}</span></div><Link to="/rider/chat" className="icon-btn"><Icon name="chat" /></Link><a href={`tel:${ride.customer?.phone}`} className="icon-btn"><Icon name="phone" /></a></div>
+      <DeliveryDetailsDisplay ride={ride} />
       <div className="kv" style={{marginTop:16}}><div><span>Distance</span><b>{ride.distanceKm} km</b></div><div><span>Payment</span><b>Cash · {payment?.status || 'pending'}</b></div></div>
       <div className="fare-total"><span>Fare</span><span>LKR {Number(ride.fare).toFixed(2)}</span></div>
       {step && <button className="btn btn-primary btn-block" disabled={busy || Boolean(request)} onClick={advance}>{step.label}</button>}

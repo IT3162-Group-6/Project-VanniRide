@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/Icon';
+import DeliveryDetailsForm, { DeliveryOrderSummary } from '../../components/DeliveryDetailsForm';
 import LocationMap from '../../components/LocationMap';
 import { useAppState } from '../../context/AppState';
 import { QUICK_PICK_LOCATIONS } from '../../data/quickPickLocations';
+import {
+  FOOD_PICKUP_LOCATIONS,
+  buildDeliveryPayload,
+  createDefaultDeliveryDetails,
+  validateDeliveryDetails,
+} from '../../data/deliveryOptions';
 import { mapApi, ridesApi } from '../../services/api';
 
 const coordinateLabel = ({ latitude, longitude }) =>
@@ -25,7 +32,7 @@ function LocationSummary({ label, location, selected }) {
 }
 
 export default function RequestRide() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const { showToast } = useAppState();
   const [step, setStep] = useState(1);
@@ -39,9 +46,10 @@ export default function RequestRide() {
   const [activeLocation, setActiveLocation] = useState('pickup');
   const [preview, setPreview] = useState(null);
   const [createdRide, setCreatedRide] = useState(null);
+  const [deliveryDetails, setDeliveryDetails] = useState(createDefaultDeliveryDetails);
   const [form, setForm] = useState({
     rideType: params.get('type') === 'delivery' ? 'DELIVERY' : 'TRANSPORT',
-    deliveryCategory: 'PARCEL',
+    deliveryCategory: 'FOOD',
     pickupLocation: null,
     destination: null,
   });
@@ -50,9 +58,16 @@ export default function RequestRide() {
     setForm((current) => ({
       ...current,
       rideType,
-      deliveryCategory: rideType === 'DELIVERY' ? current.deliveryCategory || 'PARCEL' : null,
+      deliveryCategory: rideType === 'DELIVERY' ? current.deliveryCategory || 'FOOD' : null,
     }));
+    setParams({ type: rideType === 'DELIVERY' ? 'delivery' : 'ride' });
     setPreview(null);
+  };
+
+  const setDeliveryCategory = (deliveryCategory) => {
+    setForm((current) => ({ ...current, deliveryCategory }));
+    setPreview(null);
+    setError('');
   };
 
   const setLocation = (target, location) => {
@@ -128,6 +143,23 @@ export default function RequestRide() {
     if (activeLocation === 'pickup') setActiveLocation('destination');
   }
 
+  function chooseFoodPickup(place) {
+    setDeliveryDetails((current) => ({
+      ...current,
+      foodOrder: {
+        ...current.foodOrder,
+        outletCode: place.id,
+        outletName: place.displayName,
+      },
+    }));
+    setForm((current) => ({ ...current, pickupLocation: null }));
+    setActiveLocation('pickup');
+    setSearchQuery(place.searchQuery);
+    setSearchResults([]);
+    setPreview(null);
+    setError(`“${place.displayName}” selected. Choose its exact pickup point from search results or the map.`);
+  }
+
   function useCurrentLocation() {
     setError('');
     if (!navigator.geolocation) {
@@ -154,12 +186,22 @@ export default function RequestRide() {
   const routePayload = () => ({
     rideType: form.rideType,
     deliveryCategory: form.rideType === 'DELIVERY' ? form.deliveryCategory : null,
+    ...(form.rideType === 'DELIVERY'
+      ? { deliveryDetails: buildDeliveryPayload(deliveryDetails, form.deliveryCategory) }
+      : {}),
     pickupLocation: form.pickupLocation,
     destination: form.destination,
   });
 
   async function previewRoute() {
     setError('');
+    if (form.rideType === 'DELIVERY') {
+      const validationError = validateDeliveryDetails(deliveryDetails, form.deliveryCategory);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+    }
     if (!form.pickupLocation || !form.destination) {
       setError('Select both pickup and destination before continuing.');
       return;
@@ -248,13 +290,24 @@ export default function RequestRide() {
                 <label>Delivery category</label>
                 <select
                   value={form.deliveryCategory}
-                  onChange={(event) => setForm({ ...form, deliveryCategory: event.target.value })}
+                  onChange={(event) => setDeliveryCategory(event.target.value)}
                 >
                   <option value="FOOD">Food</option>
                   <option value="WATER">Water</option>
                   <option value="PARCEL">Other / Parcel</option>
                 </select>
               </div>
+            )}
+
+            {form.rideType === 'DELIVERY' && (
+              <DeliveryDetailsForm
+                category={form.deliveryCategory}
+                details={deliveryDetails}
+                setDetails={(updater) => {
+                  setDeliveryDetails(updater);
+                  setPreview(null);
+                }}
+              />
             )}
 
             <div className="location-toggle" role="group" aria-label="Location being selected">
@@ -279,23 +332,39 @@ export default function RequestRide() {
               </div>
             )}
 
-            <div className="quick-picks" aria-label="Frequently used locations">
-              <span>Frequently used locations</span>
-              <div>
-                {QUICK_PICK_LOCATIONS.map((place) => (
-                  <button type="button" key={place.id} onClick={() => chooseSearchResult(place)}>
-                    <Icon name="pin" size={13} /> {place.displayName}
-                  </button>
-                ))}
+            {form.rideType === 'TRANSPORT' && (
+              <div className="quick-picks" aria-label="Frequently used locations">
+                <span>Frequently used locations</span>
+                <div>
+                  {QUICK_PICK_LOCATIONS.map((place) => (
+                    <button type="button" key={place.id} onClick={() => chooseSearchResult(place)}>
+                      <Icon name="pin" size={13} /> {place.displayName}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {form.rideType === 'DELIVERY' && form.deliveryCategory === 'FOOD' && (
+              <div className="quick-picks" aria-label="Food pickup locations">
+                <span>Food pickup quick picks</span>
+                <div>
+                  {FOOD_PICKUP_LOCATIONS.map((place) => (
+                    <button type="button" key={place.id} className={deliveryDetails.foodOrder.outletCode === place.id ? 'selected' : ''} onClick={() => chooseFoodPickup(place)}>
+                      <Icon name="pin" size={13} /> {place.displayName}
+                    </button>
+                  ))}
+                </div>
+                <small>Exact map points can be updated when their coordinates are confirmed.</small>
+              </div>
+            )}
 
             <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={useCurrentLocation} disabled={locationBusy}>
               <Icon name="pin" size={16} /> Use my current location as pickup
             </button>
 
             <button className="btn btn-primary btn-block" onClick={previewRoute} disabled={previewBusy || locationBusy} style={{ marginTop: 14 }}>
-              {previewBusy ? 'Calculating road route…' : 'Next: Fare Estimate'}
+              {previewBusy ? 'Calculating road route…' : `Next: ${form.rideType === 'DELIVERY' ? 'Delivery' : 'Fare'} Estimate`}
             </button>
           </div>
           {map}
@@ -305,7 +374,7 @@ export default function RequestRide() {
       {step === 2 && preview && (
         <div className="request-layout">
           <div className="card">
-            <h3 style={{ marginBottom: 6 }}>Fare Estimate</h3>
+            <h3 style={{ marginBottom: 6 }}>{form.rideType === 'DELIVERY' ? 'Delivery Summary' : 'Fare Estimate'}</h3>
             {error && <div className="alert alert-error">{error}</div>}
             <div className="fare-summary" style={{ marginTop: 16 }}>
               <div><span>Road distance</span><b>{preview.distanceKm} km</b></div>
@@ -315,8 +384,18 @@ export default function RequestRide() {
             <label className="field-label" style={{ marginTop: 18 }}>Route</label>
             <div className="fare-row"><span>Pickup</span><span>{form.pickupLocation.address}</span></div>
             <div className="fare-row"><span>Destination</span><span>{form.destination.address}</span></div>
-            <div className="fare-total"><span>Estimated cash fare</span><span>LKR {Number(preview.estimatedFare).toFixed(2)}</span></div>
+            {form.rideType === 'DELIVERY' && <>
+              <div className="delivery-review-contact"><span>Receiver</span><b>{deliveryDetails.receiverName} · {deliveryDetails.receiverPhone}</b></div>
+              <DeliveryOrderSummary category={form.deliveryCategory} details={deliveryDetails} compact />
+              {preview.fareBreakdown && <div className="delivery-price-breakdown">
+                <div><span>Base delivery charge</span><b>LKR {Number(preview.fareBreakdown.baseFare).toFixed(2)}</b></div>
+                <div><span>Distance charge</span><b>LKR {Number(preview.fareBreakdown.distanceCharge).toFixed(2)}</b></div>
+                <div><span>Quantity / weight handling</span><b>LKR {Number(preview.fareBreakdown.handlingCharge).toFixed(2)}</b></div>
+              </div>}
+            </>}
+            <div className="fare-total"><span>Estimated {form.rideType === 'DELIVERY' ? 'delivery charge' : 'cash fare'}</span><span>LKR {Number(preview.estimatedFare).toFixed(2)}</span></div>
             <p className="fare-note">The backend recalculates the road route and fare when you confirm.</p>
+            {form.rideType === 'DELIVERY' && <p className="fare-note">Food or product purchase cost is separate and is not included in this delivery charge.</p>}
 
             <label className="field-label">Payment method</label>
             <div className="ride-type selected cash-only-option">

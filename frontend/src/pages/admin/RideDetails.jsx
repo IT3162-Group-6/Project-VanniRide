@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
+import DeliveryDetailsDisplay from '../../components/DeliveryDetailsDisplay';
 import MapArt from '../../components/MapArt';
 import StatusBadge from '../../components/StatusBadge';
 import { adminApi } from '../../services/api';
@@ -95,6 +96,8 @@ export default function RideDetails() {
             <div><span>Created</span><b>{new Date(ride.createdAt).toLocaleString()}</b></div>
             {rating && <div><span>Rating</span><b>{rating.rating}★{rating.review ? ` · ${rating.review}` : ''}</b></div>}
           </div>
+
+          <DeliveryDetailsDisplay ride={ride} />
 
           <div className="fare-total"><span>Stored fare</span><span>LKR {Number(ride.fare).toFixed(2)}</span></div>
 

@@ -13,7 +13,7 @@ const {
   RIDE_TYPES,
 } = require('../constants/rideConstants');
 const {
-  calculateFare,
+  calculateFareBreakdown,
 } = require('../utils/fareCalculator');
 const {
   calculateRoadDistanceKm,
@@ -248,7 +248,13 @@ exports.requestRide = catchAsync(async (req, res) => {
     pickupLocation,
     destination
   );
-  const estimatedFare = calculateFare(rideType, distanceKm);
+  const fareBreakdown = calculateFareBreakdown(
+    rideType,
+    distanceKm,
+    deliveryCategory,
+    deliveryDetails
+  );
+  const estimatedFare = fareBreakdown.total;
 
   let ride;
   try {

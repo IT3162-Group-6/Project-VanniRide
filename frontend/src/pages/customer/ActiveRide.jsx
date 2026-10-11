@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/Icon';
+import DeliveryDetailsDisplay from '../../components/DeliveryDetailsDisplay';
 import MapArt from '../../components/MapArt';
 import StatusBadge from '../../components/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
@@ -183,6 +184,8 @@ export default function ActiveRide() {
           ) : (
             <p className="muted" style={{ marginTop: 14 }}>No rider yet — we'll notify you when someone accepts.</p>
           )}
+
+          <DeliveryDetailsDisplay ride={ride} />
 
           <div className="fare-row" style={{ marginTop: 16 }}><span>Distance</span><span>{ride.distanceKm} km</span></div>
           <div className="fare-row"><span>Payment</span><span>Cash · {payment?.status || 'pending'}</span></div>

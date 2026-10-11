@@ -162,6 +162,12 @@ Response resource:
     "distanceKm": 3.42,
     "durationMinutes": 9,
     "estimatedFare": 474,
+    "fareBreakdown": {
+      "baseFare": 200,
+      "distanceCharge": 274,
+      "handlingCharge": 0,
+      "total": 474
+    },
     "routeGeometry": {
       "type": "LineString",
       "coordinates": [[80.497, 8.758], [80.503, 8.751]]
@@ -181,6 +187,11 @@ For `DELIVERY`, both route preview and ride creation must send the same
 `waterOrder`, or `parcelOrder`. The backend validates item quantities, custom
 `OTHER` descriptions, parcel weight, and Sri Lankan mobile format before
 calculating or saving the request.
+
+Delivery fare uses a LKR 150 base, LKR 60 per road-route kilometre, and a
+category handling charge: LKR 25 per food parcel, LKR 30 per water container,
+or LKR 15 per started kilogram for another parcel. The frontend must label this
+as the delivery charge and state that food/product purchase cost is separate.
 
 ### 3.4 Stored ride data
 

@@ -9,7 +9,7 @@ const {
   searchPlaces,
 } = require('../services/geocodingService');
 const { calculateRoadRoute } = require('../services/routingService');
-const { calculateFare } = require('../utils/fareCalculator');
+const { calculateFareBreakdown } = require('../utils/fareCalculator');
 const { normalizeDeliveryDetails } = require('../utils/deliveryDetails');
 
 const normalizeCoordinates = (latitudeValue, longitudeValue, label) => {
@@ -94,9 +94,10 @@ exports.previewRoute = catchAsync(async (req, res) => {
   if (rideType === 'TRANSPORT' && req.body.deliveryDetails) {
     throw new AppError('Transport requests cannot have delivery details', 400);
   }
-  if (rideType === 'DELIVERY') {
-    normalizeDeliveryDetails(req.body.deliveryDetails, deliveryCategory);
-  }
+  const deliveryDetails =
+    rideType === 'DELIVERY'
+      ? normalizeDeliveryDetails(req.body.deliveryDetails, deliveryCategory)
+      : null;
 
   const pickupLocation = normalizeLocation(req.body.pickupLocation, 'Pickup');
   const destination = normalizeLocation(req.body.destination, 'Destination');
@@ -109,12 +110,20 @@ exports.previewRoute = catchAsync(async (req, res) => {
     );
   }
 
+  const fareBreakdown = calculateFareBreakdown(
+    rideType,
+    route.distanceKm,
+    deliveryCategory,
+    deliveryDetails
+  );
+
   res.status(200).json({
     success: true,
     data: {
       routePreview: {
         ...route,
-        estimatedFare: calculateFare(rideType, route.distanceKm),
+        estimatedFare: fareBreakdown.total,
+        fareBreakdown,
       },
     },
   });

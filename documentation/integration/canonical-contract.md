@@ -386,12 +386,16 @@ participant allowance, and cannot alter a completed or cancelled ride.
   service-unavailable error and does not create a ride.
 - Live location tracking is not included.
 
-Version-one fare calculation:
+Fare calculation:
 
 ```text
 TRANSPORT = LKR 200 base fare + LKR 80 per road-route kilometre
-DELIVERY  = LKR 150 base fare + LKR 80 per road-route kilometre
+DELIVERY  = LKR 150 base fare + LKR 60 per road-route kilometre + handling
 ```
+
+Delivery handling is LKR 25 per food parcel, LKR 30 per water container, or
+LKR 15 per started kilogram for another parcel. The estimate is the rider's
+delivery charge only; food and product purchase costs are separate.
 
 The final estimate is rounded to the nearest whole LKR and stored in both the
 ride and its pending payment record.

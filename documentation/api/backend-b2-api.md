@@ -73,8 +73,9 @@ interface without exposing geocoding traffic directly from the browser:
 - `GET /api/maps/reverse?latitude=8.7514&longitude=80.4971` - Convert a selected
   coordinate to an address.
 - `POST /api/maps/route-preview` - Return the shortest route distance,
-  estimated duration, GeoJSON line, and estimated fare without creating a
-  ride.
+  estimated duration, GeoJSON line, estimated fare, and fare breakdown without
+  creating a ride. The breakdown contains `baseFare`, `distanceCharge`,
+  `handlingCharge`, and `total`.
 
 Search and reverse requests are cached and serialized by the backend. Do not
 implement keystroke-by-keystroke autocomplete against the public Nominatim
