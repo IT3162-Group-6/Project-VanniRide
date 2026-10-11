@@ -6,7 +6,6 @@ import MarketingLayout from './components/MarketingLayout';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Toast from './components/Toast';
-import InstallPrompt from './components/InstallPrompt';
 
 // public
 import Home from './pages/Home';
@@ -101,7 +100,6 @@ export default function App() {
         </BrowserRouter>
       </AuthProvider>
       <Toast />
-      <InstallPrompt />
     </AppStateProvider>
   );
 }
