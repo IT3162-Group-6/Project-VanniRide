@@ -173,9 +173,12 @@ test('returns map-ready road routes and caches geocoding provider results', asyn
 
   clearGeocodingCache();
   let providerCalls = 0;
+  const requestedGeocodingUrls = [];
   const geocodingFetch = async (url) => {
     providerCalls += 1;
-    const isReverse = new URL(url).pathname.endsWith('/reverse');
+    const requestedUrl = new URL(url);
+    requestedGeocodingUrls.push(requestedUrl);
+    const isReverse = requestedUrl.pathname.endsWith('/reverse');
     return {
       ok: true,
       status: 200,
@@ -191,8 +194,22 @@ test('returns map-ready road routes and caches geocoding provider results', asyn
               {
                 place_id: 1,
                 display_name: 'University of Vavuniya',
+                name: 'University of Vavuniya',
+                address: {
+                  university: 'University of Vavuniya',
+                  village: 'Pambaimadu',
+                  state: 'Northern Province',
+                },
                 lat: '8.7581',
                 lon: '80.4982',
+              },
+              {
+                place_id: 3,
+                display_name: 'University outside the Northern Province',
+                name: 'University outside the Northern Province',
+                address: { state: 'Western Province' },
+                lat: '6.9',
+                lon: '79.8',
               },
             ],
     };
@@ -207,10 +224,19 @@ test('returns map-ready road routes and caches geocoding provider results', asyn
   const firstSearch = await searchPlaces('University', geocodingOptions);
   const secondSearch = await searchPlaces('University', geocodingOptions);
   const reverse = await reverseGeocode(8.7514, 80.4971, geocodingOptions);
-  assert.equal(firstSearch[0].displayName, 'University of Vavuniya');
+  assert.equal(firstSearch[0].displayName, 'University of Vavuniya, Pambaimadu');
+  assert.equal(firstSearch[0].fullDisplayName, 'University of Vavuniya');
+  assert.equal(firstSearch.length, 1);
   assert.deepEqual(secondSearch, firstSearch);
   assert.equal(reverse.displayName, 'Vavuniya Town');
   assert.equal(providerCalls, 2);
+  assert.equal(requestedGeocodingUrls[0].searchParams.get('countrycodes'), 'lk');
+  assert.equal(requestedGeocodingUrls[0].searchParams.get('bounded'), '1');
+  assert.equal(requestedGeocodingUrls[0].searchParams.get('accept-language'), 'en');
+  assert.equal(
+    requestedGeocodingUrls[0].searchParams.get('viewbox'),
+    '79.45,10.15,81.05,8.20'
+  );
 
   const preview = await invokeController(
     mapController.previewRoute,

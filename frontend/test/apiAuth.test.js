@@ -19,6 +19,7 @@ const {
   riderApi,
   ridesApi,
 } = await import('../src/services/api.js');
+const { QUICK_PICK_LOCATIONS } = await import('../src/data/quickPickLocations.js');
 
 const jsonResponse = (body, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -28,6 +29,24 @@ const jsonResponse = (body, status = 200) => ({
 
 test.beforeEach(() => {
   storage.clear();
+});
+
+test('offers the approved frequently used Vavuniya locations', () => {
+  assert.deepEqual(
+    QUICK_PICK_LOCATIONS.map((place) => place.displayName),
+    [
+      'University of Vavuniya',
+      'Vavuniya Town',
+      'Vavuniya Bus Stand',
+      'Vavuniya Railway Station',
+      'Poovarasankulam Hospital',
+      'Hostel Premises, Pambaimadu',
+    ]
+  );
+  assert.equal(
+    QUICK_PICK_LOCATIONS.some((place) => /teaching hospital/i.test(place.displayName)),
+    false
+  );
 });
 
 test('logs in against the backend, stores the token, and normalizes the user', async () => {

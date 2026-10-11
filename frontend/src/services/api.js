@@ -218,8 +218,8 @@ export function estimateFare(distanceKm) {
    MAP SEARCH / ROUTING
    ============================================================ */
 export const mapApi = {
-  async search(query) {
-    const response = await http('/maps/search', { params: { q: query } });
+  async search(query, { signal } = {}) {
+    const response = await http('/maps/search', { params: { q: query }, signal });
     return response.data?.places || [];
   },
 

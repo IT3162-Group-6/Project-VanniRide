@@ -5,6 +5,10 @@ const cache = new Map();
 let requestQueue = Promise.resolve();
 let lastRequestAt = 0;
 
+// Nominatim view boxes use: left longitude, top latitude, right longitude,
+// bottom latitude. This box keeps discovery within Sri Lanka's Northern Province.
+const NORTHERN_PROVINCE_VIEWBOX = '79.45,10.15,81.05,8.20';
+
 const normalizeBaseUrl = (value) => {
   let url;
   try {
@@ -104,12 +108,50 @@ const requestJson = async (pathname, query, options = {}) => {
   return queued;
 };
 
+const compactDisplayName = (place) => {
+  const address = place.address || {};
+  const candidates = [
+    place.name,
+    address.amenity,
+    address.university,
+    address.hospital,
+    address.building,
+    address.shop,
+    address.tourism,
+    address.road,
+    address.neighbourhood,
+    address.suburb,
+    address.village,
+    address.town,
+    address.city,
+    address.county,
+  ];
+  const parts = [];
+  for (const candidate of candidates) {
+    const value = String(candidate || '').trim();
+    if (!value || parts.some((part) => part.toLowerCase() === value.toLowerCase())) {
+      continue;
+    }
+    parts.push(value);
+    if (parts.length === 3) break;
+  }
+  return parts.join(', ') || String(place.display_name || '').trim();
+};
+
+const isNorthernProvincePlace = (place) => {
+  const address = place.address || {};
+  const state = String(address.state || '').trim().toLowerCase();
+  const provinceCode = String(address['ISO3166-2-lvl4'] || '').trim().toUpperCase();
+  return state === 'northern province' || provinceCode === 'LK-4';
+};
+
 const serializePlace = (place) => {
   const latitude = Number(place.lat);
   const longitude = Number(place.lon);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   return {
-    displayName: String(place.display_name || '').trim(),
+    displayName: compactDisplayName(place),
+    fullDisplayName: String(place.display_name || '').trim(),
     latitude,
     longitude,
     providerPlaceId: String(place.place_id || ''),
@@ -123,13 +165,25 @@ const searchPlaces = async (query, options = {}) => {
   );
   const payload = await requestJson(
     '/search',
-    { q: query, format: 'jsonv2', limit, addressdetails: 1 },
+    {
+      q: query,
+      format: 'jsonv2',
+      limit,
+      addressdetails: 1,
+      'accept-language': 'en',
+      countrycodes: 'lk',
+      viewbox: NORTHERN_PROVINCE_VIEWBOX,
+      bounded: 1,
+    },
     options
   );
   if (!Array.isArray(payload)) {
     throw new AppError('The geocoding service returned an invalid response', 503);
   }
-  return payload.map(serializePlace).filter(Boolean);
+  return payload
+    .filter(isNorthernProvincePlace)
+    .map(serializePlace)
+    .filter(Boolean);
 };
 
 const reverseGeocode = async (latitude, longitude, options = {}) => {

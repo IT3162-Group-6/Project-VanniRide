@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import LocationMap from '../../components/LocationMap';
 import { useAppState } from '../../context/AppState';
+import { QUICK_PICK_LOCATIONS } from '../../data/quickPickLocations';
 import { mapApi, ridesApi } from '../../services/api';
 
 const coordinateLabel = ({ latitude, longitude }) =>
@@ -62,6 +63,41 @@ export default function RequestRide() {
     setPreview(null);
   };
 
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 3) return undefined;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSearchBusy(true);
+      setError('');
+      try {
+        const places = await mapApi.search(query, { signal: controller.signal });
+        setSearchResults(places);
+        if (places.length === 0) {
+          setError('No matching places were found in Northern Province.');
+        }
+      } catch (requestError) {
+        if (requestError.name !== 'AbortError') setError(requestError.message);
+      } finally {
+        if (!controller.signal.aborted) setSearchBusy(false);
+      }
+    }, 450);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery]);
+
+  function updateSearchQuery(event) {
+    const value = event.target.value;
+    setSearchQuery(value);
+    setSearchResults([]);
+    setError('');
+    if (value.trim().length < 3) setSearchBusy(false);
+  }
+
   async function resolvePoint(target, point) {
     setError('');
     setLocationBusy(true);
@@ -81,25 +117,6 @@ export default function RequestRide() {
     }
   }
 
-  async function searchPlaces(event) {
-    event.preventDefault();
-    setError('');
-    if (searchQuery.trim().length < 3) {
-      setError('Enter at least 3 characters to search for a place.');
-      return;
-    }
-    setSearchBusy(true);
-    try {
-      const places = await mapApi.search(searchQuery.trim());
-      setSearchResults(places);
-      if (places.length === 0) setError('No matching places were found.');
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setSearchBusy(false);
-    }
-  }
-
   function chooseSearchResult(place) {
     setLocation(activeLocation, {
       address: place.displayName,
@@ -108,6 +125,7 @@ export default function RequestRide() {
     });
     setSearchResults([]);
     setSearchQuery('');
+    if (activeLocation === 'pickup') setActiveLocation('destination');
   }
 
   function useCurrentLocation() {
@@ -247,10 +265,10 @@ export default function RequestRide() {
             <LocationSummary label="Pickup" location={form.pickupLocation} selected={activeLocation === 'pickup'} />
             <LocationSummary label="Destination" location={form.destination} selected={activeLocation === 'destination'} />
 
-            <form className="location-search" onSubmit={searchPlaces}>
-              <input type="search" placeholder={`Search ${activeLocation}`} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
-              <button className="btn btn-outline btn-sm" disabled={searchBusy}>{searchBusy ? 'Searching…' : 'Search'}</button>
-            </form>
+            <div className="location-search">
+              <input type="search" placeholder={`Search ${activeLocation} in Northern Province`} value={searchQuery} onChange={updateSearchQuery} />
+              {searchBusy && <span role="status">Searching…</span>}
+            </div>
             {searchResults.length > 0 && (
               <div className="location-results">
                 {searchResults.map((place) => (
@@ -260,6 +278,17 @@ export default function RequestRide() {
                 ))}
               </div>
             )}
+
+            <div className="quick-picks" aria-label="Frequently used locations">
+              <span>Frequently used locations</span>
+              <div>
+                {QUICK_PICK_LOCATIONS.map((place) => (
+                  <button type="button" key={place.id} onClick={() => chooseSearchResult(place)}>
+                    <Icon name="pin" size={13} /> {place.displayName}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={useCurrentLocation} disabled={locationBusy}>
               <Icon name="pin" size={16} /> Use my current location as pickup
