@@ -171,6 +171,8 @@ Required fields:
 - `rider_id`: rider user reference or `null`
 - `request_type`: `TRANSPORT` or `DELIVERY`
 - `delivery_category`: `FOOD`, `WATER`, `PARCEL`, or `null`
+- `delivery_details`: structured receiver and category-specific order details,
+  or `null` for transport and legacy delivery records
 - `pickup_location`: `{ address, latitude, longitude }`
 - `destination`: `{ address, latitude, longitude }`
 - `distance_km`: non-negative road-route distance
@@ -189,7 +191,10 @@ Lifecycle timestamps, nullable until applicable:
 Rules:
 
 - A transport request must have `delivery_category = null`.
-- A delivery request must have one approved delivery category.
+- A new delivery request must have one approved delivery category and a
+  matching non-null details section (`food_order`, `water_order`, or
+  `parcel_order`). Historical delivery records created before this contract may
+  omit `delivery_details` and remain readable.
 - Active statuses are `REQUESTED`, `ACCEPTED`, `ARRIVED`, and `STARTED`.
 - A customer may have no more than one active `TRANSPORT` and one active
   `DELIVERY` request at the same time.

@@ -30,6 +30,7 @@ const {
   releaseRiderAfterRide,
   serializeRiderProfile,
 } = require('../services/riderService');
+const { serializeDeliveryDetails } = require('../utils/deliveryDetails');
 
 const normalizeReason = (value) => {
   if (typeof value !== 'string') {
@@ -67,6 +68,7 @@ const serializeRide = (rideDocument) => {
     riderId: ride.rider_id?.toString() || null,
     rideType: ride.request_type,
     deliveryCategory: ride.delivery_category || null,
+    deliveryDetails: serializeDeliveryDetails(ride.delivery_details),
     pickupLocation: ride.pickup_location,
     destination: ride.destination,
     distanceKm: ride.distance_km,

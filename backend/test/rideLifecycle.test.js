@@ -158,6 +158,78 @@ test('uses the shortest returned road route to estimate the fare', async () => {
   assert.equal(calculateFare('DELIVERY', distanceKm), 210);
 });
 
+test('validates and preserves structured delivery order details', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const baseBody = {
+    rideType: 'DELIVERY',
+    deliveryCategory: 'FOOD',
+    pickupLocation: {
+      address: 'Hostel Canteen',
+      latitude: 8.7581,
+      longitude: 80.4982,
+    },
+    destination: {
+      address: 'Boys Hostel',
+      latitude: 8.7514,
+      longitude: 80.4971,
+    },
+  };
+
+  await assert.rejects(
+    invokeController(
+      rideController.requestRide,
+      makeRequest({
+        user: { id: customerId.toString(), role: 'CUSTOMER' },
+        body: baseBody,
+      })
+    ),
+    (error) => error.statusCode === 400 && /Delivery details/.test(error.message)
+  );
+
+  const result = await invokeController(
+    rideController.requestRide,
+    makeRequest({
+      user: { id: customerId.toString(), role: 'CUSTOMER' },
+      body: {
+        ...baseBody,
+        deliveryDetails: {
+          receiverName: 'Student Receiver',
+          receiverPhone: '077 123 4567',
+          foodOrder: {
+            outletCode: 'HOSTEL_CANTEEN',
+            outletName: 'Hostel Canteen',
+            items: [
+              {
+                foodType: 'CHICKEN_MEAL',
+                quantity: 2,
+                description: 'Less spicy',
+              },
+              {
+                foodType: 'OTHER',
+                otherName: 'Fruit salad',
+                quantity: 1,
+              },
+            ],
+          },
+        },
+      },
+    })
+  );
+
+  assert.equal(result.statusCode, 201);
+  assert.equal(result.body.data.ride.deliveryDetails.receiverPhone, '0771234567');
+  assert.equal(result.body.data.ride.deliveryDetails.foodOrder.items.length, 2);
+  assert.equal(
+    result.body.data.ride.deliveryDetails.foodOrder.items[1].otherName,
+    'Fruit salad'
+  );
+
+  const storedRide = await Ride.findById(result.body.data.ride.id).lean();
+  assert.equal(storedRide.delivery_details.food_order.items[0].quantity, 2);
+  assert.equal(storedRide.delivery_details.water_order, null);
+  assert.equal(storedRide.delivery_details.parcel_order, null);
+});
+
 test('returns map-ready road routes and caches geocoding provider results', async () => {
   const route = await calculateRoadRoute(
     { latitude: 8.7581, longitude: 80.4982 },
@@ -859,6 +931,15 @@ test('cancels a requested ride without deleting its history', async () => {
       body: {
         rideType: 'DELIVERY',
         deliveryCategory: 'PARCEL',
+        deliveryDetails: {
+          receiverName: 'Parcel Receiver',
+          receiverPhone: '0771234567',
+          parcelOrder: {
+            parcelType: 'DOCUMENTS',
+            weightKg: 0.5,
+            notes: 'Keep dry',
+          },
+        },
         pickupLocation: {
           address: 'Campus',
           latitude: 8.7581,

@@ -7,6 +7,7 @@ const Rating = require('../models/ratingModel');
 const Ride = require('../models/rideModel');
 const Rider = require('../models/riderModel');
 const User = require('../models/userModel');
+const { serializeDeliveryDetails } = require('../utils/deliveryDetails');
 
 const ACTIVE_RIDE_STATUSES = ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'STARTED'];
 
@@ -101,6 +102,7 @@ exports.getMyHistory = catchAsync(async (req, res) => {
         riderId: ride.rider_id?.toString() || null,
         rideType: ride.request_type,
         deliveryCategory: ride.delivery_category || null,
+        deliveryDetails: serializeDeliveryDetails(ride.delivery_details),
         pickupLocation: ride.pickup_location,
         destination: ride.destination,
         distanceKm: ride.distance_km,

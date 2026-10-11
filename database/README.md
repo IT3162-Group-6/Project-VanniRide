@@ -88,6 +88,7 @@ Validation is used to prevent invalid values such as:
 - incomplete vehicle information
 - invalid rider approval values
 - invalid ride statuses
+- malformed food, water, or parcel delivery details
 - invalid payment values
 - empty messages
 - empty cancellation reasons

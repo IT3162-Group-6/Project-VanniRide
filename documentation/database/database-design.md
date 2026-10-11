@@ -163,6 +163,8 @@ The `rides` collection stores transportation and delivery requests created by cu
 - `rider_id` - References the accepted rider in `users`
 - `request_type` - `TRANSPORT` or `DELIVERY`
 - `delivery_category` - `FOOD`, `WATER`, `PARCEL`, or `null`
+- `delivery_details` - Receiver contact and one matching food, water, or parcel
+  order object; `null` for transport
 - `pickup_location` - Pickup address and coordinates
 - `destination` - Destination address and coordinates
 - `distance_km` - Calculated distance
@@ -190,7 +192,14 @@ For transport requests:
 
 ```text
 delivery_category = null
+delivery_details = null
 ```
+
+New delivery requests store the receiver name and Sri Lankan mobile number.
+Food and water orders store 1-20 item lines with type and quantity. Food lines
+may also store an optional description. Parcel orders store parcel type, rough
+weight in kilograms, and optional notes. Existing delivery records without the
+new details field remain valid for backward compatibility.
 
 ## Location Structure
 

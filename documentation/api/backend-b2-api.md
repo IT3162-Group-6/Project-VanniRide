@@ -103,7 +103,20 @@ service.
 ```
 
 `rideType` may be `TRANSPORT` or `DELIVERY`. A delivery must include
-`deliveryCategory` with `FOOD`, `WATER`, or `PARCEL`.
+`deliveryCategory` with `FOOD`, `WATER`, or `PARCEL`, plus matching
+`deliveryDetails`. Every delivery supplies `receiverName` and a Sri Lankan
+mobile `receiverPhone`.
+
+Food and water use an `items` array with 1-20 lines and a `quantity` of 1-20
+per line. Food types are `VEGETABLE_MEAL`, `CHICKEN_MEAL`, `SALMON_MEAL`,
+`FISH_MEAL`, `EGG_MEAL`, `SAUSAGES_MEAL`, `MEATBALL_MEAL`, `NOODLES`, `KOTTU`,
+`PASTA`, `PARATA`, `THOSAI`, and `OTHER`. Water container types are
+`BOTTLE_20L`, `BOTTLE_10L`, `BOTTLE_5L`, `BELOW_5L`, and `OTHER`. An `OTHER`
+food or water line must include its custom name or description.
+
+Parcel details contain `parcelType`, `weightKg`, and optional `notes`.
+Supported parcel types are `DOCUMENTS`, `FOOD`, `CLOTHING`, `MEDICINE`,
+`ELECTRONICS`, and `OTHER`; an `OTHER` parcel must include `otherType`.
 
 ### List available rides
 

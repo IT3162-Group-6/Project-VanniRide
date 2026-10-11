@@ -94,7 +94,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"rideType\": \"TRANSPORT\",\n  \"deliveryCategory\": null,\n  \"pickupLocation\": {\n    \"address\": \"University of Vavuniya\",\n    \"latitude\": 8.7581,\n    \"longitude\": 80.4982\n  },\n  \"destination\": {\n    \"address\": \"Vavuniya Town\",\n    \"latitude\": 8.7514,\n    \"longitude\": 80.4971\n  }\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"rideType\": \"DELIVERY\",\n  \"deliveryCategory\": \"FOOD\",\n  \"deliveryDetails\": {\n    \"receiverName\": \"Student Receiver\",\n    \"receiverPhone\": \"0771234567\",\n    \"foodOrder\": {\n      \"outletCode\": \"HOSTEL_CANTEEN\",\n      \"outletName\": \"Hostel Canteen\",\n      \"items\": [\n        { \"foodType\": \"CHICKEN_MEAL\", \"quantity\": 2, \"description\": \"Less spicy\" }\n      ]\n    }\n  },\n  \"pickupLocation\": {\n    \"address\": \"Hostel Canteen\",\n    \"latitude\": 8.7581,\n    \"longitude\": 80.4982\n  },\n  \"destination\": {\n    \"address\": \"Boys Hostel\",\n    \"latitude\": 8.7514,\n    \"longitude\": 80.4971\n  }\n}" },
             "url": "{{baseUrl}}/api/maps/route-preview"
           }
         }

@@ -110,6 +110,87 @@ db.runCommand({
             rider_id: { bsonType: ["objectId", "null"] },
             request_type: { enum: ["TRANSPORT", "DELIVERY"] },
             delivery_category: { enum: ["FOOD", "WATER", "PARCEL", null] },
+            delivery_details: {
+              bsonType: ["object", "null"],
+              required: [
+                "receiver_name",
+                "receiver_phone",
+                "food_order",
+                "water_order",
+                "parcel_order"
+              ],
+              properties: {
+                receiver_name: { bsonType: "string", minLength: 1, maxLength: 100 },
+                receiver_phone: {
+                  bsonType: "string",
+                  pattern: "^(\\+94|0)7[0-9]{8}$"
+                },
+                food_order: {
+                  bsonType: ["object", "null"],
+                  required: ["outlet_code", "outlet_name", "items"],
+                  properties: {
+                    outlet_code: { bsonType: ["string", "null"], maxLength: 80 },
+                    outlet_name: { bsonType: "string", minLength: 1, maxLength: 150 },
+                    items: {
+                      bsonType: "array",
+                      minItems: 1,
+                      maxItems: 20,
+                      items: {
+                        bsonType: "object",
+                        required: ["food_type", "other_name", "quantity", "description"],
+                        properties: {
+                          food_type: {
+                            enum: [
+                              "VEGETABLE_MEAL", "CHICKEN_MEAL", "SALMON_MEAL",
+                              "FISH_MEAL", "EGG_MEAL", "SAUSAGES_MEAL",
+                              "MEATBALL_MEAL", "NOODLES", "KOTTU", "PASTA",
+                              "PARATA", "THOSAI", "OTHER"
+                            ]
+                          },
+                          other_name: { bsonType: ["string", "null"], maxLength: 100 },
+                          quantity: { bsonType: numericTypes, minimum: 1, maximum: 20 },
+                          description: { bsonType: ["string", "null"], maxLength: 300 }
+                        }
+                      }
+                    }
+                  }
+                },
+                water_order: {
+                  bsonType: ["object", "null"],
+                  required: ["items"],
+                  properties: {
+                    items: {
+                      bsonType: "array",
+                      minItems: 1,
+                      maxItems: 20,
+                      items: {
+                        bsonType: "object",
+                        required: ["container_type", "other_description", "quantity"],
+                        properties: {
+                          container_type: {
+                            enum: ["BOTTLE_20L", "BOTTLE_10L", "BOTTLE_5L", "BELOW_5L", "OTHER"]
+                          },
+                          other_description: { bsonType: ["string", "null"], maxLength: 200 },
+                          quantity: { bsonType: numericTypes, minimum: 1, maximum: 20 }
+                        }
+                      }
+                    }
+                  }
+                },
+                parcel_order: {
+                  bsonType: ["object", "null"],
+                  required: ["parcel_type", "other_type", "weight_kg", "notes"],
+                  properties: {
+                    parcel_type: {
+                      enum: ["DOCUMENTS", "FOOD", "CLOTHING", "MEDICINE", "ELECTRONICS", "OTHER"]
+                    },
+                    other_type: { bsonType: ["string", "null"], maxLength: 100 },
+                    weight_kg: { bsonType: numericTypes, minimum: 0.1, maximum: 50 },
+                    notes: { bsonType: ["string", "null"], maxLength: 500 }
+                  }
+                }
+              }
+            },
             pickup_location: {
               bsonType: "object",
               required: ["address", "latitude", "longitude"],
@@ -151,10 +232,35 @@ db.runCommand({
       },
       {
         $or: [
-          { request_type: "TRANSPORT", delivery_category: null },
+          {
+            request_type: "TRANSPORT",
+            delivery_category: null,
+            delivery_details: null
+          },
           {
             request_type: "DELIVERY",
-            delivery_category: { $in: ["FOOD", "WATER", "PARCEL"] }
+            delivery_category: { $in: ["FOOD", "WATER", "PARCEL"] },
+            $or: [
+              { delivery_details: { $exists: false } },
+              {
+                delivery_category: "FOOD",
+                "delivery_details.food_order": { $type: "object" },
+                "delivery_details.water_order": null,
+                "delivery_details.parcel_order": null
+              },
+              {
+                delivery_category: "WATER",
+                "delivery_details.food_order": null,
+                "delivery_details.water_order": { $type: "object" },
+                "delivery_details.parcel_order": null
+              },
+              {
+                delivery_category: "PARCEL",
+                "delivery_details.food_order": null,
+                "delivery_details.water_order": null,
+                "delivery_details.parcel_order": { $type: "object" }
+              }
+            ]
           }
         ]
       }

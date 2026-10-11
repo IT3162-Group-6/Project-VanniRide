@@ -175,6 +175,13 @@ the route and fare before saving so a client cannot submit a forged value.
 Pickup and destination must be different valid coordinates. Straight-line
 distance is not a routing fallback.
 
+For `DELIVERY`, both route preview and ride creation must send the same
+`deliveryDetails` object. It always contains `receiverName` and
+`receiverPhone`, plus exactly one category-specific object: `foodOrder`,
+`waterOrder`, or `parcelOrder`. The backend validates item quantities, custom
+`OTHER` descriptions, parcel weight, and Sri Lankan mobile format before
+calculating or saving the request.
+
 ### 3.4 Stored ride data
 
 The required stored ride fields remain pickup/destination address and

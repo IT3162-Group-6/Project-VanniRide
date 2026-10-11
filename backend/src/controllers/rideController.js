@@ -36,6 +36,10 @@ const {
   createStartedCancellationRequest,
   respondToCancellationRequest,
 } = require('../services/cancellationService');
+const {
+  normalizeDeliveryDetails,
+  serializeDeliveryDetails,
+} = require('../utils/deliveryDetails');
 
 const ACTIVE_RIDE_STATUSES = ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'STARTED'];
 
@@ -98,6 +102,7 @@ const serializeRide = (rideDocument, participants = {}) => {
     riderId: ride.rider_id ? ride.rider_id.toString() : null,
     rideType: ride.request_type,
     deliveryCategory: ride.delivery_category,
+    deliveryDetails: serializeDeliveryDetails(ride.delivery_details),
     pickupLocation: serializeLocation(ride.pickup_location),
     destination: serializeLocation(ride.destination),
     distanceKm: ride.distance_km,
@@ -210,6 +215,15 @@ exports.requestRide = catchAsync(async (req, res) => {
     throw new AppError('Transport requests cannot have a delivery category', 400);
   }
 
+  if (rideType === 'TRANSPORT' && req.body.deliveryDetails) {
+    throw new AppError('Transport requests cannot have delivery details', 400);
+  }
+
+  const deliveryDetails =
+    rideType === 'DELIVERY'
+      ? normalizeDeliveryDetails(req.body.deliveryDetails, deliveryCategory)
+      : null;
+
   const activeRideExists = await Ride.exists({
     customer_id: userId,
     request_type: rideType,
@@ -243,6 +257,7 @@ exports.requestRide = catchAsync(async (req, res) => {
       rider_id: null,
       request_type: rideType,
       delivery_category: rideType === 'DELIVERY' ? deliveryCategory : null,
+      delivery_details: deliveryDetails,
       pickup_location: pickupLocation,
       destination,
       distance_km: distanceKm,

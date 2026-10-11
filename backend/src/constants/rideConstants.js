@@ -1,5 +1,35 @@
 const RIDE_TYPES = Object.freeze(['TRANSPORT', 'DELIVERY']);
 const DELIVERY_CATEGORIES = Object.freeze(['FOOD', 'WATER', 'PARCEL']);
+const FOOD_TYPES = Object.freeze([
+  'VEGETABLE_MEAL',
+  'CHICKEN_MEAL',
+  'SALMON_MEAL',
+  'FISH_MEAL',
+  'EGG_MEAL',
+  'SAUSAGES_MEAL',
+  'MEATBALL_MEAL',
+  'NOODLES',
+  'KOTTU',
+  'PASTA',
+  'PARATA',
+  'THOSAI',
+  'OTHER',
+]);
+const WATER_CONTAINER_TYPES = Object.freeze([
+  'BOTTLE_20L',
+  'BOTTLE_10L',
+  'BOTTLE_5L',
+  'BELOW_5L',
+  'OTHER',
+]);
+const PARCEL_TYPES = Object.freeze([
+  'DOCUMENTS',
+  'FOOD',
+  'CLOTHING',
+  'MEDICINE',
+  'ELECTRONICS',
+  'OTHER',
+]);
 const RIDE_STATUSES = Object.freeze([
   'REQUESTED',
   'ACCEPTED',
@@ -54,6 +84,9 @@ const CHAT_ACCESS_DURATION_MS = 24 * 60 * 60 * 1000;
 module.exports = {
   RIDE_TYPES,
   DELIVERY_CATEGORIES,
+  FOOD_TYPES,
+  WATER_CONTAINER_TYPES,
+  PARCEL_TYPES,
   RIDE_STATUSES,
   RIDER_AVAILABILITY,
   RIDER_APPROVAL_STATUSES,

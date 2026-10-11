@@ -10,6 +10,7 @@ const {
 } = require('../services/geocodingService');
 const { calculateRoadRoute } = require('../services/routingService');
 const { calculateFare } = require('../utils/fareCalculator');
+const { normalizeDeliveryDetails } = require('../utils/deliveryDetails');
 
 const normalizeCoordinates = (latitudeValue, longitudeValue, label) => {
   const latitude = Number(latitudeValue);
@@ -89,6 +90,12 @@ exports.previewRoute = catchAsync(async (req, res) => {
   }
   if (rideType === 'TRANSPORT' && deliveryCategory) {
     throw new AppError('Transport requests cannot have a delivery category', 400);
+  }
+  if (rideType === 'TRANSPORT' && req.body.deliveryDetails) {
+    throw new AppError('Transport requests cannot have delivery details', 400);
+  }
+  if (rideType === 'DELIVERY') {
+    normalizeDeliveryDetails(req.body.deliveryDetails, deliveryCategory);
   }
 
   const pickupLocation = normalizeLocation(req.body.pickupLocation, 'Pickup');
