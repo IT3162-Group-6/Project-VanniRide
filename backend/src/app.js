@@ -12,6 +12,7 @@ const ratingRoutes = require('./routes/ratingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const userRoutes = require('./routes/userRoutes');
 const mapRoutes = require('./routes/mapRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -65,6 +66,7 @@ app.use('/api/rides', paymentRoutes); // Member B2 cash payment tracking
 app.use('/api/rides', chatRoutes); // Member B2 ride-scoped text chat
 app.use('/api', ratingRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Handle 404 Routes (Must remain below active routes)
 app.use((req, res, next) => {
