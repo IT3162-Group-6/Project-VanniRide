@@ -33,7 +33,6 @@ export default function ChatBox({ title, subtitle, initial = '', messages = [], 
       <div className="chat-head">
         <div className="avatar avatar-online">{avatarChar}</div>
         <div><b>{title}</b><span>{subtitle}</span></div>
-        <button className="icon-btn icon-btn-plain" aria-label="More options"><Icon name="list" size={18} /></button>
       </div>
 
       <div className="chat-body" ref={bodyRef}>
@@ -60,13 +59,12 @@ export default function ChatBox({ title, subtitle, initial = '', messages = [], 
         <div className="chat-field">
           <input
             type="text"
-            placeholder="Type a message..."
+            placeholder={disabled ? 'This conversation is read-only' : 'Type a message...'}
             autoComplete="off"
             value={text}
             onChange={(e) => setText(e.target.value)}
             disabled={disabled}
           />
-          <span className="chat-clip"><Icon name="share" size={17} /></span>
         </div>
         <button type="submit" aria-label="Send" disabled={disabled}><Icon name="send" size={18} /></button>
       </form>

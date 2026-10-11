@@ -20,6 +20,10 @@ const {
   ridesApi,
 } = await import('../src/services/api.js');
 const { QUICK_PICK_LOCATIONS } = await import('../src/data/quickPickLocations.js');
+const {
+  filterConversations,
+  isConversationRide,
+} = await import('../src/data/conversationFilters.js');
 
 const jsonResponse = (body, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -46,6 +50,33 @@ test('offers the approved frequently used Vavuniya locations', () => {
   assert.equal(
     QUICK_PICK_LOCATIONS.some((place) => /teaching hospital/i.test(place.displayName)),
     false
+  );
+});
+
+test('builds participant conversations and filters them by lifecycle state', () => {
+  const rides = [
+    { id: 'active', status: 'accepted', rider: { id: 'r1' } },
+    { id: 'complete', status: 'completed', rider: { id: 'r1' } },
+    { id: 'cancelled', status: 'cancelled', rider: { id: 'r1' } },
+    { id: 'waiting', status: 'pending', rider: null },
+  ];
+  const conversations = rides.filter((ride) => isConversationRide(ride, 'rider'));
+  assert.deepEqual(conversations.map((ride) => ride.id), [
+    'active',
+    'complete',
+    'cancelled',
+  ]);
+  assert.deepEqual(
+    filterConversations(conversations, 'active').map((ride) => ride.id),
+    ['active']
+  );
+  assert.deepEqual(
+    filterConversations(conversations, 'completed').map((ride) => ride.id),
+    ['complete']
+  );
+  assert.deepEqual(
+    filterConversations(conversations, 'cancelled').map((ride) => ride.id),
+    ['cancelled']
   );
 });
 
