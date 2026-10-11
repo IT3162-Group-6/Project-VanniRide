@@ -1772,13 +1772,21 @@ test('rejects unsafe production configuration before server startup', () => {
   assert.throws(
     () => env.validateRuntimeConfig({
       ...env,
+      routingBaseUrl: 'not-a-url',
+    }),
+    /ROUTING_BASE_URL must be a valid URL/
+  );
+  assert.throws(
+    () => env.validateRuntimeConfig({
+      ...env,
       nodeEnv: 'production',
       mongoUri: 'mongodb://database/vanniRideDB',
       jwtSecret: 'replace_with_a_long_random_secret',
       corsOrigins: ['https://app.example.com'],
       corsOriginsConfigured: false,
+      routingBaseUrlConfigured: false,
     }),
-    /Production JWT_SECRET.*CORS_ORIGINS/
+    /Production JWT_SECRET.*CORS_ORIGINS.*ROUTING_BASE_URL/
   );
   assert.doesNotThrow(() => env.validateRuntimeConfig({
     ...env,
@@ -1787,6 +1795,8 @@ test('rejects unsafe production configuration before server startup', () => {
     jwtSecret: '7wSx6Jq9uMd4Kr2Nv8Pa5Bc1Tf3Hg0Zy',
     corsOrigins: ['https://app.example.com'],
     corsOriginsConfigured: true,
+    routingBaseUrl: 'https://routing.example.com',
+    routingBaseUrlConfigured: true,
   }));
 });
 

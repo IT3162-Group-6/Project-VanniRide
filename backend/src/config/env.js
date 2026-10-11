@@ -1,5 +1,8 @@
 require('dotenv').config();
 
+const DEFAULT_DEVELOPMENT_ROUTING_BASE_URL =
+  'https://router.project-osrm.org';
+
 const parseOrigins = (value) =>
   String(value || '')
     .split(',')
@@ -12,7 +15,14 @@ const config = {
   mongoUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  routingBaseUrl: process.env.ROUTING_BASE_URL,
+  // Keep local development usable when an older .env file predates the
+  // routing settings. Production still has to configure its provider
+  // explicitly in validateRuntimeConfig below.
+  routingBaseUrl:
+    process.env.ROUTING_BASE_URL || DEFAULT_DEVELOPMENT_ROUTING_BASE_URL,
+  routingBaseUrlConfigured: Boolean(
+    String(process.env.ROUTING_BASE_URL || '').trim()
+  ),
   routingProfile: process.env.ROUTING_PROFILE || 'driving',
   routingAlternatives: Number(process.env.ROUTING_ALTERNATIVES || 3),
   routingTimeoutMs: Number(process.env.ROUTING_TIMEOUT_MS || 5000),
@@ -54,6 +64,14 @@ const validateRuntimeConfig = (candidate = config) => {
   ) {
     errors.push('CANCELLATION_SWEEP_INTERVAL_MS must be at least 1000');
   }
+  try {
+    const routingUrl = new URL(candidate.routingBaseUrl);
+    if (!['http:', 'https:'].includes(routingUrl.protocol)) {
+      errors.push('ROUTING_BASE_URL must use HTTP or HTTPS');
+    }
+  } catch {
+    errors.push('ROUTING_BASE_URL must be a valid URL');
+  }
   if (candidate.nodeEnv === 'production') {
     if (
       String(candidate.jwtSecret || '').length < 32 ||
@@ -63,6 +81,9 @@ const validateRuntimeConfig = (candidate = config) => {
     }
     if (!candidate.corsOriginsConfigured || candidate.corsOrigins.length === 0) {
       errors.push('CORS_ORIGINS must be explicitly configured in production');
+    }
+    if (!candidate.routingBaseUrlConfigured) {
+      errors.push('ROUTING_BASE_URL must be explicitly configured in production');
     }
   }
   if (errors.length) {
