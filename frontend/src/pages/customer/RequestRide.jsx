@@ -37,7 +37,12 @@ function LocationSummary({ label, location, selected, onSelect }) {
 }
 
 export default function RequestRide() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const requestedRideType = params.get('type') === 'delivery' ? 'DELIVERY' : 'TRANSPORT';
+  return <RequestRideForm key={requestedRideType} requestedRideType={requestedRideType} />;
+}
+
+function RequestRideForm({ requestedRideType }) {
   const navigate = useNavigate();
   const { showToast } = useAppState();
   const [step, setStep] = useState(1);
@@ -53,21 +58,11 @@ export default function RequestRide() {
   const [createdRide, setCreatedRide] = useState(null);
   const [deliveryDetails, setDeliveryDetails] = useState(createDefaultDeliveryDetails);
   const [form, setForm] = useState({
-    rideType: params.get('type') === 'delivery' ? 'DELIVERY' : 'TRANSPORT',
+    rideType: requestedRideType,
     deliveryCategory: 'FOOD',
     pickupLocation: null,
     destination: null,
   });
-
-  const setRideType = (rideType) => {
-    setForm((current) => ({
-      ...current,
-      rideType,
-      deliveryCategory: rideType === 'DELIVERY' ? current.deliveryCategory || 'FOOD' : null,
-    }));
-    setParams({ type: rideType === 'DELIVERY' ? 'delivery' : 'ride' });
-    setPreview(null);
-  };
 
   const setDeliveryCategory = (deliveryCategory) => {
     setForm((current) => ({ ...current, deliveryCategory }));
@@ -314,24 +309,6 @@ export default function RequestRide() {
               Create {form.rideType === 'TRANSPORT' ? 'Ride' : 'Delivery'} Request
             </h3>
             {error && <div className="alert alert-error">{error}</div>}
-
-            <label className="field-label">Request type</label>
-            <div className="ride-type-grid">
-              {[
-                { value: 'TRANSPORT', icon: 'bike', title: 'Ride', sub: 'Take me somewhere' },
-                { value: 'DELIVERY', icon: 'package', title: 'Delivery', sub: 'Move an item' },
-              ].map((type) => (
-                <button
-                  type="button"
-                  key={type.value}
-                  className={`ride-type ${form.rideType === type.value ? 'selected' : ''}`}
-                  onClick={() => setRideType(type.value)}
-                >
-                  <div className="fi" style={{ width: 34, height: 34 }}><Icon name={type.icon} /></div>
-                  <div><b>{type.title}</b><span>{type.sub}</span></div>
-                </button>
-              ))}
-            </div>
 
             {form.rideType === 'DELIVERY' && (
               <div className="delivery-category-tabs" role="tablist" aria-label="Delivery category">

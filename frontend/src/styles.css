@@ -352,7 +352,6 @@ ul{margin:0;padding:0;list-style:none}
 .delivery-price-breakdown>div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:.82rem}
 .delivery-price-breakdown span{color:var(--ink-soft)}
 
-.ride-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 22px}
 .ride-type{
   border:1.5px solid var(--line);border-radius:var(--radius-md);padding:14px;cursor:pointer;
   display:flex;align-items:center;gap:10px;background:#fff;
@@ -494,7 +493,6 @@ ul{margin:0;padding:0;list-style:none}
   }
   .bottom-nav a.active{color:var(--green-600)}
   .greeting-card{flex-direction:column;align-items:flex-start;text-align:left}
-  .ride-type-grid{grid-template-columns:1fr}
   .fare-summary{flex-direction:column;gap:8px}
   .delivery-receiver-grid,.delivery-item-grid{grid-template-columns:1fr}
   .chat-wrap{height:calc(100vh - 220px)}

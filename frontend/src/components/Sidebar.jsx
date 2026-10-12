@@ -1,11 +1,12 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon';
 import { useAuth } from '../context/AuthContext';
 
 export const NAV_BY_ROLE = {
   customer: [
     { to: '/customer/dashboard', icon: 'grid', label: 'Dashboard' },
-    { to: '/customer/request', icon: 'plus', label: 'Request a Ride' },
+    { to: '/customer/request?type=ride', icon: 'plus', label: 'Request a Ride', requestType: 'ride' },
+    { to: '/customer/request?type=delivery', icon: 'package', label: 'Request a Delivery', requestType: 'delivery' },
     { to: '/customer/active', icon: 'route', label: 'Active Ride' },
     { to: '/customer/chat', icon: 'chat', label: 'Messages' },
     { to: '/customer/history', icon: 'list', label: 'Ride History' },
@@ -33,8 +34,10 @@ const ROLE_LABEL = { customer: 'Customer', rider: 'Rider', admin: 'Admin' };
 
 export default function Sidebar({ open, onNavigate }) {
   const navigate = useNavigate();
+  const { pathname, search } = useLocation();
   const { user, logout } = useAuth();
   const links = NAV_BY_ROLE[user?.role] || [];
+  const selectedRequestType = new URLSearchParams(search).get('type') || 'ride';
 
   return (
     <aside className={`sidebar ${open ? 'open' : ''}`}>
@@ -45,7 +48,17 @@ export default function Sidebar({ open, onNavigate }) {
 
       <nav className="sidebar-nav">
         {links.map((l) => (
-          <NavLink key={l.to} to={l.to} onClick={onNavigate} className={({ isActive }) => (isActive ? 'active' : '')}>
+          <NavLink
+            key={l.to}
+            to={l.to}
+            onClick={onNavigate}
+            className={({ isActive }) => {
+              if (l.requestType) {
+                return pathname === '/customer/request' && selectedRequestType === l.requestType ? 'active' : '';
+              }
+              return isActive ? 'active' : '';
+            }}
+          >
             <Icon name={l.icon} /> {l.label}
           </NavLink>
         ))}
