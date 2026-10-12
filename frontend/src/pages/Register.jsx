@@ -56,6 +56,9 @@ export default function Register() {
           <div className="field">
             <label>University email</label>
             <input type="email" placeholder="you@vau.ac.lk" required value={form.email} onChange={set('email')} />
+            {import.meta.env.DEV && (
+              <small className="muted">Testing mode also accepts other valid email addresses.</small>
+            )}
           </div>
           <div className="field">
             <label>Phone number</label>

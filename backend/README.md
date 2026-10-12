@@ -24,6 +24,10 @@ readiness response requires an active MongoDB connection.
 - `MONGODB_URI` - MongoDB connection string
 - `JWT_SECRET` - signing key; production requires a non-placeholder value of
   at least 32 characters
+- `UNIVERSITY_EMAIL_DOMAIN` - domain allowed for public customer and rider
+  registration; defaults to `vau.ac.lk`
+- `ALLOW_NON_UNIVERSITY_EMAILS` - local testing bypass; it cannot be enabled
+  in production
 - `CORS_ORIGINS` - comma-separated exact frontend origins; explicitly required
   in production
 - `ROUTING_BASE_URL` - OSRM-compatible routing service

@@ -8,6 +8,10 @@ const {
   normalizeVehicle,
   serializeRiderProfile,
 } = require('../services/riderService');
+const {
+  isValidEmail,
+  registrationEmailIsAllowed,
+} = require('../utils/universityEmail');
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
@@ -50,6 +54,18 @@ exports.register = async (req, res, next) => {
     const { name, phone, password } = req.body;
     const email = normalizeEmail(req.body.email);
     const role = String(req.body.role || '').toUpperCase();
+
+    if (!isValidEmail(email)) {
+      return next(new AppError('Please provide a valid email address', 400));
+    }
+    if (!registrationEmailIsAllowed(email, env)) {
+      return next(
+        new AppError(
+          `Registration requires a @${env.universityEmailDomain} email address`,
+          400
+        )
+      );
+    }
 
     const existingUser = await User.exists({ email });
     if (existingUser) {

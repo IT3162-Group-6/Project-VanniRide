@@ -39,6 +39,11 @@ All protected endpoints require `Authorization: Bearer <token>`. Tokens are
 rejected if the user no longer exists, the account is suspended, the embedded
 role differs from the stored role, or logout has invalidated the token version.
 
+Public registration accepts only addresses under the configured
+`UNIVERSITY_EMAIL_DOMAIN` (`vau.ac.lk` by default). Local development and tests
+may set `ALLOW_NON_UNIVERSITY_EMAILS=true` so team members can create temporary
+accounts. This bypass is disabled and rejected when `NODE_ENV=production`.
+
 ## Ride workflow
 
 ```text

@@ -19,7 +19,8 @@ It does not select a hosting provider or contain production credentials.
   release MongoDB through graceful SIGTERM/SIGINT handling.
 - Production startup rejects missing database/JWT values, placeholder or short
   JWT secrets, missing explicit CORS origins, invalid environments, invalid
-  ports, and unsafe cancellation-worker intervals.
+  ports, unsafe cancellation-worker intervals, and any attempt to enable the
+  non-university registration bypass.
 - Demo credentials and local `.env` files are not suitable for production.
 
 ## Backend environment
@@ -32,6 +33,8 @@ PORT=<platform port>
 MONGODB_URI=<private production MongoDB URI>
 JWT_SECRET=<random value of at least 32 characters>
 JWT_EXPIRES_IN=7d
+UNIVERSITY_EMAIL_DOMAIN=vau.ac.lk
+ALLOW_NON_UNIVERSITY_EMAILS=false
 CORS_ORIGINS=https://<frontend-domain>
 ROUTING_BASE_URL=<OSRM-compatible provider>
 ROUTING_PROFILE=driving
@@ -104,7 +107,8 @@ npm run build
 
 1. `GET /health` returns HTTP 200 and `database: connected`.
 2. An unlisted browser origin is rejected.
-3. Customer and rider registration/login work over HTTPS.
+3. Customer and rider registration/login work over HTTPS, and registration
+   rejects addresses outside `@vau.ac.lk`.
 4. A newly registered rider is pending and cannot go online.
 5. Admin approval enables rider availability.
 6. Customer request, rider acceptance, chat, status progression, completion,

@@ -9,12 +9,26 @@ const parseOrigins = (value) =>
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);
 
+const parseBoolean = (value, fallback = false) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  return String(value).trim().toLowerCase() === 'true';
+};
+
+const nodeEnv = process.env.NODE_ENV || 'development';
+
 const config = {
   port: process.env.PORT || 5000,
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
   mongoUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  universityEmailDomain: String(
+    process.env.UNIVERSITY_EMAIL_DOMAIN || 'vau.ac.lk'
+  ).trim().toLowerCase().replace(/^@+/, ''),
+  allowNonUniversityEmails: parseBoolean(
+    process.env.ALLOW_NON_UNIVERSITY_EMAILS,
+    nodeEnv !== 'production'
+  ),
   // Keep local development usable when an older .env file predates the
   // routing settings. Production still has to configure its provider
   // explicitly in validateRuntimeConfig below.
@@ -52,6 +66,9 @@ const validateRuntimeConfig = (candidate = config) => {
   const errors = [];
   if (!candidate.mongoUri) errors.push('MONGODB_URI is required');
   if (!candidate.jwtSecret) errors.push('JWT_SECRET is required');
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(candidate.universityEmailDomain || '')) {
+    errors.push('UNIVERSITY_EMAIL_DOMAIN must be a valid domain');
+  }
   if (!['development', 'test', 'production'].includes(candidate.nodeEnv)) {
     errors.push('NODE_ENV must be development, test, or production');
   }
@@ -73,6 +90,9 @@ const validateRuntimeConfig = (candidate = config) => {
     errors.push('ROUTING_BASE_URL must be a valid URL');
   }
   if (candidate.nodeEnv === 'production') {
+    if (candidate.allowNonUniversityEmails) {
+      errors.push('ALLOW_NON_UNIVERSITY_EMAILS cannot be enabled in production');
+    }
     if (
       String(candidate.jwtSecret || '').length < 32 ||
       /replace|secret|example/i.test(String(candidate.jwtSecret || ''))

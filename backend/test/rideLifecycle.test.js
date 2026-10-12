@@ -57,6 +57,11 @@ const {
   reverseGeocode,
   searchPlaces,
 } = require('../src/services/geocodingService');
+const {
+  isValidEmail,
+  isUniversityEmail,
+  registrationEmailIsAllowed,
+} = require('../src/utils/universityEmail');
 
 const TEST_DATABASE_URI =
   process.env.MONGODB_TEST_URI ||
@@ -238,6 +243,63 @@ test('lists, reads, and broadcasts persistent notifications', async () => {
   );
   assert.equal(markedAll.body.data.updatedCount, 1);
   assert.equal(await Notification.countDocuments({ user_id: customer._id, is_read: false }), 0);
+});
+
+test('restricts release registration to university email while preserving the test bypass', async () => {
+  assert.equal(isValidEmail('student@vau.ac.lk'), true);
+  assert.equal(isValidEmail('student@@vau.ac.lk'), false);
+  assert.equal(isUniversityEmail(' Student@VAU.AC.LK ', 'vau.ac.lk'), true);
+  assert.equal(isUniversityEmail('student@notvau.ac.lk', 'vau.ac.lk'), false);
+  assert.equal(
+    registrationEmailIsAllowed('temporary@example.com', {
+      universityEmailDomain: 'vau.ac.lk',
+      allowNonUniversityEmails: true,
+    }),
+    true
+  );
+
+  const originalBypass = env.allowNonUniversityEmails;
+  env.allowNonUniversityEmails = false;
+  try {
+    await assert.rejects(
+      invokeController(
+        authController.register,
+        makeRequest({
+          body: {
+            name: 'External Tester',
+            email: 'external@example.com',
+            phone: '0700000198',
+            password: 'Password123!',
+            role: 'CUSTOMER',
+          },
+        })
+      ),
+      (error) =>
+        error.statusCode === 400 &&
+        /@vau\.ac\.lk/.test(error.message)
+    );
+    assert.equal(
+      await User.countDocuments({ email: 'external@example.com' }),
+      0
+    );
+
+    const accepted = await invokeController(
+      authController.register,
+      makeRequest({
+        body: {
+          name: 'University Tester',
+          email: 'student@vau.ac.lk',
+          phone: '0700000199',
+          password: 'Password123!',
+          role: 'CUSTOMER',
+        },
+      })
+    );
+    assert.equal(accepted.statusCode, 201);
+    assert.equal(accepted.body.data.user.email, 'student@vau.ac.lk');
+  } finally {
+    env.allowNonUniversityEmails = originalBypass;
+  }
 });
 
 test('validates and preserves structured delivery order details', async () => {
@@ -2085,6 +2147,19 @@ test('rejects unsafe production configuration before server startup', () => {
     }),
     /Production JWT_SECRET.*CORS_ORIGINS.*ROUTING_BASE_URL/
   );
+  assert.throws(
+    () => env.validateRuntimeConfig({
+      ...env,
+      nodeEnv: 'production',
+      jwtSecret: '7wSx6Jq9uMd4Kr2Nv8Pa5Bc1Tf3Hg0Zy',
+      corsOrigins: ['https://app.example.com'],
+      corsOriginsConfigured: true,
+      routingBaseUrl: 'https://routing.example.com',
+      routingBaseUrlConfigured: true,
+      allowNonUniversityEmails: true,
+    }),
+    /ALLOW_NON_UNIVERSITY_EMAILS cannot be enabled in production/
+  );
   assert.doesNotThrow(() => env.validateRuntimeConfig({
     ...env,
     nodeEnv: 'production',
@@ -2094,6 +2169,7 @@ test('rejects unsafe production configuration before server startup', () => {
     corsOriginsConfigured: true,
     routingBaseUrl: 'https://routing.example.com',
     routingBaseUrlConfigured: true,
+    allowNonUniversityEmails: false,
   }));
 });
 
