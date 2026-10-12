@@ -441,9 +441,22 @@ GET   /api/admin/riders
 PATCH /api/admin/riders/:riderUserId/approval
 GET   /api/admin/rides/:rideId/messages
 PATCH /api/admin/rides/:rideId/cancel
+GET   /api/notifications
+PATCH /api/notifications/:notificationId/read
+PATCH /api/notifications/read-all
+POST  /api/admin/notifications/broadcast
 ```
 
 All existing version-one endpoints remain in force.
+
+### Notification-centre behavior
+
+The navigation bell opens a role-specific notification page and displays the
+stored unread count. A user can open and mark one notification as read or mark
+all notifications as read. Notifications are created for ride and delivery
+requests, acceptance and status changes, cancellations, chat events, rider
+approval decisions, cash confirmation, and administrator app updates. An
+administrator may broadcast an update to one role or all roles.
 
 ## 10. Added constants
 

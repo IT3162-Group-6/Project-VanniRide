@@ -11,7 +11,8 @@ const collections = [
   "ratings",
   "chat_access_requests",
   "admin_audit_logs",
-  "ignored_ride_requests"
+  "ignored_ride_requests",
+  "notifications"
 ];
 
 collections.forEach(function(collectionName) {

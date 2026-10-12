@@ -6,6 +6,7 @@ const {
 } = require('../utils/authenticatedUser');
 const Payment = require('../models/paymentModel');
 const Ride = require('../models/rideModel');
+const { notifySafely } = require('../services/notificationService');
 
 const serializePayment = (paymentDocument) => {
   const payment = paymentDocument.toObject
@@ -84,6 +85,16 @@ exports.markPaymentPaid = catchAsync(async (req, res) => {
     }
     throw new AppError('Cash payment has already been confirmed', 409);
   }
+
+  await notifySafely({
+    userId: ride.customer_id,
+    type: 'PAYMENT_CONFIRMED',
+    title: 'Cash payment confirmed',
+    message: `Your cash payment of LKR ${payment.amount} has been confirmed by the rider.`,
+    link: '/customer/history',
+    rideId: ride._id,
+    io: req.app?.get('io'),
+  });
 
   res.status(200).json({
     success: true,

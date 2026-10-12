@@ -4,6 +4,7 @@ const {
 const {
   emitCancellationResolvedWithIo,
 } = require('../utils/socketEvents');
+const { notifySafely } = require('../services/notificationService');
 
 const runSweep = async (io) => {
   const results = await processExpiredCancellationRequests();
@@ -13,11 +14,34 @@ const runSweep = async (io) => {
       result.ride,
       result.cancellationRequest
     );
-    if (result.ride?.status === 'CANCELLED') {
-      io?.to(`ride_${result.ride._id}`).emit('ride_status_changed', {
-        rideId: result.ride._id.toString(),
-        status: result.ride.status,
-        riderId: result.ride.rider_id?.toString() || null,
+    const ride = result.ride;
+    if (ride && result.cancellationRequest?.status === 'AUTO_CANCELLED') {
+      await Promise.all([
+        notifySafely({
+          userId: ride.customer_id,
+          type: 'CANCELLATION_RESOLVED',
+          title: 'Ride cancelled automatically',
+          message: 'The cancellation response time expired, so the ride was cancelled automatically.',
+          link: '/customer/history',
+          rideId: ride._id,
+          io,
+        }),
+        notifySafely({
+          userId: ride.rider_id,
+          type: 'CANCELLATION_RESOLVED',
+          title: 'Ride cancelled automatically',
+          message: 'The cancellation response time expired, so the ride was cancelled automatically.',
+          link: '/rider/history',
+          rideId: ride._id,
+          io,
+        }),
+      ]);
+    }
+    if (ride?.status === 'CANCELLED') {
+      io?.to(`ride_${ride._id}`).emit('ride_status_changed', {
+        rideId: ride._id.toString(),
+        status: ride.status,
+        riderId: ride.rider_id?.toString() || null,
         updatedAt: new Date().toISOString(),
       });
     }

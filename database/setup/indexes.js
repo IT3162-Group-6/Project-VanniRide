@@ -146,4 +146,7 @@ ensureIndex(
 );
 db.ignored_ride_requests.createIndex({ rider_id: 1, ignored_at: 1 });
 
+db.notifications.createIndex({ user_id: 1, is_read: 1, created_at: -1 });
+db.notifications.createIndex({ created_at: -1 });
+
 print("All Vanni Ride indexes created successfully.");

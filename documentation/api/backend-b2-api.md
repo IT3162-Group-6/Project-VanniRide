@@ -202,6 +202,25 @@ assigned rider in `confirmedBy` and the confirmation time in `paidAt`. The
 amount returned by the API is the authoritative amount stored on the payment
 record, initially copied from the ride estimate when the ride is created.
 
+## Notification endpoints
+
+Notifications are stored per user and power the bell badge and notification
+centre for customers, riders, and administrators.
+
+- `GET /api/notifications?limit=50` - Return the current user's newest
+  notifications and unread count.
+- `PATCH /api/notifications/:notificationId/read` - Mark one owned
+  notification as read.
+- `PATCH /api/notifications/read-all` - Mark all of the current user's
+  notifications as read.
+- `POST /api/admin/notifications/broadcast` - Administrator sends an app
+  update to one or more of `CUSTOMER`, `RIDER`, and `ADMIN`.
+
+Ride requests and lifecycle changes, cancellations, chat messages and access
+decisions, rider approval decisions, cash confirmation, and app updates create
+notifications. The `notification_created` Socket.IO event is also sent to the
+affected user's private room when the user is connected.
+
 ## Chat endpoints
 
 - `GET /api/rides/:rideId/messages` - Customer or assigned rider
@@ -284,6 +303,7 @@ All endpoints below require an authenticated `ADMIN` account:
 - `GET /api/admin/ratings`
 - `GET /api/admin/chat-access-requests`
 - `PATCH /api/admin/chat-access-requests/:requestId`
+- `POST /api/admin/notifications/broadcast`
 - `GET /api/admin/statistics`
 
 Account status request:

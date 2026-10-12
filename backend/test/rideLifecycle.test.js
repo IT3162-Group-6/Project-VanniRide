@@ -18,6 +18,7 @@ const adminController = require('../src/controllers/adminController');
 const authController = require('../src/controllers/authController');
 const historyController = require('../src/controllers/historyController');
 const mapController = require('../src/controllers/mapController');
+const notificationController = require('../src/controllers/notificationController');
 const userController = require('../src/controllers/userController');
 const app = require('../src/app');
 const env = require('../src/config/env');
@@ -29,6 +30,7 @@ const chatRoutes = require('../src/routes/chatRoutes');
 const ratingRoutes = require('../src/routes/ratingRoutes');
 const adminRoutes = require('../src/routes/adminRoutes');
 const mapRoutes = require('../src/routes/mapRoutes');
+const notificationRoutes = require('../src/routes/notificationRoutes');
 const Ride = require('../src/models/rideModel');
 const Rider = require('../src/models/riderModel');
 const IgnoredRideRequest = require('../src/models/ignoredRideRequestModel');
@@ -40,6 +42,7 @@ const Payment = require('../src/models/paymentModel');
 const Message = require('../src/models/messageModel');
 const Rating = require('../src/models/ratingModel');
 const AdminAuditLog = require('../src/models/adminAuditLogModel');
+const Notification = require('../src/models/notificationModel');
 const initializeSocketHandler = require('../src/sockets/socketHandler');
 const {
   calculateFare,
@@ -137,6 +140,7 @@ test.beforeEach(async () => {
     Rating.deleteMany({}),
     AdminAuditLog.deleteMany({}),
     IgnoredRideRequest.deleteMany({}),
+    Notification.deleteMany({}),
   ]);
 });
 
@@ -169,6 +173,71 @@ test('uses the shortest returned road route to estimate the fare', async () => {
       total: 270,
     }
   );
+});
+
+test('lists, reads, and broadcasts persistent notifications', async () => {
+  const [customer, admin] = await User.create([
+    {
+      name: 'Notification Customer',
+      email: 'notification-customer@vau.ac.lk',
+      phone: '0771111111',
+      password_hash: 'hashed-password',
+      role: 'CUSTOMER',
+      account_status: 'ACTIVE',
+    },
+    {
+      name: 'Notification Admin',
+      email: 'notification-admin@vau.ac.lk',
+      phone: '0772222222',
+      password_hash: 'hashed-password',
+      role: 'ADMIN',
+      account_status: 'ACTIVE',
+    },
+  ]);
+  const notification = await Notification.create({
+    user_id: customer._id,
+    type: 'SYSTEM',
+    title: 'Welcome update',
+    message: 'Notifications are ready.',
+    link: '/customer/dashboard',
+  });
+
+  const listed = await invokeController(
+    notificationController.getNotifications,
+    makeRequest({ user: customer, query: { limit: 20 } })
+  );
+  assert.equal(listed.body.data.unreadCount, 1);
+  assert.equal(listed.body.data.notifications[0].title, 'Welcome update');
+
+  const read = await invokeController(
+    notificationController.markNotificationRead,
+    makeRequest({
+      user: customer,
+      params: { notificationId: notification._id.toString() },
+    })
+  );
+  assert.equal(read.body.data.notification.isRead, true);
+
+  const broadcast = await invokeController(
+    notificationController.broadcastSystemNotification,
+    makeRequest({
+      user: admin,
+      body: {
+        title: 'App maintenance',
+        message: 'A short maintenance window is planned.',
+        roles: ['CUSTOMER'],
+      },
+    })
+  );
+  assert.equal(broadcast.statusCode, 201);
+  assert.equal(broadcast.body.data.recipientCount, 1);
+
+  const markedAll = await invokeController(
+    notificationController.markAllNotificationsRead,
+    makeRequest({ user: customer })
+  );
+  assert.equal(markedAll.body.data.updatedCount, 1);
+  assert.equal(await Notification.countDocuments({ user_id: customer._id, is_read: false }), 0);
 });
 
 test('validates and preserves structured delivery order details', async () => {
@@ -661,13 +730,18 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
     messageResult.body.data.message.messageText,
     'I am waiting near the main gate.'
   );
-  assert.equal(emittedMessages.length, 1);
-  assert.equal(emittedMessages[0].room, `ride_${rideId}`);
-  assert.equal(emittedMessages[0].event, 'new_message');
+  assert.equal(emittedMessages.length, 2);
+  const messageEvent = emittedMessages.find((item) => item.event === 'new_message');
+  const notificationEvent = emittedMessages.find(
+    (item) => item.event === 'notification_created'
+  );
+  assert.equal(messageEvent.room, `ride_${rideId}`);
   assert.equal(
-    emittedMessages[0].payload.messageText,
+    messageEvent.payload.messageText,
     'I am waiting near the main gate.'
   );
+  assert.equal(notificationEvent.room, `user_${riderUserId}`);
+  assert.equal(notificationEvent.payload.type, 'CHAT_MESSAGE');
 
   const historyResult = await invokeController(
     chatController.getMessages,
@@ -764,6 +838,13 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
   assert.equal(storedPayment.amount, 260);
   assert.ok(storedPayment.confirmed_by.equals(riderUserId));
   assert.ok(storedPayment.paid_at instanceof Date);
+
+  const paymentNotification = await Notification.findOne({
+    user_id: customerId,
+    type: 'PAYMENT_CONFIRMED',
+  }).lean();
+  assert.ok(paymentNotification);
+  assert.match(paymentNotification.message, /LKR 260/);
 
   await assert.rejects(
     invokeController(
@@ -1928,7 +2009,8 @@ test('keeps the Postman collection synchronized with every implemented API route
           .replaceAll('{{riderUserId}}', ':riderUserId')
           .replaceAll('{{userId}}', ':userId')
           .replaceAll('{{paymentId}}', ':paymentId')
-          .replaceAll('{{chatAccessRequestId}}', ':requestId');
+          .replaceAll('{{chatAccessRequestId}}', ':requestId')
+          .replaceAll('{{notificationId}}', ':notificationId');
         collectedRoutes.push(`${item.request.method} ${normalizedPath}`);
       }
       collectRequests(item.item);
@@ -1945,6 +2027,7 @@ test('keeps the Postman collection synchronized with every implemented API route
     ['/api', ratingRoutes],
     ['/api/admin', adminRoutes],
     ['/api/maps', mapRoutes],
+    ['/api/notifications', notificationRoutes],
   ];
   const implementedRoutes = mountedRouters.flatMap(([basePath, router]) =>
     router.stack.flatMap((layer) => {
@@ -1966,7 +2049,7 @@ test('keeps the Postman collection synchronized with every implemented API route
   );
 
   assert.equal(new Set(collectedRoutes).size, collectedRoutes.length);
-  assert.equal(implementedRoutes.length, 45);
+  assert.equal(implementedRoutes.length, 49);
   assert.deepEqual(collectedRoutes.sort(), implementedRoutes.sort());
 });
 
@@ -2335,6 +2418,9 @@ test('authenticates ride sockets and persists room-scoped messages', async () =>
     const receivedMessage = new Promise((resolve) => {
       riderSocket.once('new_message', resolve);
     });
+    const receivedNotification = new Promise((resolve) => {
+      riderSocket.once('notification_created', resolve);
+    });
     const sendResult = await emitWithAck(customerSocket, 'send_message', {
       rideId: ride._id.toString(),
       messageText: 'Socket message',
@@ -2342,10 +2428,18 @@ test('authenticates ride sockets and persists room-scoped messages', async () =>
 
     assert.equal(sendResult.success, true);
     assert.equal((await receivedMessage).messageText, 'Socket message');
+    assert.equal((await receivedNotification).type, 'CHAT_MESSAGE');
     assert.equal(
       await Message.countDocuments({
         ride_id: ride._id,
         message_text: 'Socket message',
+      }),
+      1
+    );
+    assert.equal(
+      await Notification.countDocuments({
+        user_id: riderUserId,
+        type: 'CHAT_MESSAGE',
       }),
       1
     );

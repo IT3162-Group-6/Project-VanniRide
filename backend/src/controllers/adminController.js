@@ -31,6 +31,10 @@ const {
   serializeRiderProfile,
 } = require('../services/riderService');
 const { serializeDeliveryDetails } = require('../utils/deliveryDetails');
+const {
+  notifyManySafely,
+  notifySafely,
+} = require('../services/notificationService');
 
 const normalizeReason = (value) => {
   if (typeof value !== 'string') {
@@ -282,6 +286,16 @@ exports.reviewRiderApproval = catchAsync(async (req, res) => {
   }
 
   emitRiderApprovalUpdated(req, updatedRider);
+  await notifySafely({
+    userId: updatedRider.user_id,
+    type: 'RIDER_APPROVAL',
+    title: approvalStatus === 'APPROVED' ? 'Rider account approved' : 'Rider application update',
+    message: approvalStatus === 'APPROVED'
+      ? 'Your rider account was approved. You can now go online and accept requests.'
+      : `Your rider application was rejected. Reason: ${reason}`,
+    link: '/rider/dashboard',
+    io: req.app?.get('io'),
+  });
   return res.status(200).json({
     success: true,
     message: `Rider ${approvalStatus.toLowerCase()} successfully`,
@@ -584,6 +598,15 @@ exports.forceCancelRide = catchAsync(async (req, res) => {
   }
   emitRideStatusChanged(req, cancelledRide);
   emitRideForceCancelled(req, cancelledRide, reason);
+  await notifyManySafely({
+    userIds: [cancelledRide.customer_id, cancelledRide.rider_id],
+    type: 'RIDE_CANCELLED',
+    title: `${cancelledRide.request_type === 'DELIVERY' ? 'Delivery' : 'Ride'} cancelled by administrator`,
+    message: `Reason: ${reason}`,
+    link: null,
+    rideId: cancelledRide._id,
+    io: req.app?.get('io'),
+  });
 
   return res.status(200).json({
     success: true,
@@ -847,6 +870,28 @@ exports.reviewChatAccessRequest = catchAsync(async (req, res) => {
   }
 
   emitChatAccessUpdated(req, ride, updatedRequest);
+  await notifySafely({
+    userId: ride.customer_id,
+    type: 'CHAT_ACCESS',
+    title: status === 'APPROVED' ? 'Chat access approved' : 'Chat access request rejected',
+    message: status === 'APPROVED'
+      ? 'Post-completion chat is available for the next 24 hours.'
+      : `Your post-completion chat request was rejected. Reason: ${reason}`,
+    link: status === 'APPROVED' ? '/customer/chat' : '/customer/history',
+    rideId: ride._id,
+    io: req.app?.get('io'),
+  });
+  if (status === 'APPROVED' && ride.rider_id) {
+    await notifySafely({
+      userId: ride.rider_id,
+      type: 'CHAT_ACCESS',
+      title: 'Post-completion chat reopened',
+      message: 'The customer received approval to contact you for the next 24 hours.',
+      link: '/rider/chat',
+      rideId: ride._id,
+      io: req.app?.get('io'),
+    });
+  }
 
   return res.status(200).json({
     success: true,

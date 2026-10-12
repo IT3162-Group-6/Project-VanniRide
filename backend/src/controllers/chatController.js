@@ -7,6 +7,7 @@ const {
 const Message = require('../models/messageModel');
 const Ride = require('../models/rideModel');
 const ChatAccessRequest = require('../models/chatAccessRequestModel');
+const User = require('../models/userModel');
 const {
   assertChatSendingAllowed,
   findActiveChatAccess,
@@ -18,6 +19,10 @@ const {
   emitChatAccessUpdated,
   emitNewMessage,
 } = require('../utils/socketEvents');
+const {
+  notifyManySafely,
+  notifySafely,
+} = require('../services/notificationService');
 
 const getParticipantRide = async (rideId, userId, role) => {
   validateObjectId(rideId, 'ride ID');
@@ -85,6 +90,18 @@ exports.sendMessage = catchAsync(async (req, res) => {
     message_text: messageText,
   });
   emitNewMessage(req, message);
+  const recipientId = role === 'CUSTOMER' ? ride.rider_id : ride.customer_id;
+  if (recipientId) {
+    await notifySafely({
+      userId: recipientId,
+      type: 'CHAT_MESSAGE',
+      title: 'New message',
+      message: messageText.length > 90 ? `${messageText.slice(0, 87)}…` : messageText,
+      link: `/${role === 'CUSTOMER' ? 'rider' : 'customer'}/chat?rideId=${ride._id}`,
+      rideId: ride._id,
+      io: req.app?.get('io'),
+    });
+  }
 
   res.status(201).json({
     success: true,
@@ -147,6 +164,18 @@ exports.requestPostCompletionAccess = catchAsync(async (req, res) => {
   }
 
   emitChatAccessUpdated(req, ride, chatAccessRequest);
+  const admins = await User.find({ role: 'ADMIN', account_status: 'ACTIVE' })
+    .select('_id')
+    .lean();
+  await notifyManySafely({
+    userIds: admins.map((admin) => admin._id),
+    type: 'CHAT_ACCESS',
+    title: 'Chat access review needed',
+    message: 'A customer requested post-completion chat access.',
+    link: '/admin/dashboard',
+    rideId: ride._id,
+    io: req.app?.get('io'),
+  });
   res.status(201).json({
     success: true,
     message: 'Post-completion chat access request submitted',

@@ -6,6 +6,7 @@ import MarketingLayout from './components/MarketingLayout';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Toast from './components/Toast';
+import Notifications from './pages/Notifications';
 
 // public
 import Home from './pages/Home';
@@ -63,6 +64,7 @@ export default function App() {
               <Route path="chat" element={<CustomerChat />} />
               <Route path="history" element={<CustomerHistory />} />
               <Route path="profile" element={<CustomerProfile />} />
+              <Route path="notifications" element={<Notifications />} />
             </Route>
 
             {/* ---------- rider ---------- */}
@@ -78,6 +80,7 @@ export default function App() {
               <Route path="chat" element={<RiderChat />} />
               <Route path="history" element={<RiderHistory />} />
               <Route path="profile" element={<RiderProfile />} />
+              <Route path="notifications" element={<Notifications />} />
             </Route>
 
             {/* ---------- admin ---------- */}
@@ -93,6 +96,7 @@ export default function App() {
               <Route path="rides" element={<Rides />} />
               <Route path="rides/:id" element={<RideDetails />} />
               <Route path="profile" element={<AdminProfile />} />
+              <Route path="notifications" element={<Notifications />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

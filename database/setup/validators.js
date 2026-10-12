@@ -503,4 +503,37 @@ db.runCommand({
   validationAction: "error"
 });
 
+db.runCommand({
+  collMod: "notifications",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "user_id", "type", "title", "message", "link", "ride_id",
+        "is_read", "read_at", "created_at"
+      ],
+      properties: {
+        user_id: { bsonType: "objectId" },
+        type: {
+          enum: [
+            "RIDE_REQUEST", "RIDE_ACCEPTED", "RIDE_STATUS",
+            "RIDE_CANCELLED", "CANCELLATION_REQUESTED",
+              "CANCELLATION_RESOLVED", "CHAT_MESSAGE", "CHAT_ACCESS",
+              "RIDER_APPROVAL", "PAYMENT_CONFIRMED", "SYSTEM"
+          ]
+        },
+        title: { bsonType: "string", minLength: 1, maxLength: 120 },
+        message: { bsonType: "string", minLength: 1, maxLength: 500 },
+        link: { bsonType: ["string", "null"], maxLength: 300 },
+        ride_id: { bsonType: ["objectId", "null"] },
+        is_read: { bsonType: "bool" },
+        read_at: { bsonType: ["date", "null"] },
+        created_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
 print("All Vanni Ride validators applied successfully.");

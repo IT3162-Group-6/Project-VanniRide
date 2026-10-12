@@ -195,6 +195,14 @@
       ]
     },
     {
+      "name": "Notifications",
+      "item": [
+        { "name": "List My Notifications", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/notifications?limit=50" } },
+        { "name": "Mark Notification Read", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/notifications/{{notificationId}}/read" } },
+        { "name": "Mark All Notifications Read", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/notifications/read-all" } }
+      ]
+    },
+    {
       "name": "Administration",
       "item": [
         { "name": "List Users", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/users" } },
@@ -250,7 +258,16 @@
             "url": "{{baseUrl}}/api/admin/chat-access-requests/{{chatAccessRequestId}}"
           }
         },
-        { "name": "Get Statistics", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/statistics" } }
+        { "name": "Get Statistics", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/statistics" } },
+        {
+          "name": "Broadcast App Update",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Vanni Ride update\",\n  \"message\": \"A new version of the app is available.\",\n  \"roles\": [\"CUSTOMER\", \"RIDER\"]\n}" },
+            "url": "{{baseUrl}}/api/admin/notifications/broadcast"
+          }
+        }
       ]
     }
   ]

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
 import { useAuth, HOME_BY_ROLE } from '../context/AuthContext';
+import { NOTIFICATIONS_CHANGED_EVENT, notificationsApi } from '../services/api';
 
 /**
  * variant="public" — marketing header (Home / Login / Register)
@@ -9,7 +10,28 @@ import { useAuth, HOME_BY_ROLE } from '../context/AuthContext';
  */
 export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMenu }) {
   const [open, setOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (variant !== 'app' || !user) return undefined;
+    let alive = true;
+    const refreshCount = () => {
+      notificationsApi.list(1)
+        .then((result) => alive && setUnreadCount(result.unreadCount))
+        .catch(() => {});
+    };
+    refreshCount();
+    const timer = window.setInterval(refreshCount, 20_000);
+    window.addEventListener('focus', refreshCount);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshCount);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshCount);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshCount);
+    };
+  }, [user, variant]);
 
   if (variant === 'app') {
     return (
@@ -19,10 +41,10 @@ export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMen
         </button>
         <h1>{title}</h1>
         <div className="app-topbar-actions">
-          <button className="icon-btn" aria-label="Notifications">
+          <Link to={`/${user?.role}/notifications`} className="icon-btn" aria-label="Notifications">
             <Icon name="bell" />
-            <span className="badge">2</span>
-          </button>
+            {unreadCount > 0 && <span className="badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+          </Link>
           <Link to={`/${user?.role}/profile`} className="avatar">
             {user?.name?.[0]?.toUpperCase() || 'U'}
           </Link>

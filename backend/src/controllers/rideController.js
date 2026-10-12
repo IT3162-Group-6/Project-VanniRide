@@ -40,6 +40,10 @@ const {
   normalizeDeliveryDetails,
   serializeDeliveryDetails,
 } = require('../utils/deliveryDetails');
+const {
+  notifyManySafely,
+  notifySafely,
+} = require('../services/notificationService');
 
 const ACTIVE_RIDE_STATUSES = ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'STARTED'];
 
@@ -295,6 +299,19 @@ exports.requestRide = catchAsync(async (req, res) => {
   }
 
   emitNewRideRequest(req, ride);
+  const availableRiders = await Rider.find({
+    approval_status: 'APPROVED',
+    availability_status: 'AVAILABLE',
+  }).select('user_id').lean();
+  await notifyManySafely({
+    userIds: availableRiders.map((rider) => rider.user_id),
+    type: 'RIDE_REQUEST',
+    title: `New ${rideType === 'DELIVERY' ? 'delivery' : 'ride'} request`,
+    message: `${pickupLocation.address} to ${destination.address}`,
+    link: `/rider/requests/${ride._id}`,
+    rideId: ride._id,
+    io: req.app?.get('io'),
+  });
 
   res.status(201).json({
     success: true,
@@ -523,6 +540,15 @@ exports.acceptRide = catchAsync(async (req, res) => {
   }
 
   emitRideStatusChanged(req, ride);
+  await notifySafely({
+    userId: ride.customer_id,
+    type: 'RIDE_ACCEPTED',
+    title: `${ride.request_type === 'DELIVERY' ? 'Delivery' : 'Ride'} accepted`,
+    message: 'A rider accepted your request. You can now track the request and open the chat.',
+    link: `/customer/active?rideId=${ride._id}`,
+    rideId: ride._id,
+    io: req.app?.get('io'),
+  });
 
   const customer = await User.findById(ride.customer_id)
     .select('name phone')
@@ -630,6 +656,27 @@ exports.updateRideStatus = catchAsync(async (req, res) => {
   }
 
   emitRideStatusChanged(req, ride);
+  const statusMessages = {
+    ARRIVED: ['Rider has arrived', 'Your rider has arrived at the pickup point.'],
+    STARTED: [
+      ride.request_type === 'DELIVERY' ? 'Delivery picked up' : 'Ride started',
+      ride.request_type === 'DELIVERY' ? 'Your delivery is now on the way.' : 'Your trip is now in progress.',
+    ],
+    COMPLETED: [
+      ride.request_type === 'DELIVERY' ? 'Delivery completed' : 'Ride completed',
+      ride.request_type === 'DELIVERY' ? 'Your delivery was marked as completed.' : 'Your trip was marked as completed.',
+    ],
+  };
+  const [statusTitle, statusMessage] = statusMessages[targetStatus];
+  await notifySafely({
+    userId: ride.customer_id,
+    type: 'RIDE_STATUS',
+    title: statusTitle,
+    message: statusMessage,
+    link: targetStatus === 'COMPLETED' ? '/customer/history' : `/customer/active?rideId=${ride._id}`,
+    rideId: ride._id,
+    io: req.app?.get('io'),
+  });
 
   const customer = await User.findById(ride.customer_id)
     .select('name phone')
@@ -671,6 +718,18 @@ exports.cancelRide = catchAsync(async (req, res) => {
       reason,
     });
     emitRideStatusChanged(req, result.ride);
+    const otherUserId = isCustomer ? ride.rider_id : ride.customer_id;
+    if (otherUserId) {
+      await notifySafely({
+        userId: otherUserId,
+        type: 'RIDE_CANCELLED',
+        title: `${ride.request_type === 'DELIVERY' ? 'Delivery' : 'Ride'} cancelled`,
+        message: `The request was cancelled. Reason: ${reason}`,
+        link: isCustomer ? '/rider/history' : '/customer/history',
+        rideId: ride._id,
+        io: req.app?.get('io'),
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -691,6 +750,15 @@ exports.cancelRide = catchAsync(async (req, res) => {
       reason,
     });
     emitCancellationRequested(req, ride, result.cancellationRequest);
+    await notifySafely({
+      userId: respondingUserId,
+      type: 'CANCELLATION_REQUESTED',
+      title: 'Cancellation confirmation needed',
+      message: `The other participant requested cancellation. Reason: ${reason}`,
+      link: isCustomer ? `/rider/active?rideId=${ride._id}` : `/customer/active?rideId=${ride._id}`,
+      rideId: ride._id,
+      io: req.app?.get('io'),
+    });
 
     return res.status(202).json({
       success: true,
@@ -748,6 +816,19 @@ exports.respondToCancellation = catchAsync(async (req, res) => {
   if (result.ride?.status === 'CANCELLED') {
     emitRideStatusChanged(req, result.ride);
   }
+  const requesterId = result.cancellationRequest.requested_by;
+  const requesterIsCustomer = result.ride?.customer_id?.equals(requesterId);
+  await notifySafely({
+    userId: requesterId,
+    type: 'CANCELLATION_RESOLVED',
+    title: result.ride?.status === 'CANCELLED' ? 'Cancellation confirmed' : 'Ride will continue',
+    message: result.ride?.status === 'CANCELLED'
+      ? 'The other participant confirmed the cancellation.'
+      : 'The other participant chose to continue the ride.',
+    link: requesterIsCustomer ? '/customer/history' : '/rider/history',
+    rideId: result.cancellationRequest.ride_id,
+    io: req.app?.get('io'),
+  });
 
   return res.status(200).json({
     success: true,

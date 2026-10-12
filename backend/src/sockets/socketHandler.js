@@ -10,6 +10,7 @@ const {
   serializeMessage,
 } = require('../services/chatService');
 const { rideRoom, userRoom } = require('../utils/socketEvents');
+const { notifySafely } = require('../services/notificationService');
 
 const getToken = (socket) => {
   if (socket.handshake.auth?.token) {
@@ -150,6 +151,20 @@ const initializeSocketHandler = (io, config) => {
           const payload = serializeMessage(message);
 
           io.to(rideRoom(rideId)).emit('new_message', payload);
+          const recipientId = socket.user.role === 'CUSTOMER'
+            ? ride.rider_id
+            : ride.customer_id;
+          await notifySafely({
+            userId: recipientId,
+            type: 'CHAT_MESSAGE',
+            title: 'New message',
+            message: normalizedMessage.length > 90
+              ? `${normalizedMessage.slice(0, 87)}…`
+              : normalizedMessage,
+            link: `/${socket.user.role === 'CUSTOMER' ? 'rider' : 'customer'}/chat?rideId=${ride._id}`,
+            rideId: ride._id,
+            io,
+          });
           respond(acknowledge, { success: true, data: { message: payload } });
         } catch (error) {
           respond(acknowledge, { success: false, message: error.message });

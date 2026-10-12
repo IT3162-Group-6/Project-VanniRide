@@ -11,18 +11,21 @@ const TITLES = {
   '/customer/chat': 'Messages',
   '/customer/history': 'Ride History',
   '/customer/profile': 'Profile',
+  '/customer/notifications': 'Notifications',
   '/rider/dashboard': 'Rider Dashboard',
   '/rider/requests': 'Available Requests',
   '/rider/active': 'Active Ride',
   '/rider/chat': 'Messages',
   '/rider/history': 'Ride History',
   '/rider/profile': 'Profile',
+  '/rider/notifications': 'Notifications',
   '/admin/dashboard': 'Admin Dashboard',
   '/admin/users': 'All Users',
   '/admin/customers': 'Customers',
   '/admin/riders': 'Riders',
   '/admin/rides': 'Rides',
   '/admin/profile': 'Profile',
+  '/admin/notifications': 'Notifications',
 };
 
 export default function AppLayout() {

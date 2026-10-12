@@ -15,6 +15,7 @@ const {
   chatApi,
   getToken,
   mapApi,
+  notificationsApi,
   ratingApi,
   riderApi,
   ridesApi,
@@ -532,6 +533,43 @@ test('connects ride chat, access requests, and rider ratings', async () => {
   assert.deepEqual(JSON.parse(requests[1].options.body), { messageText: 'Found it' });
   assert.deepEqual(JSON.parse(requests[2].options.body), { reason: 'Lost item' });
   assert.deepEqual(JSON.parse(requests[3].options.body), { rating: 5, review: 'Safe ride' });
+});
+
+test('lists and updates notifications through the backend API', async () => {
+  localStorage.setItem('vr_token', 'notification-token');
+  const requests = [];
+  global.fetch = async (url, options) => {
+    const request = { url: String(url), options };
+    requests.push(request);
+    if (request.url.includes('/notifications?')) {
+      return jsonResponse({
+        success: true,
+        data: {
+          unreadCount: 1,
+          notifications: [{ id: 'n1', title: 'Ride accepted', isRead: false }],
+        },
+      });
+    }
+    if (request.url.endsWith('/notifications/n1/read')) {
+      return jsonResponse({ success: true, data: { notification: { id: 'n1', isRead: true } } });
+    }
+    if (request.url.endsWith('/notifications/read-all')) {
+      return jsonResponse({ success: true, data: { updatedCount: 2 } });
+    }
+    if (request.url.endsWith('/admin/notifications/broadcast')) {
+      return jsonResponse({ success: true, data: { recipientCount: 4 } }, 201);
+    }
+    throw new Error(`Unexpected request ${request.url}`);
+  };
+
+  assert.equal((await notificationsApi.list()).unreadCount, 1);
+  assert.equal((await notificationsApi.markRead('n1')).isRead, true);
+  assert.equal(await notificationsApi.markAllRead(), 2);
+  assert.equal(
+    (await notificationsApi.broadcast({ title: 'Update', message: 'Ready', roles: ['CUSTOMER'] })).recipientCount,
+    4
+  );
+  assert.deepEqual(requests.map((request) => request.options.method), ['GET', 'PATCH', 'PATCH', 'POST']);
 });
 
 test('connects administrator management, review, audit, and statistics APIs', async () => {

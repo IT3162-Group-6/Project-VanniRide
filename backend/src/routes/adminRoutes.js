@@ -1,6 +1,7 @@
 const express = require('express');
 const adminController = require('../controllers/adminController');
 const { protect, restrictTo } = require('../middlewares/authMiddleware');
+const notificationController = require('../controllers/notificationController');
 
 const router = express.Router();
 
@@ -28,5 +29,6 @@ router.patch(
   adminController.reviewChatAccessRequest
 );
 router.get('/statistics', adminController.getAdminStatistics);
+router.post('/notifications/broadcast', notificationController.broadcastSystemNotification);
 
 module.exports = router;

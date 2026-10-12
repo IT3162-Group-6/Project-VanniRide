@@ -15,6 +15,7 @@ const BASE_URL = String(
 const TOKEN_KEY = 'vr_token';
 const DB_KEY = 'vr_db';
 export const AUTH_EXPIRED_EVENT = 'vanni-ride:auth-expired';
+export const NOTIFICATIONS_CHANGED_EVENT = 'vanni-ride:notifications-changed';
 
 export const RIDE_STATUS = {
   PENDING: 'pending',
@@ -677,6 +678,29 @@ export const ratingApi = {
   },
 };
 
+export const notificationsApi = {
+  async list(limit = 50) {
+    if (USE_MOCK_AUTH) return { notifications: [], unreadCount: 0 };
+    const response = await http('/notifications', { params: { limit } });
+    return {
+      notifications: response.data?.notifications || [],
+      unreadCount: response.data?.unreadCount || 0,
+    };
+  },
+  async markRead(notificationId) {
+    const response = await http(`/notifications/${notificationId}/read`, { method: 'PATCH' });
+    return response.data?.notification;
+  },
+  async markAllRead() {
+    const response = await http('/notifications/read-all', { method: 'PATCH' });
+    return response.data?.updatedCount || 0;
+  },
+  async broadcast(payload) {
+    const response = await http('/admin/notifications/broadcast', { method: 'POST', body: payload });
+    return response.data;
+  },
+};
+
 /* ============================================================
    PAYMENTS / WALLET
    ============================================================ */
@@ -832,4 +856,4 @@ export const adminApi = {
   },
 };
 
-export default { authApi, riderApi, mapApi, ridesApi, chatApi, ratingApi, paymentsApi, adminApi };
+export default { authApi, riderApi, mapApi, ridesApi, chatApi, ratingApi, notificationsApi, paymentsApi, adminApi };
