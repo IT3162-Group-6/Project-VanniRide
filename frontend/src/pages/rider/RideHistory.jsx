@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import Icon from '../../components/Icon';
 import RideCard from '../../components/RideCard';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authStore';
 import { riderApi, ridesApi } from '../../services/api';
-import { useAppState } from '../../context/AppState';
+import { useAppState } from '../../context/appStateStore';
 
 export default function RideHistory() {
   const { user } = useAuth();

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import StatusBadge from '../../components/StatusBadge';
-import { useAuth } from '../../context/AuthContext';
-import { useAppState } from '../../context/AppState';
+import { useAuth } from '../../context/authStore';
+import { useAppState } from '../../context/appStateStore';
 import { riderApi } from '../../services/api';
 
 export default function Profile() {

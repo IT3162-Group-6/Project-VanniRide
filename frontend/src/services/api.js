@@ -11,6 +11,10 @@ const USE_MOCK_DATA = import.meta.env?.VITE_USE_MOCK_DATA === 'true';
 const BASE_URL = String(
   import.meta.env?.VITE_API_URL || 'http://localhost:5000/api'
 ).replace(/\/$/, '');
+export const API_ORIGIN = new URL(
+  BASE_URL,
+  typeof window === 'undefined' ? 'http://localhost' : window.location.origin
+).origin;
 
 const TOKEN_KEY = 'vr_token';
 const DB_KEY = 'vr_db';

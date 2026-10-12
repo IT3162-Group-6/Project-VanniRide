@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import UserTable from '../../components/UserTable';
 import { adminApi } from '../../services/api';
-import { useAppState } from '../../context/AppState';
+import { useAppState } from '../../context/appStateStore';
 
 export default function Customers() {
   const { showToast } = useAppState();

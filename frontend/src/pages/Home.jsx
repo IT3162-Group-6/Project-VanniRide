@@ -49,7 +49,7 @@ export default function Home() {
           <div className="service-card"><div className="fi"><Icon name="bike" /></div><b>Campus to Hostel</b><span>Quick &amp; safe rides</span></div>
           <div className="service-card"><div className="fi"><Icon name="route" /></div><b>Town Rides</b><span>Vavuniya town &amp; more</span></div>
           <div className="service-card"><div className="fi"><Icon name="package" /></div><b>Deliveries</b><span>Medicine, groceries &amp; more</span></div>
-          <div className="service-card"><div className="fi"><Icon name="clock" /></div><b>Scheduled Rides</b><span>Book for later</span></div>
+          <div className="service-card"><div className="fi"><Icon name="food" /></div><b>Food &amp; Water</b><span>Order essentials around campus</span></div>
         </div>
       </section>
 

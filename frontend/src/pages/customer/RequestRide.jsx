@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import DeliveryDetailsForm, { DeliveryOrderSummary } from '../../components/DeliveryDetailsForm';
 import LocationMap from '../../components/LocationMap';
-import { useAppState } from '../../context/AppState';
+import { useAppState } from '../../context/appStateStore';
 import { QUICK_PICK_LOCATIONS } from '../../data/quickPickLocations';
 import {
   FOOD_PICKUP_LOCATIONS,

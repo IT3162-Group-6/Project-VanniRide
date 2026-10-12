@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import DeliveryDetailsDisplay from '../../components/DeliveryDetailsDisplay';
-import MapArt from '../../components/MapArt';
+import ActiveRequestMap from '../../components/ActiveRequestMap';
 import StatusBadge from '../../components/StatusBadge';
-import { useAppState } from '../../context/AppState';
-import { useAuth } from '../../context/AuthContext';
+import { useAppState } from '../../context/appStateStore';
+import { useAuth } from '../../context/authStore';
 import { ridesApi } from '../../services/api';
 
 export default function RequestDetails() {
@@ -72,7 +72,7 @@ export default function RequestDetails() {
           </button>
         </div>
       </div>
-      <div className="map-box"><MapArt from={ride.pickup} to={ride.dropoff} /></div>
+      <div className="map-box" aria-label="Pickup and destination map"><ActiveRequestMap pickup={ride.pickupLocation} destination={ride.destination} /></div>
     </div>
   );
 }

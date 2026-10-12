@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth, HOME_BY_ROLE } from '../context/AuthContext';
-import { useAppState } from '../context/AppState';
+import { useAuth, HOME_BY_ROLE } from '../context/authStore';
+import { useAppState } from '../context/appStateStore';
 
 export default function Register() {
   const { register } = useAuth();

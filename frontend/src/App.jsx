@@ -1,50 +1,46 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppStateProvider } from './context/AppState';
+import { RealtimeProvider } from './context/RealtimeContext';
 
 import MarketingLayout from './components/MarketingLayout';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Toast from './components/Toast';
-import Notifications from './pages/Notifications';
-
-// public
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-
-// customer
-import CustomerDashboard from './pages/customer/CustomerDashboard';
-import RequestRide from './pages/customer/RequestRide';
-import CustomerActiveRide from './pages/customer/ActiveRide';
-import CustomerChat from './pages/customer/Chat';
-import CustomerHistory from './pages/customer/RideHistory';
-import CustomerProfile from './pages/customer/Profile';
-
-// rider
-import RiderDashboard from './pages/rider/RiderDashboard';
-import AvailableRequests from './pages/rider/AvailableRequests';
-import RequestDetails from './pages/rider/RequestDetails';
-import RiderActiveRide from './pages/rider/ActiveRide';
-import RiderChat from './pages/rider/Chat';
-import RiderHistory from './pages/rider/RideHistory';
-import RiderProfile from './pages/rider/Profile';
-
-// admin
-import AdminDashboard from './pages/admin/AdminDashboard';
-import Users from './pages/admin/Users';
-import Customers from './pages/admin/Customers';
-import Riders from './pages/admin/Riders';
-import Rides from './pages/admin/Rides';
-import RideDetails from './pages/admin/RideDetails';
-import AdminProfile from './pages/admin/Profile';
+const Notifications = lazy(() => import('./pages/Notifications'));
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const CustomerDashboard = lazy(() => import('./pages/customer/CustomerDashboard'));
+const RequestRide = lazy(() => import('./pages/customer/RequestRide'));
+const CustomerActiveRide = lazy(() => import('./pages/customer/ActiveRide'));
+const CustomerChat = lazy(() => import('./pages/customer/Chat'));
+const CustomerHistory = lazy(() => import('./pages/customer/RideHistory'));
+const CustomerProfile = lazy(() => import('./pages/customer/Profile'));
+const RiderDashboard = lazy(() => import('./pages/rider/RiderDashboard'));
+const AvailableRequests = lazy(() => import('./pages/rider/AvailableRequests'));
+const RequestDetails = lazy(() => import('./pages/rider/RequestDetails'));
+const RiderActiveRide = lazy(() => import('./pages/rider/ActiveRide'));
+const RiderChat = lazy(() => import('./pages/rider/Chat'));
+const RiderHistory = lazy(() => import('./pages/rider/RideHistory'));
+const RiderProfile = lazy(() => import('./pages/rider/Profile'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const Users = lazy(() => import('./pages/admin/Users'));
+const Customers = lazy(() => import('./pages/admin/Customers'));
+const Riders = lazy(() => import('./pages/admin/Riders'));
+const Rides = lazy(() => import('./pages/admin/Rides'));
+const RideDetails = lazy(() => import('./pages/admin/RideDetails'));
+const AdminProfile = lazy(() => import('./pages/admin/Profile'));
 
 export default function App() {
   return (
     <AppStateProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
+        <RealtimeProvider>
+          <BrowserRouter>
+            <Suspense fallback={<p className="muted page-loading">Loading page…</p>}>
+            <Routes>
             {/* ---------- public ---------- */}
             <Route element={<MarketingLayout />}>
               <Route path="/" element={<Home />} />
@@ -100,8 +96,10 @@ export default function App() {
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
+            </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </RealtimeProvider>
       </AuthProvider>
       <Toast />
     </AppStateProvider>

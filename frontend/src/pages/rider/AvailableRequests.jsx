@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Icon from '../../components/Icon';
 import RideCard from '../../components/RideCard';
+import { useRealtimeEvent } from '../../context/realtimeHooks';
 import { ridesApi } from '../../services/api';
 
 const TABS = [
@@ -25,9 +26,12 @@ export default function AvailableRequests() {
 
   useEffect(() => {
     const initial = setTimeout(load, 0);
-    const timer = setInterval(load, 5000);
+    const timer = setInterval(load, 20000);
     return () => { clearTimeout(initial); clearInterval(timer); };
   }, [load]);
+
+  useRealtimeEvent('new_ride_request', load);
+  useRealtimeEvent('ride_status_changed', load);
 
   const shown = tab === 'all' ? rides : rides.filter((r) => r.type === tab);
 

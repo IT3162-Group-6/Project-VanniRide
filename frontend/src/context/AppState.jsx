@@ -1,6 +1,5 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react';
-
-const AppStateContext = createContext(null);
+import { useState, useCallback, useRef } from 'react';
+import { AppStateContext } from './appStateStore';
 
 export function AppStateProvider({ children }) {
   const [toastMsg, setToastMsg] = useState(null);
@@ -17,10 +16,4 @@ export function AppStateProvider({ children }) {
       {children}
     </AppStateContext.Provider>
   );
-}
-
-export function useAppState() {
-  const ctx = useContext(AppStateContext);
-  if (!ctx) throw new Error('useAppState must be used inside <AppStateProvider>');
-  return ctx;
 }

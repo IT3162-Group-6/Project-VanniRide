@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import Icon from './Icon';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authStore';
 
 const LINKS = {
   customer: [

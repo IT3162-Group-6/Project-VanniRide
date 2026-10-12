@@ -1,13 +1,6 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AUTH_EXPIRED_EVENT, authApi, riderApi } from '../services/api';
-
-const AuthContext = createContext(null);
-
-export const HOME_BY_ROLE = {
-  customer: '/customer/dashboard',
-  rider: '/rider/dashboard',
-  admin: '/admin/dashboard',
-};
+import { AuthContext } from './authStore';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -97,10 +90,4 @@ export function AuthProvider({ children }) {
     refresh,
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
-  return ctx;
 }

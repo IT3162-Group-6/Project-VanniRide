@@ -33,12 +33,26 @@ route line, and cash fare. Ride creation sends only the selected request type,
 delivery category, and locations; the backend recalculates distance and fare so
 client values cannot be forged.
 
+## Live updates and active request maps
+
+Socket.IO delivers ride progress, cancellation, notification, chat, and
+available-request changes immediately. A 20-second timed refresh remains as a
+recovery fallback if the live connection is interrupted.
+
+Active requests and request-detail pages display the stored pickup and
+destination on OpenStreetMap. Riders can open the appropriate pickup or
+destination in Google Maps for navigation through a free Maps URL that does
+not require a Google API key.
+
+Application pages are loaded on demand to keep the initial download smaller.
+
 ## Customer ride and cash history
 
 Customer dashboard, active ride, history, and profile summaries use the real
-ride/history endpoints. Active rides poll for status changes and display the
-stored cash payment state. The old wallet panels now show paid and pending cash
-information plus the account's rolling one-hour cancellation allowance.
+ride/history endpoints. Active requests update through the live connection and
+display the stored cash payment state. The old wallet panels now show paid and
+pending cash information plus the account's rolling one-hour cancellation
+allowance.
 
 Cancellation always requires a reason. Requested and accepted rides cancel
 immediately. Once a trip has started, the page displays the pending 15-minute

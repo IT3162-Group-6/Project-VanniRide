@@ -291,6 +291,7 @@ ul{margin:0;padding:0;list-style:none}
 .map-box > svg{width:100%;height:100%;position:absolute;inset:0}
 .map-box-live{min-height:540px}
 .location-map{position:absolute;inset:0;width:100%;height:100%;font-family:inherit}
+.page-loading{padding:32px;text-align:center}
 .map-help{
   position:absolute;z-index:500;left:12px;right:12px;bottom:12px;padding:9px 12px;
   border-radius:var(--radius-md);background:rgba(255,255,255,.94);border:1px solid var(--line);

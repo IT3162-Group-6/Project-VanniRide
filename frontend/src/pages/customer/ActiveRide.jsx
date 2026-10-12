@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/Icon';
+import ActiveRequestMap from '../../components/ActiveRequestMap';
 import DeliveryDetailsDisplay from '../../components/DeliveryDetailsDisplay';
-import MapArt from '../../components/MapArt';
 import StatusBadge from '../../components/StatusBadge';
-import { useAuth } from '../../context/AuthContext';
-import { useAppState } from '../../context/AppState';
+import { useAuth } from '../../context/authStore';
+import { useAppState } from '../../context/appStateStore';
+import { useRealtimeEvent, useRideRoom } from '../../context/realtimeHooks';
 import { ridesApi, RIDE_STATUS } from '../../services/api';
 
-const FLOW = [
+const progressFlow = (isDelivery) => [
   { key: RIDE_STATUS.PENDING, label: 'Requested', sub: 'Waiting for a rider to accept', time: 'requestedAt' },
   { key: RIDE_STATUS.ACCEPTED, label: 'Accepted', sub: 'A rider accepted your request', time: 'acceptedAt' },
   { key: RIDE_STATUS.ONTHEWAY, label: 'Arrived', sub: 'Rider reached the pickup point', time: 'arrivedAt' },
-  { key: RIDE_STATUS.PICKED, label: 'Started', sub: 'Trip is in progress', time: 'startedAt' },
-  { key: RIDE_STATUS.COMPLETED, label: 'Completed', sub: 'Thanks for riding with us', time: 'completedAt' },
+  { key: RIDE_STATUS.PICKED, label: isDelivery ? 'Picked up' : 'Started', sub: isDelivery ? 'Your delivery is on the way' : 'Your trip is in progress', time: 'startedAt' },
+  { key: RIDE_STATUS.COMPLETED, label: 'Completed', sub: isDelivery ? 'Your delivery has arrived' : 'You reached your destination', time: 'completedAt' },
 ];
 
 function formatTime(value) {
@@ -45,7 +46,9 @@ export default function ActiveRide() {
       const activeRides = rides.filter((item) =>
         ['pending', 'accepted', 'ontheway', 'picked'].includes(item.status)
       );
+      const selectedRide = rides.find((item) => item.id === selectedRideId);
       const currentRide =
+        (selectedRide?.status === RIDE_STATUS.COMPLETED ? selectedRide : null) ||
         activeRides.find((item) => item.id === selectedRideId) ||
         activeRides[0] ||
         null;
@@ -74,12 +77,23 @@ export default function ActiveRide() {
 
   useEffect(() => {
     const initial = setTimeout(() => void load(), 0);
-    const timer = setInterval(() => void load(), 5000);
+    const timer = setInterval(() => void load(), 20000);
     return () => {
       clearTimeout(initial);
       clearInterval(timer);
     };
   }, [load]);
+
+  useRideRoom(ride?.id || selectedRideId);
+  useRealtimeEvent('ride_status_changed', (event) => {
+    if (!ride || event.rideId === ride.id || event.rideId === selectedRideId) void load();
+  });
+  useRealtimeEvent('cancellation_requested', (event) => {
+    if (event.rideId === ride?.id) void load();
+  });
+  useRealtimeEvent('cancellation_resolved', (event) => {
+    if (event.rideId === ride?.id) void load();
+  });
 
   async function cancelRide() {
     if (!reason.trim()) {
@@ -142,7 +156,9 @@ export default function ActiveRide() {
     );
   }
 
-  const currentIndex = FLOW.findIndex((item) => item.key === ride.status);
+  const isDelivery = ride.type === 'delivery';
+  const flow = progressFlow(isDelivery);
+  const currentIndex = flow.findIndex((item) => item.key === ride.status);
   const canInitiateCancellation = ['REQUESTED', 'ACCEPTED', 'STARTED'].includes(ride.apiStatus);
   const mustRespond = cancellationRequest?.respondingUserId === user.id;
 
@@ -152,20 +168,24 @@ export default function ActiveRide() {
         <div className="track-banner">
           <Icon name={ride.status === RIDE_STATUS.PENDING ? 'clock' : 'check'} />
           <div>
-            {ride.status === RIDE_STATUS.PENDING ? 'Looking for a rider' : 'Ride in progress'}
+            {ride.status === RIDE_STATUS.PENDING
+              ? 'Looking for a rider'
+              : ride.status === RIDE_STATUS.COMPLETED
+                ? `${isDelivery ? 'Delivery' : 'Ride'} completed`
+                : `${isDelivery ? 'Delivery' : 'Ride'} in progress`}
             <span>{ride.pickup} → {ride.dropoff}</span>
           </div>
         </div>
 
         <div className="card">
           <div className="card-head">
-            <h3>Track Request · #{ride.id.slice(-6)}</h3>
+            <h3>Track {isDelivery ? 'Delivery' : 'Ride'} · #{ride.id.slice(-6)}</h3>
             <StatusBadge status={ride.status} />
           </div>
           {error && <div className="alert alert-error">{error}</div>}
 
           <div className="timeline">
-            {FLOW.map((item, index) => (
+            {flow.map((item, index) => (
               <div key={item.key} className={`timeline-item ${index < currentIndex ? 'done' : ''} ${index === currentIndex ? 'active' : ''}`}>
                 <div className="timeline-dot">{index < currentIndex && <Icon name="check" size={12} />}</div>
                 <div className="timeline-body"><b>{item.label}</b><span>{item.sub}</span></div>
@@ -217,7 +237,9 @@ export default function ActiveRide() {
           )}
         </div>
       </div>
-      <div className="map-box"><MapArt from={ride.pickup} to={ride.dropoff} /></div>
+      <div className="map-box" aria-label="Pickup and destination map">
+        <ActiveRequestMap pickup={ride.pickupLocation} destination={ride.destination} />
+      </div>
     </div>
   );
 }

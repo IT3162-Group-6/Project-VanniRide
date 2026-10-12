@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth, HOME_BY_ROLE } from '../context/AuthContext';
-import { useAppState } from '../context/AppState';
+import { useAuth, HOME_BY_ROLE } from '../context/authStore';
+import { useAppState } from '../context/appStateStore';
 import { isMockAuth } from '../services/api';
 
 const DEMO = [

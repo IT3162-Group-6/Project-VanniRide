@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Icon from '../../components/Icon';
 import RideCard from '../../components/RideCard';
 import { ridesApi } from '../../services/api';
-import { useAppState } from '../../context/AppState';
+import { useAppState } from '../../context/appStateStore';
 
 const TABS = [
   { key: 'all', label: 'All' },

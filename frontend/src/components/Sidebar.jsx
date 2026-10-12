@@ -1,34 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon';
-import { useAuth } from '../context/AuthContext';
-
-export const NAV_BY_ROLE = {
-  customer: [
-    { to: '/customer/dashboard', icon: 'grid', label: 'Dashboard' },
-    { to: '/customer/request?type=ride', icon: 'plus', label: 'Request a Ride', requestType: 'ride' },
-    { to: '/customer/request?type=delivery', icon: 'package', label: 'Request a Delivery', requestType: 'delivery' },
-    { to: '/customer/active', icon: 'route', label: 'Active Ride' },
-    { to: '/customer/chat', icon: 'chat', label: 'Messages' },
-    { to: '/customer/history', icon: 'list', label: 'Ride History' },
-    { to: '/customer/profile', icon: 'user', label: 'Profile' },
-  ],
-  rider: [
-    { to: '/rider/dashboard', icon: 'grid', label: 'Dashboard' },
-    { to: '/rider/requests', icon: 'list', label: 'Available Requests' },
-    { to: '/rider/active', icon: 'route', label: 'Active Ride' },
-    { to: '/rider/chat', icon: 'chat', label: 'Messages' },
-    { to: '/rider/history', icon: 'clock', label: 'Ride History' },
-    { to: '/rider/profile', icon: 'user', label: 'Profile' },
-  ],
-  admin: [
-    { to: '/admin/dashboard', icon: 'grid', label: 'Dashboard' },
-    { to: '/admin/users', icon: 'user', label: 'All Users' },
-    { to: '/admin/customers', icon: 'user', label: 'Customers' },
-    { to: '/admin/riders', icon: 'bike', label: 'Riders' },
-    { to: '/admin/rides', icon: 'car', label: 'Rides' },
-    { to: '/admin/profile', icon: 'settings', label: 'Profile' },
-  ],
-};
+import { useAuth } from '../context/authStore';
+import { NAV_BY_ROLE } from '../data/navigation';
 
 const ROLE_LABEL = { customer: 'Customer', rider: 'Rider', admin: 'Admin' };
 

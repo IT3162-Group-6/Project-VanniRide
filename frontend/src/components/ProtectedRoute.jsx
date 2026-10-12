@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth, HOME_BY_ROLE } from '../context/AuthContext';
+import { useAuth, HOME_BY_ROLE } from '../context/authStore';
 
 /**
  * Guards a route subtree.

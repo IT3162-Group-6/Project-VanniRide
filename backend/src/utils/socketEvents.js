@@ -64,7 +64,8 @@ const emitRideStatusChanged = (req, ride) => {
 
   let emitter = io
     .to(rideRoom(ride._id.toString()))
-    .to(userRoom(ride.customer_id.toString()));
+    .to(userRoom(ride.customer_id.toString()))
+    .to('role_RIDER');
 
   if (ride.rider_id) {
     emitter = emitter.to(userRoom(ride.rider_id.toString()));

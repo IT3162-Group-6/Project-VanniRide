@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import RiderArt from '../../components/RiderArt';
 import RideCard from '../../components/RideCard';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authStore';
 import { ridesApi } from '../../services/api';
 
 export default function CustomerDashboard() {
@@ -71,7 +71,7 @@ export default function CustomerDashboard() {
       ))}
 
       <div className="stat-grid">
-        <div className="stat-card"><span>Total rides</span><b>{summary?.rides.total ?? rides.length}</b></div>
+        <div className="stat-card"><span>Total requests</span><b>{summary?.rides.total ?? rides.length}</b></div>
         <div className="stat-card"><span>Completed</span><b>{summary?.rides.completed ?? completed.length}</b></div>
         <div className="stat-card"><span>Cash paid</span><b>LKR {Number(summary?.payments.totalPaidAmount || 0).toFixed(2)}</b></div>
       </div>
@@ -102,9 +102,9 @@ export default function CustomerDashboard() {
             <div className="card-head"><h3>Quick Links</h3></div>
             <div className="quick-links">
               <Link to="/customer/request"><Icon name="plus" size={16} /> New Request</Link>
-              <Link to="/customer/active"><Icon name="pin" size={16} /> Track Active Ride</Link>
+              <Link to="/customer/active"><Icon name="pin" size={16} /> Track Active Request</Link>
               <Link to="/customer/chat"><Icon name="chat" size={16} /> Message Rider</Link>
-              <Link to="/customer/history"><Icon name="clock" size={16} /> Ride History</Link>
+              <Link to="/customer/history"><Icon name="clock" size={16} /> Request History</Link>
             </div>
           </div>
           <div className="promo-card">

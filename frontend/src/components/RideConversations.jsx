@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import ChatBox from './ChatBox';
 import Icon from './Icon';
-import { useAuth } from '../context/AuthContext';
-import { useAppState } from '../context/AppState';
+import { useAuth } from '../context/authStore';
+import { useAppState } from '../context/appStateStore';
+import { useRealtimeEvent, useRideRoom } from '../context/realtimeHooks';
 import {
   CONVERSATION_FILTERS,
   filterConversations,
@@ -51,7 +52,7 @@ export default function RideConversations({ role }) {
     [rides, filter]
   );
 
-  useEffect(() => {
+  const loadConversations = useCallback(() => {
     let active = true;
     ridesApi.history()
       .then((history) => {
@@ -63,7 +64,9 @@ export default function RideConversations({ role }) {
           (item) => item.id === requestedRideId.current
         );
         setRides(eligible);
-        setRideId(requested?.id || eligible[0]?.id || '');
+        setRideId((current) => current && eligible.some((item) => item.id === current)
+          ? current
+          : requested?.id || eligible[0]?.id || '');
       })
       .catch((requestError) => {
         if (active) setError(requestError.message);
@@ -75,6 +78,8 @@ export default function RideConversations({ role }) {
       active = false;
     };
   }, [participantKey]);
+
+  useEffect(() => loadConversations(), [loadConversations]);
 
   const loadMessages = useCallback(async () => {
     if (!rideId) return;
@@ -99,12 +104,25 @@ export default function RideConversations({ role }) {
 
   useEffect(() => {
     const initial = setTimeout(() => void loadMessages(), 0);
-    const timer = setInterval(() => void loadMessages(), 5000);
+    const timer = setInterval(() => void loadMessages(), 20000);
     return () => {
       clearTimeout(initial);
       clearInterval(timer);
     };
   }, [loadMessages]);
+
+  useRideRoom(rideId);
+  useRealtimeEvent('new_message', (event) => {
+    if (event.rideId === rideId) void loadMessages();
+  });
+  useRealtimeEvent('chat_access_updated', (event) => {
+    if (event.rideId === rideId) void loadMessages();
+  });
+  useRealtimeEvent('ride_status_changed', (event) => {
+    if (!rides.some((item) => item.id === event.rideId)) return;
+    loadConversations();
+    if (event.rideId === rideId) void loadMessages();
+  });
 
   const selectRide = useCallback((nextRideId) => {
     messageRequest.current += 1;
@@ -128,7 +146,9 @@ export default function RideConversations({ role }) {
   const send = useCallback(async (text) => {
     try {
       const message = await chatApi.send(rideId, user.id, text);
-      setMessages((items) => [...items, message]);
+      setMessages((items) => items.some((item) => item.id === message.id)
+        ? items
+        : [...items, message]);
     } catch (requestError) {
       setError(requestError.message);
       throw requestError;

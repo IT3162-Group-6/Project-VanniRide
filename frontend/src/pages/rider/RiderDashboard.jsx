@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import RideCard from '../../components/RideCard';
 import RiderArt from '../../components/RiderArt';
-import { useAuth } from '../../context/AuthContext';
-import { useAppState } from '../../context/AppState';
+import { useAuth } from '../../context/authStore';
+import { useAppState } from '../../context/appStateStore';
 import { ratingApi, riderApi, ridesApi } from '../../services/api';
 
 export default function RiderDashboard() {

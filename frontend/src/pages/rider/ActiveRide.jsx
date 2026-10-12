@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
+import ActiveRequestMap from '../../components/ActiveRequestMap';
 import DeliveryDetailsDisplay from '../../components/DeliveryDetailsDisplay';
-import MapArt from '../../components/MapArt';
 import StatusBadge from '../../components/StatusBadge';
-import { useAuth } from '../../context/AuthContext';
-import { useAppState } from '../../context/AppState';
+import { useAuth } from '../../context/authStore';
+import { useAppState } from '../../context/appStateStore';
+import { useRealtimeEvent, useRideRoom } from '../../context/realtimeHooks';
 import { ridesApi, RIDE_STATUS } from '../../services/api';
 import { riderNavigation } from '../../utils/googleMaps';
 
-const NEXT = {
-  [RIDE_STATUS.ACCEPTED]: { to: RIDE_STATUS.ONTHEWAY, label: 'Mark rider arrived' },
-  [RIDE_STATUS.ONTHEWAY]: { to: RIDE_STATUS.PICKED, label: 'Start trip' },
-  [RIDE_STATUS.PICKED]: { to: RIDE_STATUS.COMPLETED, label: 'Complete ride' },
-};
+const nextStep = (status, isDelivery) => ({
+  [RIDE_STATUS.ACCEPTED]: { to: RIDE_STATUS.ONTHEWAY, label: 'I have arrived at pickup' },
+  [RIDE_STATUS.ONTHEWAY]: { to: RIDE_STATUS.PICKED, label: isDelivery ? 'Confirm parcel picked up' : 'Start ride' },
+  [RIDE_STATUS.PICKED]: { to: RIDE_STATUS.COMPLETED, label: isDelivery ? 'Complete delivery' : 'Complete ride' },
+}[status]);
 
 export default function ActiveRide() {
   const { user, refresh } = useAuth();
@@ -55,18 +56,29 @@ export default function ActiveRide() {
 
   useEffect(() => {
     const initial = setTimeout(() => void load(), 0);
-    const timer = setInterval(() => void load(), 5000);
+    const timer = setInterval(() => void load(), 20000);
     return () => { clearTimeout(initial); clearInterval(timer); };
   }, [load]);
+
+  useRideRoom(ride?.id);
+  useRealtimeEvent('ride_status_changed', (event) => {
+    if (event.riderId === user.id || event.rideId === ride?.id) void load();
+  });
+  useRealtimeEvent('cancellation_requested', (event) => {
+    if (event.rideId === ride?.id) void load();
+  });
+  useRealtimeEvent('cancellation_resolved', (event) => {
+    if (event.rideId === ride?.id) void load();
+  });
 
   async function advance() {
     setBusy(true); setError('');
     try {
-      const step = NEXT[ride.status];
+      const step = nextStep(ride.status, ride.type === 'delivery');
       const updated = await ridesApi.updateStatus(ride.id, step.to);
       setRide(updated);
       if (step.to === RIDE_STATUS.COMPLETED) void refresh().catch(() => {});
-      showToast(step.to === RIDE_STATUS.COMPLETED ? 'Ride completed — confirm the cash receipt' : 'Status updated');
+      showToast(step.to === RIDE_STATUS.COMPLETED ? 'Request completed — confirm the cash receipt' : 'Status updated');
     } catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   }
@@ -106,13 +118,14 @@ export default function ActiveRide() {
   if (loading) return <p className="muted">Loading…</p>;
   if (!ride) return <div className="card">{error && <div className="alert alert-error">{error}</div>}<div className="empty"><div className="fi"><Icon name="route" /></div><b>You are not handling a request</b><p>Open Available Requests to accept a ride or delivery. It will then appear here with navigation and status controls.</p><button className="btn btn-primary" onClick={() => navigate('/rider/requests')}>View available requests</button></div></div>;
 
-  const step = NEXT[ride.status];
+  const isDelivery = ride.type === 'delivery';
+  const step = nextStep(ride.status, isDelivery);
   const canCancel = ['ACCEPTED', 'STARTED'].includes(ride.apiStatus);
   const mustRespond = request?.respondingUserId === user.id;
   const navigation = riderNavigation(ride);
   return (
     <div className="request-layout"><div className="card">
-      <div className="card-head"><h3>Active Ride · #{ride.id.slice(-6)}</h3><StatusBadge status={ride.status} /></div>
+      <div className="card-head"><h3>Active {isDelivery ? 'Delivery' : 'Ride'} · #{ride.id.slice(-6)}</h3><StatusBadge status={ride.status} /></div>
       {error && <div className="alert alert-error">{error}</div>}
       <div className="route-block"><div className="route-point"><span className="dot dot-start"/><div><b>{ride.pickup}</b><span>Pickup</span></div></div><div className="route-point"><span className="dot dot-end"/><div><b>{ride.dropoff}</b><span>Drop-off</span></div></div></div>
       {navigation && (
@@ -128,6 +141,6 @@ export default function ActiveRide() {
       {step && <button className="btn btn-primary btn-block" disabled={busy || Boolean(request)} onClick={advance}>{step.label}</button>}
       {ride.status === RIDE_STATUS.COMPLETED && payment?.status !== 'paid' && <button className="btn btn-primary btn-block" disabled={busy} onClick={confirmCash}>Confirm cash received</button>}
       {request ? <div className="cancellation-panel"><b>Cancellation confirmation pending</b><p>{request.reason}</p>{mustRespond ? <div className="cancellation-actions"><button className="btn btn-primary btn-sm" disabled={busy} onClick={() => respond('CANCEL')}>Cancel trip</button><button className="btn btn-outline btn-sm" disabled={busy} onClick={() => respond('RESUME')}>Resume trip</button></div> : <span>Waiting for the customer; auto-cancels after 15 minutes.</span>}</div> : canCancel && <div className="cancellation-panel"><div className="field"><label>Cancellation reason</label><input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500}/></div><button className="btn btn-ghost btn-block" disabled={busy || allowance?.remaining === 0} onClick={cancel}>Request cancellation</button><span>{allowance ? `${allowance.remaining} of ${allowance.limit} remaining this hour` : ''}</span></div>}
-    </div><div className="map-box"><MapArt from={ride.pickup} to={ride.dropoff}/></div></div>
+    </div><div className="map-box" aria-label="Pickup and destination map"><ActiveRequestMap pickup={ride.pickupLocation} destination={ride.destination}/></div></div>
   );
 }

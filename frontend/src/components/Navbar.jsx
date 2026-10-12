@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
-import { useAuth, HOME_BY_ROLE } from '../context/AuthContext';
+import { useAuth, HOME_BY_ROLE } from '../context/authStore';
 import { NOTIFICATIONS_CHANGED_EVENT, notificationsApi } from '../services/api';
 
 /**

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
-import { useAppState } from '../context/AppState';
-import { useAuth } from '../context/AuthContext';
+import { useAppState } from '../context/appStateStore';
+import { useAuth } from '../context/authStore';
 import {
   NOTIFICATIONS_CHANGED_EVENT,
   notificationsApi,
@@ -61,7 +61,18 @@ export default function Notifications() {
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(initialLoad);
+    const receiveNotification = (event) => {
+      const notification = event.detail;
+      if (!notification?.id) return;
+      setItems((current) => current.some((item) => item.id === notification.id)
+        ? current
+        : [notification, ...current]);
+    };
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, receiveNotification);
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, receiveNotification);
+    };
   }, []);
 
   const visibleItems = useMemo(
