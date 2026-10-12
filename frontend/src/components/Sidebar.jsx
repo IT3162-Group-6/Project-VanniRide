@@ -32,7 +32,7 @@ export const NAV_BY_ROLE = {
 
 const ROLE_LABEL = { customer: 'Customer', rider: 'Rider', admin: 'Admin' };
 
-export default function Sidebar({ open, onNavigate }) {
+export default function Sidebar({ open, collapsed, onNavigate }) {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const { user, logout } = useAuth();
@@ -40,9 +40,10 @@ export default function Sidebar({ open, onNavigate }) {
   const selectedRequestType = new URLSearchParams(search).get('type') || 'ride';
 
   return (
-    <aside className={`sidebar ${open ? 'open' : ''}`}>
+    <aside className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-brand">
-        <span className="brand-mark brand-mark-dark"><Icon name="pin" size={20} /></span> Vanni <b>Ride</b>
+        <span className="brand-mark brand-mark-dark"><Icon name="pin" size={20} /></span>
+        <span className="sidebar-brand-text">Vanni <b>Ride</b></span>
       </div>
       <div className="sidebar-role">{ROLE_LABEL[user?.role] || 'Guest'} panel</div>
 
@@ -58,17 +59,21 @@ export default function Sidebar({ open, onNavigate }) {
               }
               return isActive ? 'active' : '';
             }}
+            aria-label={l.label}
+            title={collapsed ? l.label : undefined}
           >
-            <Icon name={l.icon} /> {l.label}
+            <Icon name={l.icon} /> <span className="sidebar-label">{l.label}</span>
           </NavLink>
         ))}
       </nav>
 
       <button
         className="sidebar-logout"
+        aria-label="Logout"
+        title={collapsed ? 'Logout' : undefined}
         onClick={() => { onNavigate?.(); logout(); navigate('/login', { replace: true }); }}
       >
-        <Icon name="logout" /> Logout
+        <Icon name="logout" /> <span className="sidebar-label">Logout</span>
       </button>
     </aside>
   );

@@ -30,6 +30,7 @@ const TITLES = {
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { pathname, search } = useLocation();
   const requestTitle =
     pathname === '/customer/request' && new URLSearchParams(search).get('type') === 'delivery'
@@ -38,12 +39,24 @@ export default function AppLayout() {
   const title = requestTitle || TITLES[pathname] || (pathname.startsWith('/rider/requests/') ? 'Request Details'
     : pathname.startsWith('/admin/rides/') ? 'Ride Details' : 'Vanni Ride');
 
+  const toggleSidebar = () => {
+    if (window.matchMedia('(max-width: 640px)').matches) {
+      setSidebarOpen((current) => !current);
+      return;
+    }
+    setSidebarCollapsed((current) => !current);
+  };
+
   return (
-    <div className="app-shell">
-      <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
+    <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <Sidebar
+        open={sidebarOpen}
+        collapsed={sidebarCollapsed}
+        onNavigate={() => setSidebarOpen(false)}
+      />
       {sidebarOpen && <div className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
       <div className="app-main">
-        <Navbar variant="app" title={title} onMenu={() => setSidebarOpen((v) => !v)} />
+        <Navbar variant="app" title={title} onMenu={toggleSidebar} />
         <section className="app-content">
           <Outlet />
         </section>

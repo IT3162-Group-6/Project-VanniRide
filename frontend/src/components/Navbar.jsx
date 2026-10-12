@@ -36,7 +36,7 @@ export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMen
   if (variant === 'app') {
     return (
       <header className="app-topbar">
-        <button className="icon-btn" aria-label="Open menu" onClick={onMenu}>
+        <button className="icon-btn" aria-label="Toggle navigation sidebar" title="Toggle navigation sidebar" onClick={onMenu}>
           <Icon name="menu" />
         </button>
         <h1>{title}</h1>
