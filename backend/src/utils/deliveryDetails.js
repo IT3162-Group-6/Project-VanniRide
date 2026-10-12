@@ -140,8 +140,8 @@ const normalizeDeliveryDetails = (value, category) => {
   }
 
   const normalized = {
-    receiver_name: requiredText(value.receiverName, 'Receiver name', 100),
-    receiver_phone: normalizePhone(value.receiverPhone),
+    receiver_name: null,
+    receiver_phone: null,
     food_order: null,
     water_order: null,
     parcel_order: null,
@@ -162,6 +162,8 @@ const normalizeDeliveryDetails = (value, category) => {
       items: normalizeItems(value.waterOrder?.items, normalizeWaterItem),
     };
   } else if (category === 'PARCEL') {
+    normalized.receiver_name = requiredText(value.receiverName, 'Receiver name', 100);
+    normalized.receiver_phone = normalizePhone(value.receiverPhone);
     normalized.parcel_order = normalizeParcelOrder(value.parcelOrder);
   }
 

@@ -9,10 +9,12 @@ export default function DeliveryDetailsDisplay({ ride }) {
 
   return (
     <div className="delivery-details-display">
-      <div className="delivery-review-contact">
-        <span>Receiver</span>
-        <b>{details.receiverName} · {details.receiverPhone}</b>
-      </div>
+      {ride.deliveryCategory === 'PARCEL' && details.receiverName && (
+        <div className="delivery-review-contact">
+          <span>Receiver</span>
+          <b>{details.receiverName} · {details.receiverPhone}</b>
+        </div>
+      )}
       {details.foodOrder?.outletName && <div className="delivery-review-contact"><span>Food outlet</span><b>{details.foodOrder.outletName}</b></div>}
       <DeliveryOrderSummary category={ride.deliveryCategory} details={details} compact />
       {foodNotes.map((item, index) => <p key={`${item.foodType}-${index}`} className="fare-note"><b>Item note:</b> {item.description}</p>)}

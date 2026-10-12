@@ -23,18 +23,24 @@ test('offers every approved food pickup quick pick', () => {
 
 test('validates delivery fields and builds only the selected category payload', () => {
   const details = createDefaultDeliveryDetails();
-  assert.equal(validateDeliveryDetails(details, 'FOOD'), 'Enter the receiver name.');
+  assert.equal(validateDeliveryDetails(details, 'FOOD'), 'Choose or enter the food pickup location.');
 
-  details.receiverName = 'Student Receiver';
-  details.receiverPhone = '077 123 4567';
   details.foodOrder.outletCode = 'hostel-canteen';
   details.foodOrder.outletName = 'Hostel Canteen';
   details.foodOrder.items[0].quantity = 2;
 
   assert.equal(validateDeliveryDetails(details, 'FOOD'), '');
   assert.deepEqual(buildDeliveryPayload(details, 'FOOD'), {
-    receiverName: 'Student Receiver',
-    receiverPhone: '0771234567',
     foodOrder: details.foodOrder,
+  });
+
+  assert.equal(validateDeliveryDetails(details, 'PARCEL'), 'Enter the receiver name.');
+  details.receiverName = 'Parcel Receiver';
+  details.receiverPhone = '077 123 4567';
+  assert.equal(validateDeliveryDetails(details, 'PARCEL'), '');
+  assert.deepEqual(buildDeliveryPayload(details, 'PARCEL'), {
+    receiverName: 'Parcel Receiver',
+    receiverPhone: '0771234567',
+    parcelOrder: details.parcelOrder,
   });
 });

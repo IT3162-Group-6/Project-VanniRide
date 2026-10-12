@@ -120,9 +120,9 @@ db.runCommand({
                 "parcel_order"
               ],
               properties: {
-                receiver_name: { bsonType: "string", minLength: 1, maxLength: 100 },
+                receiver_name: { bsonType: ["string", "null"], minLength: 1, maxLength: 100 },
                 receiver_phone: {
-                  bsonType: "string",
+                  bsonType: ["string", "null"],
                   pattern: "^(\\+94|0)7[0-9]{8}$"
                 },
                 food_order: {

@@ -21,13 +21,18 @@ function StepDot({ n, current }) {
   return <div className={`step-dot ${cls}`}>{n < current ? <Icon name="check" size={14} /> : n}</div>;
 }
 
-function LocationSummary({ label, location, selected }) {
+function LocationSummary({ label, location, selected, onSelect }) {
   return (
-    <div className={`location-summary ${selected ? 'selected' : ''}`}>
+    <button
+      type="button"
+      className={`location-summary ${selected ? 'selected' : ''}`}
+      onClick={onSelect}
+      aria-pressed={selected}
+    >
       <span>{label}</span>
       <b>{location?.address || `Select ${label.toLowerCase()} on the map`}</b>
       {location && <small>{coordinateLabel(location)}</small>}
-    </div>
+    </button>
   );
 }
 
@@ -249,6 +254,49 @@ export default function RequestRide() {
     </div>
   );
 
+  const locationPicker = (
+    <div className="location-picker">
+      <div className="location-toggle" role="group" aria-label="Location being selected">
+        <button type="button" className={activeLocation === 'pickup' ? 'active' : ''} onClick={() => setActiveLocation('pickup')}>Pickup</button>
+        <button type="button" className={activeLocation === 'destination' ? 'active' : ''} onClick={() => setActiveLocation('destination')}>Destination</button>
+      </div>
+
+      <LocationSummary label="Pickup" location={form.pickupLocation} selected={activeLocation === 'pickup'} onSelect={() => setActiveLocation('pickup')} />
+      <LocationSummary label="Destination" location={form.destination} selected={activeLocation === 'destination'} onSelect={() => setActiveLocation('destination')} />
+
+      <div className="location-search">
+        <input type="search" placeholder={`Search ${activeLocation} in Northern Province`} value={searchQuery} onChange={updateSearchQuery} />
+        {searchBusy && <span role="status">Searching…</span>}
+      </div>
+      {searchResults.length > 0 && (
+        <div className="location-results">
+          {searchResults.map((place) => (
+            <button type="button" key={place.providerPlaceId || `${place.latitude}-${place.longitude}`} onClick={() => chooseSearchResult(place)}>
+              {place.displayName}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {form.rideType === 'TRANSPORT' && (
+        <div className="quick-picks" aria-label="Frequently used locations">
+          <span>Frequently used locations</span>
+          <div>
+            {QUICK_PICK_LOCATIONS.map((place) => (
+              <button type="button" key={place.id} onClick={() => chooseSearchResult(place)}>
+                <Icon name="pin" size={13} /> {place.displayName}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={useCurrentLocation} disabled={locationBusy}>
+        <Icon name="pin" size={16} /> Use my current location as pickup
+      </button>
+    </div>
+  );
+
   return (
     <>
       <div className="stepper">
@@ -286,23 +334,34 @@ export default function RequestRide() {
             </div>
 
             {form.rideType === 'DELIVERY' && (
-              <div className="field">
-                <label>Delivery category</label>
-                <select
-                  value={form.deliveryCategory}
-                  onChange={(event) => setDeliveryCategory(event.target.value)}
-                >
-                  <option value="FOOD">Food</option>
-                  <option value="WATER">Water</option>
-                  <option value="PARCEL">Other / Parcel</option>
-                </select>
+              <div className="delivery-category-tabs" role="tablist" aria-label="Delivery category">
+                {[
+                  { value: 'FOOD', label: 'Food' },
+                  { value: 'WATER', label: 'Water' },
+                  { value: 'PARCEL', label: 'Other Parcel' },
+                ].map((category) => (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={form.deliveryCategory === category.value}
+                    className={form.deliveryCategory === category.value ? 'active' : ''}
+                    key={category.value}
+                    onClick={() => setDeliveryCategory(category.value)}
+                  >
+                    {category.label}
+                  </button>
+                ))}
               </div>
             )}
+
+            {form.rideType === 'DELIVERY' && form.deliveryCategory === 'FOOD' && locationPicker}
 
             {form.rideType === 'DELIVERY' && (
               <DeliveryDetailsForm
                 category={form.deliveryCategory}
                 details={deliveryDetails}
+                foodPickupLocations={FOOD_PICKUP_LOCATIONS}
+                onChooseFoodPickup={chooseFoodPickup}
                 setDetails={(updater) => {
                   setDeliveryDetails(updater);
                   setPreview(null);
@@ -310,58 +369,7 @@ export default function RequestRide() {
               />
             )}
 
-            <div className="location-toggle" role="group" aria-label="Location being selected">
-              <button type="button" className={activeLocation === 'pickup' ? 'active' : ''} onClick={() => setActiveLocation('pickup')}>Pickup</button>
-              <button type="button" className={activeLocation === 'destination' ? 'active' : ''} onClick={() => setActiveLocation('destination')}>Destination</button>
-            </div>
-
-            <LocationSummary label="Pickup" location={form.pickupLocation} selected={activeLocation === 'pickup'} />
-            <LocationSummary label="Destination" location={form.destination} selected={activeLocation === 'destination'} />
-
-            <div className="location-search">
-              <input type="search" placeholder={`Search ${activeLocation} in Northern Province`} value={searchQuery} onChange={updateSearchQuery} />
-              {searchBusy && <span role="status">Searching…</span>}
-            </div>
-            {searchResults.length > 0 && (
-              <div className="location-results">
-                {searchResults.map((place) => (
-                  <button type="button" key={place.providerPlaceId || `${place.latitude}-${place.longitude}`} onClick={() => chooseSearchResult(place)}>
-                    {place.displayName}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {form.rideType === 'TRANSPORT' && (
-              <div className="quick-picks" aria-label="Frequently used locations">
-                <span>Frequently used locations</span>
-                <div>
-                  {QUICK_PICK_LOCATIONS.map((place) => (
-                    <button type="button" key={place.id} onClick={() => chooseSearchResult(place)}>
-                      <Icon name="pin" size={13} /> {place.displayName}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {form.rideType === 'DELIVERY' && form.deliveryCategory === 'FOOD' && (
-              <div className="quick-picks" aria-label="Food pickup locations">
-                <span>Food pickup quick picks</span>
-                <div>
-                  {FOOD_PICKUP_LOCATIONS.map((place) => (
-                    <button type="button" key={place.id} className={deliveryDetails.foodOrder.outletCode === place.id ? 'selected' : ''} onClick={() => chooseFoodPickup(place)}>
-                      <Icon name="pin" size={13} /> {place.displayName}
-                    </button>
-                  ))}
-                </div>
-                <small>Exact map points can be updated when their coordinates are confirmed.</small>
-              </div>
-            )}
-
-            <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={useCurrentLocation} disabled={locationBusy}>
-              <Icon name="pin" size={16} /> Use my current location as pickup
-            </button>
+            {(form.rideType === 'TRANSPORT' || form.deliveryCategory !== 'FOOD') && locationPicker}
 
             <button className="btn btn-primary btn-block" onClick={previewRoute} disabled={previewBusy || locationBusy} style={{ marginTop: 14 }}>
               {previewBusy ? 'Calculating road route…' : `Next: ${form.rideType === 'DELIVERY' ? 'Delivery' : 'Fare'} Estimate`}
@@ -385,7 +393,9 @@ export default function RequestRide() {
             <div className="fare-row"><span>Pickup</span><span>{form.pickupLocation.address}</span></div>
             <div className="fare-row"><span>Destination</span><span>{form.destination.address}</span></div>
             {form.rideType === 'DELIVERY' && <>
-              <div className="delivery-review-contact"><span>Receiver</span><b>{deliveryDetails.receiverName} · {deliveryDetails.receiverPhone}</b></div>
+              {form.deliveryCategory === 'PARCEL' && (
+                <div className="delivery-review-contact"><span>Receiver</span><b>{deliveryDetails.receiverName} · {deliveryDetails.receiverPhone}</b></div>
+              )}
               <DeliveryOrderSummary category={form.deliveryCategory} details={deliveryDetails} compact />
               {preview.fareBreakdown && <div className="delivery-price-breakdown">
                 <div><span>Base delivery charge</span><b>LKR {Number(preview.fareBreakdown.baseFare).toFixed(2)}</b></div>

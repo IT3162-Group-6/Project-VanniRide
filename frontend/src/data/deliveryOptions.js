@@ -63,11 +63,6 @@ export const getOptionLabel = (options, value) =>
   options.find((option) => option.value === value)?.label || value;
 
 export function validateDeliveryDetails(details, category) {
-  if (!details.receiverName.trim()) return 'Enter the receiver name.';
-  if (!/^(?:\+94|0)7\d{8}$/.test(details.receiverPhone.replace(/[\s-]/g, ''))) {
-    return 'Enter a valid Sri Lankan mobile number for the receiver.';
-  }
-
   if (category === 'FOOD') {
     if (!details.foodOrder.outletName.trim()) return 'Choose or enter the food pickup location.';
     if (details.foodOrder.items.length === 0) return 'Add at least one food item.';
@@ -86,6 +81,10 @@ export function validateDeliveryDetails(details, category) {
   }
 
   if (category === 'PARCEL') {
+    if (!details.receiverName.trim()) return 'Enter the receiver name.';
+    if (!/^(?:\+94|0)7\d{8}$/.test(details.receiverPhone.replace(/[\s-]/g, ''))) {
+      return 'Enter a valid Sri Lankan mobile number for the receiver.';
+    }
     if (details.parcelOrder.parcelType === 'OTHER' && !details.parcelOrder.otherType.trim()) {
       return 'Enter the custom parcel type.';
     }
@@ -95,11 +94,11 @@ export function validateDeliveryDetails(details, category) {
 }
 
 export function buildDeliveryPayload(details, category) {
-  const common = {
+  if (category === 'FOOD') return { foodOrder: details.foodOrder };
+  if (category === 'WATER') return { waterOrder: details.waterOrder };
+  return {
     receiverName: details.receiverName.trim(),
     receiverPhone: details.receiverPhone.replace(/[\s-]/g, ''),
+    parcelOrder: details.parcelOrder,
   };
-  if (category === 'FOOD') return { ...common, foodOrder: details.foodOrder };
-  if (category === 'WATER') return { ...common, waterOrder: details.waterOrder };
-  return { ...common, parcelOrder: details.parcelOrder };
 }

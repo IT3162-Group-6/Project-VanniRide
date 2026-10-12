@@ -35,7 +35,7 @@ function ReceiverFields({ details, setDetails }) {
   );
 }
 
-function FoodForm({ details, setDetails }) {
+function FoodForm({ details, setDetails, pickupLocations = [], onChoosePickup }) {
   const updateOrder = (updater) => setDetails((current) => ({
     ...current,
     foodOrder: updater(current.foodOrder),
@@ -59,6 +59,19 @@ function FoodForm({ details, setDetails }) {
         <label>Food pickup / restaurant</label>
         <input value={details.foodOrder.outletName} maxLength={150} onChange={(event) => updateOrder((order) => ({ ...order, outletCode: '', outletName: event.target.value }))} placeholder="Choose a quick pick or enter the outlet name" />
       </div>
+      {pickupLocations.length > 0 && (
+        <div className="quick-picks" aria-label="Food pickup locations">
+          <span>Food pickup quick picks</span>
+          <div>
+            {pickupLocations.map((place) => (
+              <button type="button" key={place.id} className={details.foodOrder.outletCode === place.id ? 'selected' : ''} onClick={() => onChoosePickup(place)}>
+                {place.displayName}
+              </button>
+            ))}
+          </div>
+          <small>Confirm the exact pickup point using search or the map.</small>
+        </div>
+      )}
       <div className="delivery-section-head"><div><b>Food items</b><span>Add each food separately</span></div><button type="button" className="btn btn-outline btn-sm" onClick={addItem}>+ Add food</button></div>
       {details.foodOrder.items.map((item, index) => (
         <div className="delivery-item-card" key={`food-${index}`}>
@@ -150,12 +163,25 @@ export function DeliveryOrderSummary({ category, details, compact = false }) {
   );
 }
 
-export default function DeliveryDetailsForm({ category, details, setDetails }) {
+export default function DeliveryDetailsForm({
+  category,
+  details,
+  setDetails,
+  foodPickupLocations,
+  onChooseFoodPickup,
+}) {
   return (
     <div className="delivery-details-form">
       <h4>Delivery details</h4>
-      <ReceiverFields details={details} setDetails={setDetails} />
-      {category === 'FOOD' && <FoodForm details={details} setDetails={setDetails} />}
+      {category === 'PARCEL' && <ReceiverFields details={details} setDetails={setDetails} />}
+      {category === 'FOOD' && (
+        <FoodForm
+          details={details}
+          setDetails={setDetails}
+          pickupLocations={foodPickupLocations}
+          onChoosePickup={onChooseFoodPickup}
+        />
+      )}
       {category === 'WATER' && <WaterForm details={details} setDetails={setDetails} />}
       {category === 'PARCEL' && <ParcelForm details={details} setDetails={setDetails} />}
       <DeliveryOrderSummary category={category} details={details} />

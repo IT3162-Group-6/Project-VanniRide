@@ -58,8 +58,8 @@ const waterItemSchema = new mongoose.Schema(
 
 const deliveryDetailsSchema = new mongoose.Schema(
   {
-    receiver_name: { type: String, required: true, maxlength: 100 },
-    receiver_phone: { type: String, required: true },
+    receiver_name: { type: String, default: null, maxlength: 100 },
+    receiver_phone: { type: String, default: null },
     food_order: {
       type: new mongoose.Schema(
         {
@@ -225,6 +225,15 @@ rideSchema.pre('validate', function validateDeliveryCategory() {
       this.invalidate(
         'delivery_details',
         'Delivery details must match the selected delivery category'
+      );
+    }
+    if (
+      this.delivery_category === 'PARCEL' &&
+      (!this.delivery_details.receiver_name || !this.delivery_details.receiver_phone)
+    ) {
+      this.invalidate(
+        'delivery_details',
+        'Parcel deliveries require a receiver name and phone number'
       );
     }
   }

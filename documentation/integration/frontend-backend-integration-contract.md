@@ -182,11 +182,12 @@ Pickup and destination must be different valid coordinates. Straight-line
 distance is not a routing fallback.
 
 For `DELIVERY`, both route preview and ride creation must send the same
-`deliveryDetails` object. It always contains `receiverName` and
-`receiverPhone`, plus exactly one category-specific object: `foodOrder`,
-`waterOrder`, or `parcelOrder`. The backend validates item quantities, custom
-`OTHER` descriptions, parcel weight, and Sri Lankan mobile format before
-calculating or saving the request.
+`deliveryDetails` object. It contains exactly one category-specific object:
+`foodOrder`, `waterOrder`, or `parcelOrder`. A parcel also requires
+`receiverName` and `receiverPhone`; food and water deliveries use the
+registered customer as the receiver. The backend validates item quantities,
+custom `OTHER` descriptions, parcel weight, and the parcel receiver's Sri
+Lankan mobile format before calculating or saving the request.
 
 Delivery fare uses a LKR 150 base, LKR 60 per road-route kilometre, and a
 category handling charge: LKR 25 per food parcel, LKR 30 per water container,

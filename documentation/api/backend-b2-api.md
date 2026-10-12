@@ -105,8 +105,9 @@ service.
 
 `rideType` may be `TRANSPORT` or `DELIVERY`. A delivery must include
 `deliveryCategory` with `FOOD`, `WATER`, or `PARCEL`, plus matching
-`deliveryDetails`. Every delivery supplies `receiverName` and a Sri Lankan
-mobile `receiverPhone`.
+`deliveryDetails`. Parcel deliveries supply `receiverName` and a Sri Lankan
+mobile `receiverPhone`; food and water deliveries use the registered customer
+as the receiver and do not require these fields.
 
 Food and water use an `items` array with 1-20 lines and a `quantity` of 1-20
 per line. Food types are `VEGETABLE_MEAL`, `CHICKEN_MEAL`, `SALMON_MEAL`,

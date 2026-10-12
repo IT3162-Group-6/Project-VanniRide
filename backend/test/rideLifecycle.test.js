@@ -206,8 +206,6 @@ test('validates and preserves structured delivery order details', async () => {
       body: {
         ...baseBody,
         deliveryDetails: {
-          receiverName: 'Student Receiver',
-          receiverPhone: '077 123 4567',
           foodOrder: {
             outletCode: 'HOSTEL_CANTEEN',
             outletName: 'Hostel Canteen',
@@ -231,7 +229,7 @@ test('validates and preserves structured delivery order details', async () => {
 
   assert.equal(result.statusCode, 201);
   assert.equal(result.body.data.ride.estimatedFare, 270);
-  assert.equal(result.body.data.ride.deliveryDetails.receiverPhone, '0771234567');
+  assert.equal(result.body.data.ride.deliveryDetails.receiverPhone, null);
   assert.equal(result.body.data.ride.deliveryDetails.foodOrder.items.length, 2);
   assert.equal(
     result.body.data.ride.deliveryDetails.foodOrder.items[1].otherName,
