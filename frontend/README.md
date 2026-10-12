@@ -57,6 +57,12 @@ completion. Vehicle changes return the rider to pending approval.
 Rider history and dashboard earnings use confirmed backend cash payments;
 pending cash receipts are shown separately and can be confirmed from history.
 
+The active-request screen provides an external Google Maps navigation link.
+Immediately after acceptance it routes the rider to the stored pickup
+coordinate; after pickup it routes to the stored destination. Google Maps
+provides turn-by-turn navigation while Vanni Ride remains responsible for the
+request status and customer communication.
+
 ## Chat and rider ratings
 
 Customer and rider chat pages now load their real ride conversations and poll

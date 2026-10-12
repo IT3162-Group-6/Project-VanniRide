@@ -85,8 +85,8 @@ export default function AvailableRequests() {
       {!loading && shown.length === 0 && (
         <div className="empty">
           <div className="fi"><Icon name="list" /></div>
-          <b>No open requests</b>
-          <p>New ride and delivery requests from students will appear here.</p>
+          <b>{tab === 'all' ? 'No requests are available' : `No ${tab} requests are available`}</b>
+          <p>This list refreshes automatically. New requests from customers will appear here when they are submitted.</p>
         </div>
       )}
     </div>

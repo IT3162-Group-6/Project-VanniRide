@@ -87,7 +87,7 @@ export default function CustomerDashboard() {
               to={['pending', 'accepted', 'ontheway', 'picked'].includes(r.status) ? `/customer/active?rideId=${r.id}` : '/customer/history'}
             />
           ))}
-          {rides.length === 0 && <p className="muted">No requests yet.</p>}
+          {rides.length === 0 && <p className="muted">You have not requested a ride or delivery yet. Use the sidebar to create your first request.</p>}
         </div>
 
         <div>

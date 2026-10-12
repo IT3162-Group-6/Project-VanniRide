@@ -87,7 +87,7 @@ export default function AdminDashboard() {
             </div>
           );
         })}
-        {chatRequests.every((request) => request.status !== 'PENDING') && <p className="muted">No pending chat access requests.</p>}
+        {chatRequests.every((request) => request.status !== 'PENDING') && <p className="muted">No chat-access requests need review. New customer requests will appear here.</p>}
       </div>
     </>
   );

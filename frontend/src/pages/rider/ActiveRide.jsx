@@ -7,6 +7,7 @@ import StatusBadge from '../../components/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppState';
 import { ridesApi, RIDE_STATUS } from '../../services/api';
+import { riderNavigation } from '../../utils/googleMaps';
 
 const NEXT = {
   [RIDE_STATUS.ACCEPTED]: { to: RIDE_STATUS.ONTHEWAY, label: 'Mark rider arrived' },
@@ -103,16 +104,23 @@ export default function ActiveRide() {
   }
 
   if (loading) return <p className="muted">Loading…</p>;
-  if (!ride) return <div className="card">{error && <div className="alert alert-error">{error}</div>}<div className="empty"><div className="fi"><Icon name="route" /></div><b>No active ride</b><p>Accept a request to start a trip.</p><button className="btn btn-primary" onClick={() => navigate('/rider/requests')}>Browse requests</button></div></div>;
+  if (!ride) return <div className="card">{error && <div className="alert alert-error">{error}</div>}<div className="empty"><div className="fi"><Icon name="route" /></div><b>You are not handling a request</b><p>Open Available Requests to accept a ride or delivery. It will then appear here with navigation and status controls.</p><button className="btn btn-primary" onClick={() => navigate('/rider/requests')}>View available requests</button></div></div>;
 
   const step = NEXT[ride.status];
   const canCancel = ['ACCEPTED', 'STARTED'].includes(ride.apiStatus);
   const mustRespond = request?.respondingUserId === user.id;
+  const navigation = riderNavigation(ride);
   return (
     <div className="request-layout"><div className="card">
       <div className="card-head"><h3>Active Ride · #{ride.id.slice(-6)}</h3><StatusBadge status={ride.status} /></div>
       {error && <div className="alert alert-error">{error}</div>}
       <div className="route-block"><div className="route-point"><span className="dot dot-start"/><div><b>{ride.pickup}</b><span>Pickup</span></div></div><div className="route-point"><span className="dot dot-end"/><div><b>{ride.dropoff}</b><span>Drop-off</span></div></div></div>
+      {navigation && (
+        <div className="external-navigation">
+          <div><Icon name="route" /><span><b>{navigation.label}</b><small>Opens turn-by-turn directions in Google Maps</small></span></div>
+          <a className="btn btn-outline btn-sm" href={navigation.url} target="_blank" rel="noreferrer">Open Google Maps</a>
+        </div>
+      )}
       <div className="rider-card"><div className="avatar">{ride.customer?.name?.[0]}</div><div><b>{ride.customer?.name}</b><span>{ride.customer?.phone}</span></div><Link to="/rider/chat" className="icon-btn"><Icon name="chat" /></Link><a href={`tel:${ride.customer?.phone}`} className="icon-btn"><Icon name="phone" /></a></div>
       <DeliveryDetailsDisplay ride={ride} />
       <div className="kv" style={{marginTop:16}}><div><span>Distance</span><b>{ride.distanceKm} km</b></div><div><span>Payment</span><b>Cash · {payment?.status || 'pending'}</b></div></div>

@@ -134,8 +134,8 @@ export default function ActiveRide() {
         {error && <div className="alert alert-error">{error}</div>}
         <div className="empty">
           <div className="fi"><Icon name="route" /></div>
-          <b>No active ride</b>
-          <p>When you book a ride or delivery, you can track it here.</p>
+          <b>Nothing to track right now</b>
+          <p>Create a ride or delivery request first. Its rider, route, status, and cancellation options will appear here.</p>
           <button className="btn btn-primary" onClick={() => navigate('/customer/request')}>Request a ride</button>
         </div>
       </div>
@@ -182,7 +182,7 @@ export default function ActiveRide() {
               <a href={`tel:${ride.rider.phone}`} className="icon-btn icon-btn-call" aria-label="Call"><Icon name="phone" /></a>
             </div>
           ) : (
-            <p className="muted" style={{ marginTop: 14 }}>No rider yet — we'll notify you when someone accepts.</p>
+            <p className="muted" style={{ marginTop: 14 }}>Waiting for an available rider to accept this request. We will notify you as soon as one does.</p>
           )}
 
           <DeliveryDetailsDisplay ride={ride} />

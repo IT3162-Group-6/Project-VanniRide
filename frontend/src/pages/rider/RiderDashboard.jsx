@@ -87,13 +87,13 @@ export default function RiderDashboard() {
           {available.slice(0, 4).map((r) => (
             <RideCard key={r.id} ride={r} person="customer" to={`/rider/requests/${r.id}`} />
           ))}
-          {available.length === 0 && <p className="muted">No open requests right now.</p>}
+          {available.length === 0 && <p className="muted">There are no customer requests available right now. This list refreshes automatically while you are online.</p>}
         </div>
 
         <div className="card">
           <div className="card-head"><h3>Your Recent Rides</h3><Link to="/rider/history">History</Link></div>
           {mine.slice(0, 4).map((r) => <RideCard key={r.id} ride={r} person="customer" />)}
-          {mine.length === 0 && <p className="muted">You haven't taken any rides yet.</p>}
+          {mine.length === 0 && <p className="muted">You have not completed a ride or delivery yet. Accepted requests will appear here.</p>}
         </div>
       </div>
     </>

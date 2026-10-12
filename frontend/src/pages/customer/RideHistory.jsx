@@ -90,8 +90,8 @@ export default function RideHistory() {
       {!loading && shown.length === 0 && (
         <div className="empty">
           <div className="fi"><Icon name="list" /></div>
-          <b>Nothing here yet</b>
-          <p>Your past rides and deliveries will show up in this list.</p>
+          <b>{tab === 'all' ? 'No ride or delivery history yet' : `No ${tab} requests`}</b>
+          <p>{tab === 'all' ? 'Completed and cancelled requests will be saved here after you use the service.' : `You do not have any ${tab} rides or deliveries.`}</p>
         </div>
       )}
     </div>

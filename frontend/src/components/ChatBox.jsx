@@ -38,7 +38,7 @@ export default function ChatBox({ title, subtitle, initial = '', messages = [], 
       <div className="chat-body" ref={bodyRef}>
         {loading && <p className="muted" style={{ textAlign: 'center' }}>Loading messages…</p>}
         {!loading && messages.length === 0 && (
-          <p className="muted" style={{ textAlign: 'center' }}>No messages yet — say hello 👋</p>
+          <p className="muted" style={{ textAlign: 'center' }}>No messages have been sent in this conversation. Send a message when you are ready.</p>
         )}
         {messages.map((m) => {
           const mine = m.senderId === meId;

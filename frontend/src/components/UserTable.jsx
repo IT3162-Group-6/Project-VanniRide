@@ -4,7 +4,7 @@ import StatusBadge from './StatusBadge';
  * Admin table of users. `columns` lets each page show role specific fields.
  */
 export default function UserTable({ users, columns = [], onToggleStatus }) {
-  if (!users.length) return <p className="muted">No users found.</p>;
+  if (!users.length) return <p className="muted">No users match the current role, status, or search filters.</p>;
 
   return (
     <div className="table-wrap">

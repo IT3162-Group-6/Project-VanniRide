@@ -47,8 +47,8 @@ export default function RideHistory() {
         {!loading && rides.length === 0 && (
           <div className="empty">
             <div className="fi"><Icon name="clock" /></div>
-            <b>No rides yet</b>
-            <p>Completed trips and their earnings will be listed here.</p>
+            <b>No completed work yet</b>
+            <p>After you finish a ride or delivery, its route, cash status, and earnings will be listed here.</p>
           </div>
         )}
       </div>

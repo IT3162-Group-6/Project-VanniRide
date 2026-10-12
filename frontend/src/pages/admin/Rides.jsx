@@ -54,7 +54,7 @@ export default function Rides() {
             ))}
           </tbody>
         </table>
-        {shown.length === 0 && <p className="muted">No rides match this filter.</p>}
+        {shown.length === 0 && <p className="muted">No rides match the selected status and search text. Clear the search or choose another status.</p>}
       </div>
     </div>
   );

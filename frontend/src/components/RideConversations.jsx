@@ -158,11 +158,11 @@ export default function RideConversations({ role }) {
         {error && <div className="alert alert-error">{error}</div>}
         <div className="empty">
           <div className="fi"><Icon name="chat" /></div>
-          <b>No conversation yet</b>
+          <b>No conversations are available</b>
           <p>
             {role === 'customer'
-              ? 'An assigned ride or delivery will appear here.'
-              : 'Accept a request to chat with a customer.'}
+              ? 'A conversation becomes available after a rider accepts your ride or delivery request.'
+              : 'Accept a ride or delivery request first. You can then message that customer here.'}
           </p>
           <button className="btn btn-primary" onClick={() => navigate(requestsPath)}>
             {role === 'customer' ? 'Request a ride' : 'Browse requests'}
@@ -225,7 +225,7 @@ export default function RideConversations({ role }) {
             );
           })}
           {visibleRides.length === 0 && (
-            <p className="conversation-list-empty">No {filter} conversations.</p>
+            <p className="conversation-list-empty">No conversations match this filter. Choose another filter to see the rest.</p>
           )}
         </div>
       </aside>
