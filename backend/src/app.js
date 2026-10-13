@@ -13,6 +13,9 @@ const adminRoutes = require('./routes/adminRoutes');
 const userRoutes = require('./routes/userRoutes');
 const mapRoutes = require('./routes/mapRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const {
+  createCancellationReconciliationMiddleware,
+} = require('./workers/cancellationWorker');
 
 const app = express();
 
@@ -58,6 +61,10 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
+// A free host may sleep between requests. Reconcile elapsed cancellation
+// deadlines before serving API data so the first response after wake-up is
+// already consistent with the persisted timestamps.
+app.use('/api', createCancellationReconciliationMiddleware());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/maps', mapRoutes);

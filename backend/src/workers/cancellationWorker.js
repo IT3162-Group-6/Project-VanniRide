@@ -48,6 +48,48 @@ const runSweep = async (io) => {
   }
 };
 
+const createCancellationReconciliationMiddleware = ({
+  minimumIntervalMs = 5000,
+  sweep = runSweep,
+  now = Date.now,
+  onError = (error) => {
+    console.error(`Cancellation reconciliation failed: ${error.message}`);
+  },
+} = {}) => {
+  const safeMinimumIntervalMs = Math.max(0, Number(minimumIntervalMs) || 0);
+  let lastSuccessfulSweepAt = null;
+  let sweepPromise = null;
+
+  return async (req, _res, next) => {
+    const requestedAt = Number(now());
+    const recentlyReconciled =
+      lastSuccessfulSweepAt !== null &&
+      requestedAt - lastSuccessfulSweepAt < safeMinimumIntervalMs;
+
+    if (recentlyReconciled) {
+      next();
+      return;
+    }
+
+    if (!sweepPromise) {
+      sweepPromise = Promise.resolve()
+        .then(() => sweep(req.app.get('io')))
+        .then(() => {
+          lastSuccessfulSweepAt = Number(now());
+        })
+        .catch((error) => {
+          onError(error);
+        })
+        .finally(() => {
+          sweepPromise = null;
+        });
+    }
+
+    await sweepPromise;
+    next();
+  };
+};
+
 const startCancellationWorker = (io, intervalMs = 30000) => {
   const safeInterval =
     Number.isFinite(Number(intervalMs)) && Number(intervalMs) >= 1000
@@ -67,4 +109,8 @@ const startCancellationWorker = (io, intervalMs = 30000) => {
   return () => clearInterval(timer);
 };
 
-module.exports = { runSweep, startCancellationWorker };
+module.exports = {
+  createCancellationReconciliationMiddleware,
+  runSweep,
+  startCancellationWorker,
+};
