@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "test": "node --test --test-isolation=none",
     "start": "node server.js",
