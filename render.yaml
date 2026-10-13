@@ -29,7 +29,7 @@ services:
       - key: MAP_PROVIDER
         value: openrouteservice
       - key: OPENROUTESERVICE_BASE_URL
-        value: https://api.openrouteservice.org
+        value: https://api.heigit.org
       - key: OPENROUTESERVICE_API_KEY
         sync: false
       - key: OPENROUTESERVICE_PROFILE

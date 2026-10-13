@@ -523,7 +523,7 @@ test('adapts OpenRouteService routes and Northern Province autocomplete', async 
   assert.equal(route.durationMinutes, 3);
   assert.equal(
     routingRequest.url,
-    'https://openrouteservice.test/v2/directions/driving-car/geojson'
+    'https://openrouteservice.test/openrouteservice/v2/directions/driving-car/geojson'
   );
   assert.equal(routingRequest.options.method, 'POST');
   assert.equal(routingRequest.options.headers.authorization, 'test-api-key');
@@ -596,7 +596,7 @@ test('adapts OpenRouteService routes and Northern Province autocomplete', async 
   assert.deepEqual(cachedSearch, firstSearch);
   assert.equal(reverse.displayName, 'Vavuniya Town');
   assert.equal(requestedUrls.length, 2);
-  assert.equal(requestedUrls[0].pathname, '/geocode/autocomplete');
+  assert.equal(requestedUrls[0].pathname, '/pelias/v1/autocomplete');
   assert.equal(requestedUrls[0].searchParams.get('boundary.country'), 'LK');
   assert.equal(requestedUrls[0].searchParams.get('api_key'), 'test-api-key');
 });
@@ -2290,7 +2290,7 @@ test('rejects unsafe production configuration before server startup', () => {
     routingBaseUrlConfigured: true,
     allowNonUniversityEmails: false,
     mapProvider: 'openrouteservice',
-    openRouteServiceBaseUrl: 'https://api.openrouteservice.org',
+    openRouteServiceBaseUrl: 'https://api.heigit.org',
     openRouteServiceApiKey: 'test-api-key',
   }));
 });

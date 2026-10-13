@@ -71,7 +71,7 @@ const calculateOpenRouteServiceRoute = async (
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImplementation(
-      `${baseUrl}/v2/directions/${profile}/geojson`,
+      `${baseUrl}/openrouteservice/v2/directions/${profile}/geojson`,
       {
         method: 'POST',
         headers: {

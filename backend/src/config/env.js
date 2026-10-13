@@ -37,7 +37,7 @@ const config = {
     (openRouteServiceApiKey ? 'openrouteservice' : 'osrm-nominatim'),
   openRouteServiceBaseUrl:
     process.env.OPENROUTESERVICE_BASE_URL ||
-    'https://api.openrouteservice.org',
+    'https://api.heigit.org',
   openRouteServiceApiKey,
   openRouteServiceProfile:
     process.env.OPENROUTESERVICE_PROFILE || 'driving-car',

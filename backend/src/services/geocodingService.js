@@ -282,7 +282,7 @@ const serializeOpenRouteServicePlace = (feature) => {
 
 const searchOpenRouteServicePlaces = async (query, options, limit) => {
   const payload = await requestOpenRouteServiceJson(
-    '/geocode/autocomplete',
+    '/pelias/v1/autocomplete',
     {
       text: query,
       size: limit,
@@ -309,7 +309,7 @@ const searchOpenRouteServicePlaces = async (query, options, limit) => {
 
 const reverseOpenRouteServicePlace = async (latitude, longitude, options) => {
   const payload = await requestOpenRouteServiceJson(
-    '/geocode/reverse',
+    '/pelias/v1/reverse',
     {
       'point.lat': latitude,
       'point.lon': longitude,
