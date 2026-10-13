@@ -69,7 +69,7 @@ function FoodForm({ details, setDetails, pickupLocations = [], onChoosePickup })
               </button>
             ))}
           </div>
-          <small>Confirm the exact pickup point using search or the map.</small>
+          <small>The pickup marker is placed automatically. You can still adjust it on the map.</small>
         </div>
       )}
       <div className="delivery-section-head"><div><b>Food items</b><span>Add each food separately</span></div><button type="button" className="btn btn-outline btn-sm" onClick={addItem}>+ Add food</button></div>
@@ -88,7 +88,7 @@ function FoodForm({ details, setDetails, pickupLocations = [], onChoosePickup })
   );
 }
 
-function WaterForm({ details, setDetails }) {
+function WaterForm({ details, setDetails, pickupLocations = [], onChoosePickup, selectedPickup }) {
   const updateOrder = (updater) => setDetails((current) => ({
     ...current,
     waterOrder: updater(current.waterOrder),
@@ -105,6 +105,23 @@ function WaterForm({ details, setDetails }) {
 
   return (
     <div className="delivery-section">
+      {pickupLocations.length > 0 && (
+        <div className="quick-picks" aria-label="Water pickup locations">
+          <span>Water pickup quick picks</span>
+          <div>
+            {pickupLocations.map((place) => {
+              const selected = Number(selectedPickup?.latitude) === place.latitude
+                && Number(selectedPickup?.longitude) === place.longitude;
+              return (
+                <button type="button" key={place.id} className={selected ? 'selected' : ''} onClick={() => onChoosePickup(place)}>
+                  {place.displayName}
+                </button>
+              );
+            })}
+          </div>
+          <small>The pickup marker is placed automatically. You can still adjust it on the map.</small>
+        </div>
+      )}
       <div className="delivery-section-head"><div><b>Water containers</b><span>Add each bottle size separately</span></div><button type="button" className="btn btn-outline btn-sm" onClick={addItem}>+ Add water</button></div>
       {details.waterOrder.items.map((item, index) => (
         <div className="delivery-item-card" key={`water-${index}`}>
@@ -168,7 +185,10 @@ export default function DeliveryDetailsForm({
   details,
   setDetails,
   foodPickupLocations,
+  waterPickupLocations,
   onChooseFoodPickup,
+  onChooseWaterPickup,
+  selectedPickup,
 }) {
   return (
     <div className="delivery-details-form">
@@ -182,7 +202,7 @@ export default function DeliveryDetailsForm({
           onChoosePickup={onChooseFoodPickup}
         />
       )}
-      {category === 'WATER' && <WaterForm details={details} setDetails={setDetails} />}
+      {category === 'WATER' && <WaterForm details={details} setDetails={setDetails} pickupLocations={waterPickupLocations} onChoosePickup={onChooseWaterPickup} selectedPickup={selectedPickup} />}
       {category === 'PARCEL' && <ParcelForm details={details} setDetails={setDetails} />}
       <DeliveryOrderSummary category={category} details={details} />
     </div>

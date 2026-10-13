@@ -7,6 +7,7 @@ import { useAppState } from '../../context/appStateStore';
 import { QUICK_PICK_LOCATIONS } from '../../data/quickPickLocations';
 import {
   FOOD_PICKUP_LOCATIONS,
+  WATER_PICKUP_LOCATIONS,
   buildDeliveryPayload,
   createDefaultDeliveryDetails,
   validateDeliveryDetails,
@@ -65,7 +66,11 @@ function RequestRideForm({ requestedRideType }) {
   });
 
   const setDeliveryCategory = (deliveryCategory) => {
-    setForm((current) => ({ ...current, deliveryCategory }));
+    if (deliveryCategory === form.deliveryCategory) return;
+    setForm((current) => ({ ...current, deliveryCategory, pickupLocation: null }));
+    setActiveLocation('pickup');
+    setSearchQuery('');
+    setSearchResults([]);
     setPreview(null);
     setError('');
   };
@@ -152,12 +157,29 @@ function RequestRideForm({ requestedRideType }) {
         outletName: place.displayName,
       },
     }));
-    setForm((current) => ({ ...current, pickupLocation: null }));
-    setActiveLocation('pickup');
-    setSearchQuery(place.searchQuery);
+    setLocation('pickup', {
+      address: place.displayName,
+      latitude: place.latitude,
+      longitude: place.longitude,
+    });
+    setActiveLocation('destination');
+    setSearchQuery('');
     setSearchResults([]);
     setPreview(null);
-    setError(`“${place.displayName}” selected. Choose its exact pickup point from search results or the map.`);
+    setError('');
+  }
+
+  function chooseWaterPickup(place) {
+    setLocation('pickup', {
+      address: place.displayName,
+      latitude: place.latitude,
+      longitude: place.longitude,
+    });
+    setActiveLocation('destination');
+    setSearchQuery('');
+    setSearchResults([]);
+    setPreview(null);
+    setError('');
   }
 
   function useCurrentLocation() {
@@ -338,7 +360,10 @@ function RequestRideForm({ requestedRideType }) {
                 category={form.deliveryCategory}
                 details={deliveryDetails}
                 foodPickupLocations={FOOD_PICKUP_LOCATIONS}
+                waterPickupLocations={WATER_PICKUP_LOCATIONS}
                 onChooseFoodPickup={chooseFoodPickup}
+                onChooseWaterPickup={chooseWaterPickup}
+                selectedPickup={form.pickupLocation}
                 setDetails={(updater) => {
                   setDeliveryDetails(updater);
                   setPreview(null);

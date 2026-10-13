@@ -32,12 +32,17 @@ export const PARCEL_TYPES = Object.freeze([
 ]);
 
 export const FOOD_PICKUP_LOCATIONS = Object.freeze([
-  { id: 'hostel-canteen', displayName: 'Hostel Canteen', searchQuery: 'Boys Hostel, Pambaimadu' },
-  { id: 'rilvan-restaurant', displayName: 'Rilvan Restaurant', searchQuery: 'Rilvan Restaurant, Vavuniya' },
-  { id: 'rs-restaurant', displayName: 'RS Restaurant', searchQuery: 'RS Restaurant, Vavuniya' },
-  { id: 'army-camp-canteen', displayName: 'Army Camp Canteen', searchQuery: 'Army Camp, Pambaimadu' },
-  { id: 'applied-canteen', displayName: 'Applied Canteen', searchQuery: 'Faculty of Applied Science, University of Vavuniya' },
-  { id: 'business-studies-canteen', displayName: 'Business Studies Canteen', searchQuery: 'Faculty of Business Studies, University of Vavuniya' },
+  { id: 'hostel-canteen', displayName: 'Hostel Canteen', latitude: 8.754679431136763, longitude: 80.39997959306534 },
+  { id: 'rilvan-restaurant', displayName: 'Rilvan Restaurant', latitude: 8.755848949069371, longitude: 80.3917985440667 },
+  { id: 'rs-restaurant', displayName: 'RS Restaurant', latitude: 8.758562832226218, longitude: 80.40602169348837 },
+  { id: 'army-camp-canteen', displayName: 'Army Camp Canteen', latitude: 8.75972707146535, longitude: 80.42144188915817 },
+  { id: 'applied-canteen', displayName: 'Applied Canteen', latitude: 8.755239886779476, longitude: 80.41010048481681 },
+  { id: 'business-studies-canteen', displayName: 'Business Studies Canteen', latitude: 8.756951361634316, longitude: 80.41078483844242 },
+]);
+
+export const WATER_PICKUP_LOCATIONS = Object.freeze([
+  { id: 'girls-hostel-water', displayName: 'Girls Hostel Water Outlet', latitude: 8.755949051450258, longitude: 80.39949256607096 },
+  { id: 'bs-canteen-water', displayName: 'BS Canteen Water Outlet', latitude: 8.756834249378084, longitude: 80.41077647382527 },
 ]);
 
 export const createDefaultDeliveryDetails = () => ({
