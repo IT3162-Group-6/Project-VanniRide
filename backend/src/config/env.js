@@ -15,6 +15,9 @@ const parseBoolean = (value, fallback = false) => {
 };
 
 const nodeEnv = process.env.NODE_ENV || 'development';
+const openRouteServiceApiKey = String(
+  process.env.OPENROUTESERVICE_API_KEY || ''
+).trim();
 
 const config = {
   port: process.env.PORT || 5000,
@@ -29,6 +32,15 @@ const config = {
     process.env.ALLOW_NON_UNIVERSITY_EMAILS,
     nodeEnv !== 'production'
   ),
+  mapProvider:
+    process.env.MAP_PROVIDER ||
+    (openRouteServiceApiKey ? 'openrouteservice' : 'osrm-nominatim'),
+  openRouteServiceBaseUrl:
+    process.env.OPENROUTESERVICE_BASE_URL ||
+    'https://api.openrouteservice.org',
+  openRouteServiceApiKey,
+  openRouteServiceProfile:
+    process.env.OPENROUTESERVICE_PROFILE || 'driving-car',
   // Keep local development usable when an older .env file predates the
   // routing settings. Production still has to configure its provider
   // explicitly in validateRuntimeConfig below.
@@ -81,6 +93,22 @@ const validateRuntimeConfig = (candidate = config) => {
   ) {
     errors.push('CANCELLATION_SWEEP_INTERVAL_MS must be at least 1000');
   }
+  if (!['openrouteservice', 'osrm-nominatim'].includes(candidate.mapProvider)) {
+    errors.push('MAP_PROVIDER must be openrouteservice or osrm-nominatim');
+  }
+  if (candidate.mapProvider === 'openrouteservice') {
+    try {
+      const providerUrl = new URL(candidate.openRouteServiceBaseUrl);
+      if (!['http:', 'https:'].includes(providerUrl.protocol)) {
+        errors.push('OPENROUTESERVICE_BASE_URL must use HTTP or HTTPS');
+      }
+    } catch {
+      errors.push('OPENROUTESERVICE_BASE_URL must be a valid URL');
+    }
+    if (!String(candidate.openRouteServiceApiKey || '').trim()) {
+      errors.push('OPENROUTESERVICE_API_KEY is required');
+    }
+  }
   try {
     const routingUrl = new URL(candidate.routingBaseUrl);
     if (!['http:', 'https:'].includes(routingUrl.protocol)) {
@@ -102,8 +130,8 @@ const validateRuntimeConfig = (candidate = config) => {
     if (!candidate.corsOriginsConfigured || candidate.corsOrigins.length === 0) {
       errors.push('CORS_ORIGINS must be explicitly configured in production');
     }
-    if (!candidate.routingBaseUrlConfigured) {
-      errors.push('ROUTING_BASE_URL must be explicitly configured in production');
+    if (candidate.mapProvider !== 'openrouteservice') {
+      errors.push('MAP_PROVIDER must be openrouteservice in production');
     }
   }
   if (errors.length) {

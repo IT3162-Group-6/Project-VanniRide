@@ -484,6 +484,123 @@ test('returns map-ready road routes and caches geocoding provider results', asyn
   assert.equal(preview.body.data.routePreview.routeGeometry.type, 'LineString');
 });
 
+test('adapts OpenRouteService routes and Northern Province autocomplete', async () => {
+  let routingRequest;
+  const route = await calculateRoadRoute(
+    { latitude: 8.7581, longitude: 80.4982 },
+    { latitude: 8.7514, longitude: 80.4971 },
+    {
+      provider: 'openrouteservice',
+      apiKey: 'test-api-key',
+      baseUrl: 'https://openrouteservice.test',
+      alternatives: 1,
+      fetchImplementation: async (url, options) => {
+        routingRequest = { url, options };
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: { summary: { distance: 820, duration: 150 } },
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [
+                    [80.4982, 8.7581],
+                    [80.4971, 8.7514],
+                  ],
+                },
+              },
+            ],
+          }),
+        };
+      },
+    }
+  );
+  assert.equal(route.distanceKm, 0.82);
+  assert.equal(route.durationMinutes, 3);
+  assert.equal(
+    routingRequest.url,
+    'https://openrouteservice.test/v2/directions/driving-car/geojson'
+  );
+  assert.equal(routingRequest.options.method, 'POST');
+  assert.equal(routingRequest.options.headers.authorization, 'test-api-key');
+  assert.deepEqual(JSON.parse(routingRequest.options.body).coordinates, [
+    [80.4982, 8.7581],
+    [80.4971, 8.7514],
+  ]);
+
+  clearGeocodingCache();
+  const requestedUrls = [];
+  const geocodingOptions = {
+    provider: 'openrouteservice',
+    apiKey: 'test-api-key',
+    baseUrl: 'https://openrouteservice.test',
+    minIntervalMs: 0,
+    cacheTtlMs: 60_000,
+    fetchImplementation: async (url) => {
+      const requestedUrl = new URL(url);
+      requestedUrls.push(requestedUrl);
+      const reverse = requestedUrl.pathname.endsWith('/reverse');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          type: 'FeatureCollection',
+          features: reverse
+            ? [
+                {
+                  geometry: { type: 'Point', coordinates: [80.4971, 8.7514] },
+                  properties: {
+                    gid: 'place.2',
+                    name: 'Vavuniya Town',
+                    label: 'Vavuniya Town, Northern Province, Sri Lanka',
+                  },
+                },
+              ]
+            : [
+                {
+                  geometry: { type: 'Point', coordinates: [80.4982, 8.7581] },
+                  properties: {
+                    gid: 'venue.1',
+                    name: 'University of Vavuniya',
+                    locality: 'Pambaimadu',
+                    region: 'Northern Province',
+                    label: 'University of Vavuniya, Pambaimadu, Sri Lanka',
+                  },
+                },
+                {
+                  geometry: { type: 'Point', coordinates: [79.8612, 6.9271] },
+                  properties: {
+                    gid: 'venue.3',
+                    name: 'Outside Northern Province',
+                    label: 'Outside Northern Province, Sri Lanka',
+                  },
+                },
+              ],
+        }),
+      };
+    },
+  };
+  const firstSearch = await searchPlaces('University', geocodingOptions);
+  const cachedSearch = await searchPlaces('University', geocodingOptions);
+  const reverse = await reverseGeocode(8.7514, 80.4971, geocodingOptions);
+
+  assert.equal(firstSearch.length, 1);
+  assert.equal(
+    firstSearch[0].displayName,
+    'University of Vavuniya, Pambaimadu, Northern Province'
+  );
+  assert.deepEqual(cachedSearch, firstSearch);
+  assert.equal(reverse.displayName, 'Vavuniya Town');
+  assert.equal(requestedUrls.length, 2);
+  assert.equal(requestedUrls[0].pathname, '/geocode/autocomplete');
+  assert.equal(requestedUrls[0].searchParams.get('boundary.country'), 'LK');
+  assert.equal(requestedUrls[0].searchParams.get('api_key'), 'test-api-key');
+});
+
 test('requires rider approval and resubmits changed vehicle details for review', async () => {
   const adminId = new mongoose.Types.ObjectId();
   await User.create({
@@ -2145,7 +2262,7 @@ test('rejects unsafe production configuration before server startup', () => {
       corsOriginsConfigured: false,
       routingBaseUrlConfigured: false,
     }),
-    /Production JWT_SECRET.*CORS_ORIGINS.*ROUTING_BASE_URL/
+    /Production JWT_SECRET.*CORS_ORIGINS.*MAP_PROVIDER/
   );
   assert.throws(
     () => env.validateRuntimeConfig({
@@ -2157,6 +2274,8 @@ test('rejects unsafe production configuration before server startup', () => {
       routingBaseUrl: 'https://routing.example.com',
       routingBaseUrlConfigured: true,
       allowNonUniversityEmails: true,
+      mapProvider: 'openrouteservice',
+      openRouteServiceApiKey: 'test-api-key',
     }),
     /ALLOW_NON_UNIVERSITY_EMAILS cannot be enabled in production/
   );
@@ -2170,6 +2289,9 @@ test('rejects unsafe production configuration before server startup', () => {
     routingBaseUrl: 'https://routing.example.com',
     routingBaseUrlConfigured: true,
     allowNonUniversityEmails: false,
+    mapProvider: 'openrouteservice',
+    openRouteServiceBaseUrl: 'https://api.openrouteservice.org',
+    openRouteServiceApiKey: 'test-api-key',
   }));
 });
 

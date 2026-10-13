@@ -487,12 +487,17 @@ administrator may broadcast an update to one role or all roles.
 
 Backend configuration adds:
 
-- `GEOCODING_BASE_URL`;
-- `GEOCODING_USER_AGENT` containing the application identity;
-- `GEOCODING_CONTACT`;
+- `MAP_PROVIDER`, with `openrouteservice` required for deployment;
+- `OPENROUTESERVICE_BASE_URL`;
+- secret `OPENROUTESERVICE_API_KEY`;
+- `OPENROUTESERVICE_PROFILE`;
 - `GEOCODING_MIN_INTERVAL_MS`, no lower than the selected provider policy;
 - `GEOCODING_CACHE_TTL_MS`; and
 - map-result limits and provider timeouts.
+
+The `osrm-nominatim` option and its provider-specific settings are retained
+only as a local-development fallback. Public Nominatim must not power deployed
+autocomplete.
 
 Frontend configuration adds:
 

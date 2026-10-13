@@ -19,11 +19,135 @@ const normalizeBaseUrl = (value) => {
 const routeCoordinate = (location) =>
   `${Number(location.longitude)},${Number(location.latitude)}`;
 
+const calculateOpenRouteServiceRoute = async (
+  pickupLocation,
+  destination,
+  options
+) => {
+  const fetchImplementation = options.fetchImplementation || global.fetch;
+  if (typeof fetchImplementation !== 'function') {
+    throw new AppError('The routing HTTP client is unavailable', 500);
+  }
+
+  const baseUrl = normalizeBaseUrl(
+    options.baseUrl || config.openRouteServiceBaseUrl
+  );
+  const apiKey = String(
+    options.apiKey || config.openRouteServiceApiKey || ''
+  ).trim();
+  if (!apiKey) {
+    throw new AppError('OPENROUTESERVICE_API_KEY is required', 500);
+  }
+  const profile = encodeURIComponent(
+    options.profile || config.openRouteServiceProfile || 'driving-car'
+  );
+  const configuredTimeoutMs = Number(options.timeoutMs || config.routingTimeoutMs);
+  const timeoutMs =
+    Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs >= 100
+      ? configuredTimeoutMs
+      : 5000;
+  const configuredAlternatives = Number(
+    options.alternatives || config.routingAlternatives
+  );
+  const alternativeCount =
+    Number.isInteger(configuredAlternatives) && configuredAlternatives > 1
+      ? Math.min(3, configuredAlternatives)
+      : 1;
+  const requestBody = {
+    coordinates: [
+      [Number(pickupLocation.longitude), Number(pickupLocation.latitude)],
+      [Number(destination.longitude), Number(destination.latitude)],
+    ],
+  };
+  if (alternativeCount > 1) {
+    requestBody.alternative_routes = {
+      target_count: alternativeCount,
+      share_factor: 0.6,
+      weight_factor: 1.4,
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImplementation(
+      `${baseUrl}/v2/directions/${profile}/geojson`,
+      {
+        method: 'POST',
+        headers: {
+          accept: 'application/geo+json, application/json',
+          authorization: apiKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      }
+    );
+    if (response.status === 429) {
+      throw new AppError('The road-routing service is temporarily rate limited', 429);
+    }
+    if (!response.ok) {
+      throw new AppError('The road-routing service is unavailable', 503);
+    }
+
+    const payload = await response.json();
+    const routes = Array.isArray(payload.features)
+      ? payload.features
+          .map((feature) => ({
+            geometry: feature?.geometry,
+            distance: Number(feature?.properties?.summary?.distance),
+            duration: Number(feature?.properties?.summary?.duration),
+          }))
+          .filter((route) => Number.isFinite(route.distance) && route.distance >= 0)
+      : [];
+    if (routes.length === 0) {
+      throw new AppError(
+        'No drivable route was found between the supplied locations',
+        503
+      );
+    }
+    const shortestRoute = routes.reduce((shortest, route) =>
+      route.distance < shortest.distance ? route : shortest
+    );
+    return {
+      distanceKm: Math.round((shortestRoute.distance / 1000) * 100) / 100,
+      durationMinutes: Number.isFinite(shortestRoute.duration)
+        ? Math.max(1, Math.round(shortestRoute.duration / 60))
+        : null,
+      routeGeometry:
+        shortestRoute.geometry?.type === 'LineString' &&
+        Array.isArray(shortestRoute.geometry.coordinates)
+          ? shortestRoute.geometry
+          : null,
+    };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    if (error.name === 'AbortError') {
+      throw new AppError('The road-routing service timed out', 503);
+    }
+    throw new AppError('The road-routing service is unavailable', 503);
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const calculateRoadRoute = async (
   pickupLocation,
   destination,
   options = {}
 ) => {
+  const provider = options.provider || config.mapProvider;
+  if (provider === 'openrouteservice') {
+    return calculateOpenRouteServiceRoute(
+      pickupLocation,
+      destination,
+      options
+    );
+  }
+  if (provider !== 'osrm-nominatim') {
+    throw new AppError('The configured map provider is not supported', 500);
+  }
+
   const fetchImplementation = options.fetchImplementation || global.fetch;
   if (typeof fetchImplementation !== 'function') {
     throw new AppError('The routing HTTP client is unavailable', 500);

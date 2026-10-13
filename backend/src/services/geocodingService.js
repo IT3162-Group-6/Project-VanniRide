@@ -8,6 +8,12 @@ let lastRequestAt = 0;
 // Nominatim view boxes use: left longitude, top latitude, right longitude,
 // bottom latitude. This box keeps discovery within Sri Lanka's Northern Province.
 const NORTHERN_PROVINCE_VIEWBOX = '79.45,10.15,81.05,8.20';
+const NORTHERN_PROVINCE_BOUNDS = {
+  minLongitude: 79.45,
+  maxLatitude: 10.15,
+  maxLongitude: 81.05,
+  minLatitude: 8.2,
+};
 
 const normalizeBaseUrl = (value) => {
   let url;
@@ -108,6 +114,84 @@ const requestJson = async (pathname, query, options = {}) => {
   return queued;
 };
 
+const requestOpenRouteServiceJson = async (pathname, query, options = {}) => {
+  const fetchImplementation = options.fetchImplementation || global.fetch;
+  if (typeof fetchImplementation !== 'function') {
+    throw new AppError('The geocoding HTTP client is unavailable', 500);
+  }
+
+  const baseUrl = normalizeBaseUrl(
+    options.baseUrl || config.openRouteServiceBaseUrl
+  );
+  const apiKey = String(
+    options.apiKey || config.openRouteServiceApiKey || ''
+  ).trim();
+  if (!apiKey) {
+    throw new AppError('OPENROUTESERVICE_API_KEY is required', 500);
+  }
+  const minIntervalMs = Math.max(
+    0,
+    Number(options.minIntervalMs ?? config.geocodingMinIntervalMs) || 0
+  );
+  const timeoutMs = Math.max(
+    100,
+    Number(options.timeoutMs || config.geocodingTimeoutMs) || 5000
+  );
+  const cacheTtlMs = Math.max(
+    0,
+    Number(options.cacheTtlMs ?? config.geocodingCacheTtlMs) || 0
+  );
+  const url = new URL(`${baseUrl}${pathname}`);
+  Object.entries({ api_key: apiKey, ...query }).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  const cacheKey = url.toString();
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (cached) cache.delete(cacheKey);
+
+  const performRequest = async () => {
+    const elapsed = Date.now() - lastRequestAt;
+    if (elapsed < minIntervalMs) await wait(minIntervalMs - elapsed);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      lastRequestAt = Date.now();
+      const response = await fetchImplementation(url, {
+        headers: { accept: 'application/geo+json, application/json' },
+        signal: controller.signal,
+      });
+      if (response.status === 429) {
+        throw new AppError('The geocoding service is temporarily rate limited', 429);
+      }
+      if (!response.ok) {
+        throw new AppError('The geocoding service is unavailable', 503);
+      }
+      const value = await response.json();
+      if (cacheTtlMs > 0) {
+        cache.set(cacheKey, { value, expiresAt: Date.now() + cacheTtlMs });
+      }
+      return value;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (error.name === 'AbortError') {
+        throw new AppError('The geocoding service timed out', 503);
+      }
+      throw new AppError('The geocoding service is unavailable', 503);
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  const queued = requestQueue.then(performRequest, performRequest);
+  requestQueue = queued.catch(() => {});
+  return queued;
+};
+
 const compactDisplayName = (place) => {
   const address = place.address || {};
   const candidates = [
@@ -158,11 +242,101 @@ const serializePlace = (place) => {
   };
 };
 
+const isWithinNorthernProvinceBounds = (latitude, longitude) =>
+  latitude >= NORTHERN_PROVINCE_BOUNDS.minLatitude &&
+  latitude <= NORTHERN_PROVINCE_BOUNDS.maxLatitude &&
+  longitude >= NORTHERN_PROVINCE_BOUNDS.minLongitude &&
+  longitude <= NORTHERN_PROVINCE_BOUNDS.maxLongitude;
+
+const serializeOpenRouteServicePlace = (feature) => {
+  const coordinates = feature?.geometry?.coordinates;
+  const properties = feature?.properties || {};
+  const longitude = Number(coordinates?.[0]);
+  const latitude = Number(coordinates?.[1]);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  const parts = [];
+  for (const candidate of [
+    properties.name,
+    properties.locality,
+    properties.localadmin,
+    properties.county,
+    properties.region,
+  ]) {
+    const value = String(candidate || '').trim();
+    if (!value || parts.some((part) => part.toLowerCase() === value.toLowerCase())) {
+      continue;
+    }
+    parts.push(value);
+    if (parts.length === 3) break;
+  }
+
+  return {
+    displayName: parts.join(', ') || String(properties.label || '').trim(),
+    fullDisplayName: String(properties.label || properties.name || '').trim(),
+    latitude,
+    longitude,
+    providerPlaceId: String(properties.gid || properties.id || ''),
+  };
+};
+
+const searchOpenRouteServicePlaces = async (query, options, limit) => {
+  const payload = await requestOpenRouteServiceJson(
+    '/geocode/autocomplete',
+    {
+      text: query,
+      size: limit,
+      lang: 'en',
+      'boundary.country': 'LK',
+      'boundary.rect.min_lon': NORTHERN_PROVINCE_BOUNDS.minLongitude,
+      'boundary.rect.max_lat': NORTHERN_PROVINCE_BOUNDS.maxLatitude,
+      'boundary.rect.max_lon': NORTHERN_PROVINCE_BOUNDS.maxLongitude,
+      'boundary.rect.min_lat': NORTHERN_PROVINCE_BOUNDS.minLatitude,
+    },
+    options
+  );
+  if (!Array.isArray(payload?.features)) {
+    throw new AppError('The geocoding service returned an invalid response', 503);
+  }
+  return payload.features
+    .map(serializeOpenRouteServicePlace)
+    .filter(
+      (place) =>
+        place &&
+        isWithinNorthernProvinceBounds(place.latitude, place.longitude)
+    );
+};
+
+const reverseOpenRouteServicePlace = async (latitude, longitude, options) => {
+  const payload = await requestOpenRouteServiceJson(
+    '/geocode/reverse',
+    {
+      'point.lat': latitude,
+      'point.lon': longitude,
+      size: 1,
+      lang: 'en',
+    },
+    options
+  );
+  const place = serializeOpenRouteServicePlace(payload?.features?.[0]);
+  if (!place) {
+    throw new AppError('No address was found for the selected location', 404);
+  }
+  return place;
+};
+
 const searchPlaces = async (query, options = {}) => {
   const limit = Math.min(
     10,
     Math.max(1, Number(options.limit || config.geocodingResultLimit) || 5)
   );
+  const provider = options.provider || config.mapProvider;
+  if (provider === 'openrouteservice') {
+    return searchOpenRouteServicePlaces(query, options, limit);
+  }
+  if (provider !== 'osrm-nominatim') {
+    throw new AppError('The configured map provider is not supported', 500);
+  }
   const payload = await requestJson(
     '/search',
     {
@@ -187,6 +361,13 @@ const searchPlaces = async (query, options = {}) => {
 };
 
 const reverseGeocode = async (latitude, longitude, options = {}) => {
+  const provider = options.provider || config.mapProvider;
+  if (provider === 'openrouteservice') {
+    return reverseOpenRouteServicePlace(latitude, longitude, options);
+  }
+  if (provider !== 'osrm-nominatim') {
+    throw new AppError('The configured map provider is not supported', 500);
+  }
   const payload = await requestJson(
     '/reverse',
     { lat: latitude, lon: longitude, format: 'jsonv2', addressdetails: 1 },
