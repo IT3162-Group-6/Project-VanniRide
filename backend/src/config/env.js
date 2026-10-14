@@ -40,7 +40,8 @@ const config = {
     'https://api.heigit.org',
   openRouteServiceRoutingBaseUrl:
     process.env.OPENROUTESERVICE_ROUTING_BASE_URL ||
-    'https://api.openrouteservice.org',
+    process.env.OPENROUTESERVICE_BASE_URL ||
+    'https://api.heigit.org',
   openRouteServiceApiKey,
   openRouteServiceProfile:
     process.env.OPENROUTESERVICE_PROFILE || 'driving-car',
@@ -111,7 +112,8 @@ const validateRuntimeConfig = (candidate = config) => {
     try {
       const routingProviderUrl = new URL(
         candidate.openRouteServiceRoutingBaseUrl ||
-          'https://api.openrouteservice.org'
+          candidate.openRouteServiceBaseUrl ||
+          'https://api.heigit.org'
       );
       if (!['http:', 'https:'].includes(routingProviderUrl.protocol)) {
         errors.push(

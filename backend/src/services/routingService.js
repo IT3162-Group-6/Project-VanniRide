@@ -19,6 +19,12 @@ const normalizeBaseUrl = (value) => {
 const routeCoordinate = (location) =>
   `${Number(location.longitude)},${Number(location.latitude)}`;
 
+const openRouteServiceDirectionsUrl = (baseUrl, profile) => {
+  const hostname = new URL(baseUrl).hostname.toLowerCase();
+  const prefix = hostname === 'api.heigit.org' ? '/openrouteservice' : '';
+  return `${baseUrl}${prefix}/v2/directions/${profile}/geojson`;
+};
+
 const calculateOpenRouteServiceRoute = async (
   pickupLocation,
   destination,
@@ -71,7 +77,7 @@ const calculateOpenRouteServiceRoute = async (
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImplementation(
-      `${baseUrl}/v2/directions/${profile}/geojson`,
+      openRouteServiceDirectionsUrl(baseUrl, profile),
       {
         method: 'POST',
         headers: {
@@ -138,11 +144,32 @@ const calculateRoadRoute = async (
 ) => {
   const provider = options.provider || config.mapProvider;
   if (provider === 'openrouteservice') {
-    return calculateOpenRouteServiceRoute(
-      pickupLocation,
-      destination,
-      options
-    );
+    try {
+      return await calculateOpenRouteServiceRoute(
+        pickupLocation,
+        destination,
+        options
+      );
+    } catch (primaryError) {
+      // Keep customer requests usable if the hosted provider is unavailable,
+      // rejects the key, or is temporarily over quota. The fallback is the
+      // same free OSRM endpoint used for local development.
+      console.warn(
+        `Primary road-routing provider failed: ${primaryError.message}; trying fallback`
+      );
+      try {
+        return await calculateRoadRoute(pickupLocation, destination, {
+          provider: 'osrm-nominatim',
+          baseUrl: options.fallbackBaseUrl || config.routingBaseUrl,
+          profile: options.fallbackProfile || config.routingProfile,
+          alternatives: 1,
+          timeoutMs: options.timeoutMs || config.routingTimeoutMs,
+          fetchImplementation: options.fetchImplementation,
+        });
+      } catch {
+        throw primaryError;
+      }
+    }
   }
   if (provider !== 'osrm-nominatim') {
     throw new AppError('The configured map provider is not supported', 500);

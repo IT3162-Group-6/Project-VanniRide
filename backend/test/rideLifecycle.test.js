@@ -2291,7 +2291,7 @@ test('rejects unsafe production configuration before server startup', () => {
     allowNonUniversityEmails: false,
     mapProvider: 'openrouteservice',
     openRouteServiceBaseUrl: 'https://api.heigit.org',
-    openRouteServiceRoutingBaseUrl: 'https://api.openrouteservice.org',
+    openRouteServiceRoutingBaseUrl: 'https://api.heigit.org',
     openRouteServiceApiKey: 'test-api-key',
   }));
 });
