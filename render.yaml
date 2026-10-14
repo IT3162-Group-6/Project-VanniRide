@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: vanni-ride-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: UNIVERSITY_EMAIL_DOMAIN
+        value: vau.ac.lk
+      - key: ALLOW_NON_UNIVERSITY_EMAILS
+        value: "false"
+      - key: CORS_ORIGINS
+        sync: false
+      - key: MAP_PROVIDER
+        value: openrouteservice
+      - key: OPENROUTESERVICE_BASE_URL
+        value: https://api.heigit.org
+      - key: OPENROUTESERVICE_API_KEY
+        sync: false
+      - key: OPENROUTESERVICE_PROFILE
+        value: driving-car
+      - key: ROUTING_ALTERNATIVES
+        value: "3"
+      - key: ROUTING_TIMEOUT_MS
+        value: "10000"
+      - key: GEOCODING_MIN_INTERVAL_MS
+        value: "1000"
+      - key: GEOCODING_TIMEOUT_MS
+        value: "10000"
+      - key: GEOCODING_CACHE_TTL_MS
+        value: "86400000"
+      - key: GEOCODING_RESULT_LIMIT
+        value: "5"
+      - key: CANCELLATION_SWEEP_INTERVAL_MS
+        value: "30000"

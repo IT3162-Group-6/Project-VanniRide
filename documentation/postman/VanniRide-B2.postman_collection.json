@@ -1,0 +1,274 @@
+{
+  "info": {
+    "name": "Vanni Ride - Integrated Backend API",
+    "description": "Complete integrated backend contract. Set role tokens and resource IDs in the collection variables before sending protected requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "customerToken", "value": "" },
+    { "key": "riderToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "rideId", "value": "" },
+    { "key": "riderId", "value": "" },
+    { "key": "riderUserId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "paymentId", "value": "" },
+    { "key": "chatAccessRequestId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sample Customer\",\n  \"email\": \"customer@example.com\",\n  \"phone\": \"0771234567\",\n  \"password\": \"password123\",\n  \"role\": \"CUSTOMER\"\n}" },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": "{{baseUrl}}/api/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profiles and History",
+      "item": [
+        { "name": "Get Profile", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/users/profile" } },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Updated Name\",\n  \"phone\": \"0777654321\"\n}" },
+            "url": "{{baseUrl}}/api/users/profile"
+          }
+        },
+        { "name": "Get My History", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/users/history" } },
+        { "name": "Get Cancellation Allowance", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/users/cancellation-allowance" } },
+        {
+          "name": "Update Rider Availability",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"availabilityStatus\": \"AVAILABLE\"\n}" },
+            "url": "{{baseUrl}}/api/users/rider/availability"
+          }
+        },
+        {
+          "name": "Update Rider Vehicle Profile",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"vehicle\": {\n    \"type\": \"Motorcycle\",\n    \"model\": \"Honda Dio\",\n    \"registrationNumber\": \"NP-7788\",\n    \"color\": \"Black\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/users/rider/profile"
+          }
+        },
+        { "name": "Get Rider Earnings", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/users/rider/earnings" } }
+      ]
+    },
+    {
+      "name": "Maps",
+      "item": [
+        { "name": "Search Places", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/maps/search?q=University%20of%20Vavuniya" } },
+        { "name": "Reverse Geocode", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/maps/reverse?latitude=8.7581&longitude=80.4982" } },
+        {
+          "name": "Preview Route and Fare",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"rideType\": \"DELIVERY\",\n  \"deliveryCategory\": \"FOOD\",\n  \"deliveryDetails\": {\n    \"foodOrder\": {\n      \"outletCode\": \"HOSTEL_CANTEEN\",\n      \"outletName\": \"Hostel Canteen\",\n      \"items\": [\n        { \"foodType\": \"CHICKEN_MEAL\", \"quantity\": 2, \"description\": \"Less spicy\" }\n      ]\n    }\n  },\n  \"pickupLocation\": {\n    \"address\": \"Hostel Canteen\",\n    \"latitude\": 8.7581,\n    \"longitude\": 80.4982\n  },\n  \"destination\": {\n    \"address\": \"Boys Hostel\",\n    \"latitude\": 8.7514,\n    \"longitude\": 80.4971\n  }\n}" },
+            "url": "{{baseUrl}}/api/maps/route-preview"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ride Lifecycle",
+      "item": [
+        {
+          "name": "Request Ride",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"rideType\": \"TRANSPORT\",\n  \"pickupLocation\": {\n    \"address\": \"University of Vavuniya\",\n    \"latitude\": 8.7581,\n    \"longitude\": 80.4982\n  },\n  \"destination\": {\n    \"address\": \"Vavuniya Town\",\n    \"latitude\": 8.7514,\n    \"longitude\": 80.4971\n  }\n}" },
+            "url": "{{baseUrl}}/api/rides"
+          }
+        },
+        { "name": "List My Rides", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/rides" } },
+        { "name": "List Available Rides", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/available" } },
+        { "name": "Get Ride", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}" } },
+        { "name": "Ignore Available Ride", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/ignore" } },
+        { "name": "Restore Ignored Ride", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/ignore" } },
+        { "name": "Accept Ride", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/accept" } },
+        {
+          "name": "Advance Ride Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"ARRIVED\"\n}" },
+            "url": "{{baseUrl}}/api/rides/{{rideId}}/status"
+          }
+        },
+        {
+          "name": "Cancel Ride or Request Mutual Cancellation",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Plans changed\"\n}" },
+            "url": "{{baseUrl}}/api/rides/{{rideId}}/cancel"
+          }
+        },
+        { "name": "Get Pending Cancellation Request", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/cancellation-request" } },
+        {
+          "name": "Resolve Pending Cancellation",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"CANCEL\"\n}" },
+            "url": "{{baseUrl}}/api/rides/{{rideId}}/cancellation-request"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        { "name": "Get Ride Payment", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/payment" } },
+        { "name": "Confirm Cash Payment", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/payment" } }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        { "name": "Get Ride Messages", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/rides/{{rideId}}/messages" } },
+        {
+          "name": "Send Ride Message",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"messageText\": \"I am waiting near the main gate.\"\n}" },
+            "url": "{{baseUrl}}/api/rides/{{rideId}}/messages"
+          }
+        },
+        {
+          "name": "Request Post-completion Chat Access",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"I may have left an item in the vehicle.\"\n}" },
+            "url": "{{baseUrl}}/api/rides/{{rideId}}/chat-access-requests"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ratings",
+      "item": [
+        {
+          "name": "Rate Completed Ride",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"rating\": 5,\n  \"review\": \"Safe and friendly service\"\n}" },
+            "url": "{{baseUrl}}/api/rides/{{rideId}}/rating"
+          }
+        },
+        { "name": "Get Rider Ratings", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/riders/{{riderId}}/ratings" } }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        { "name": "List My Notifications", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/notifications?limit=50" } },
+        { "name": "Mark Notification Read", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/notifications/{{notificationId}}/read" } },
+        { "name": "Mark All Notifications Read", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/notifications/read-all" } }
+      ]
+    },
+    {
+      "name": "Administration",
+      "item": [
+        { "name": "List Users", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/users" } },
+        {
+          "name": "Update User Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"accountStatus\": \"SUSPENDED\",\n  \"reason\": \"Documented policy violation\"\n}" },
+            "url": "{{baseUrl}}/api/admin/users/{{userId}}/status"
+          }
+        },
+        { "name": "List Riders", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/riders" } },
+        {
+          "name": "Review Rider Approval",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"APPROVE\",\n  \"reason\": \"Vehicle details verified\"\n}" },
+            "url": "{{baseUrl}}/api/admin/riders/{{riderUserId}}/approval"
+          }
+        },
+        { "name": "List Rides", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/rides" } },
+        { "name": "View Ride Conversation", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/rides/{{rideId}}/messages?reason=Operational%20review&limit=50" } },
+        {
+          "name": "Force-cancel Ride",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Administrative safety cancellation\"\n}" },
+            "url": "{{baseUrl}}/api/admin/rides/{{rideId}}/cancel"
+          }
+        },
+        { "name": "List Cancellations", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/cancellations" } },
+        { "name": "List Payments", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/payments" } },
+        {
+          "name": "Correct Payment",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 300,\n  \"paymentStatus\": \"PAID\",\n  \"reason\": \"Verified cash receipt\"\n}" },
+            "url": "{{baseUrl}}/api/admin/payments/{{paymentId}}"
+          }
+        },
+        { "name": "List Ratings", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/ratings" } },
+        { "name": "List Chat Access Requests", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/chat-access-requests" } },
+        {
+          "name": "Review Chat Access Request",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"APPROVE\",\n  \"reason\": \"Lost-item contact is justified\"\n}" },
+            "url": "{{baseUrl}}/api/admin/chat-access-requests/{{chatAccessRequestId}}"
+          }
+        },
+        { "name": "Get Statistics", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/statistics" } },
+        {
+          "name": "Broadcast App Update",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Vanni Ride update\",\n  \"message\": \"A new version of the app is available.\",\n  \"roles\": [\"CUSTOMER\", \"RIDER\"]\n}" },
+            "url": "{{baseUrl}}/api/admin/notifications/broadcast"
+          }
+        }
+      ]
+    }
+  ]
+}

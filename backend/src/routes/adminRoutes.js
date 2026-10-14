@@ -1,0 +1,34 @@
+const express = require('express');
+const adminController = require('../controllers/adminController');
+const { protect, restrictTo } = require('../middlewares/authMiddleware');
+const notificationController = require('../controllers/notificationController');
+
+const router = express.Router();
+
+router.use(protect);
+router.use(restrictTo('ADMIN'));
+
+router.get('/users', adminController.getAllUsers);
+router.patch('/users/:userId/status', adminController.updateUserStatus);
+router.get('/riders', adminController.getAllRiders);
+router.patch(
+  '/riders/:riderUserId/approval',
+  adminController.reviewRiderApproval
+);
+
+router.get('/rides', adminController.getAllRides);
+router.get('/rides/:rideId/messages', adminController.getRideMessages);
+router.patch('/rides/:rideId/cancel', adminController.forceCancelRide);
+router.get('/cancellations', adminController.getAllCancellations);
+router.get('/payments', adminController.getAllPayments);
+router.patch('/payments/:paymentId', adminController.correctPayment);
+router.get('/ratings', adminController.getAllRatings);
+router.get('/chat-access-requests', adminController.getChatAccessRequests);
+router.patch(
+  '/chat-access-requests/:requestId',
+  adminController.reviewChatAccessRequest
+);
+router.get('/statistics', adminController.getAdminStatistics);
+router.post('/notifications/broadcast', notificationController.broadcastSystemNotification);
+
+module.exports = router;

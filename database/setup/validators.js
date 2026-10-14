@@ -1,0 +1,539 @@
+use("vanniRideDB");
+
+const numericTypes = ["double", "int", "long", "decimal"];
+
+db.runCommand({
+  collMod: "users",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "name",
+        "email",
+        "phone",
+        "password_hash",
+        "role",
+        "account_status",
+        "token_version",
+        "created_at",
+        "updated_at"
+      ],
+      properties: {
+        name: { bsonType: "string", minLength: 1 },
+        email: { bsonType: "string", minLength: 3 },
+        phone: { bsonType: "string", minLength: 1 },
+        password_hash: { bsonType: "string", minLength: 1 },
+        role: { enum: ["CUSTOMER", "RIDER", "ADMIN"] },
+        account_status: { enum: ["ACTIVE", "SUSPENDED"] },
+        token_version: { bsonType: numericTypes, minimum: 0 },
+        created_at: { bsonType: "date" },
+        updated_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "riders",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "user_id",
+        "availability_status",
+        "vehicle",
+        "approval_status",
+        "review_reason",
+        "reviewed_by",
+        "reviewed_at",
+        "created_at",
+        "updated_at"
+      ],
+      properties: {
+        user_id: { bsonType: "objectId" },
+        availability_status: { enum: ["AVAILABLE", "UNAVAILABLE", "BUSY"] },
+        vehicle: {
+          bsonType: "object",
+          required: ["type", "model", "registration_number", "color"],
+          properties: {
+            type: { bsonType: "string", minLength: 1, maxLength: 50 },
+            model: { bsonType: "string", minLength: 1, maxLength: 100 },
+            registration_number: {
+              bsonType: "string",
+              minLength: 1,
+              maxLength: 30,
+              pattern: "^[A-Z0-9 -]+$"
+            },
+            color: { bsonType: "string", minLength: 1, maxLength: 50 }
+          }
+        },
+        approval_status: { enum: ["PENDING", "APPROVED", "REJECTED"] },
+        review_reason: {
+          bsonType: ["string", "null"],
+          minLength: 1,
+          maxLength: 500
+        },
+        reviewed_by: { bsonType: ["objectId", "null"] },
+        reviewed_at: { bsonType: ["date", "null"] },
+        created_at: { bsonType: "date" },
+        updated_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "rides",
+  validator: {
+    $and: [
+      {
+        $jsonSchema: {
+          bsonType: "object",
+          required: [
+            "customer_id",
+            "rider_id",
+            "request_type",
+            "delivery_category",
+            "pickup_location",
+            "destination",
+            "distance_km",
+            "fare_amount",
+            "status",
+            "requested_at"
+          ],
+          properties: {
+            customer_id: { bsonType: "objectId" },
+            rider_id: { bsonType: ["objectId", "null"] },
+            request_type: { enum: ["TRANSPORT", "DELIVERY"] },
+            delivery_category: { enum: ["FOOD", "WATER", "PARCEL", null] },
+            delivery_details: {
+              bsonType: ["object", "null"],
+              required: [
+                "receiver_name",
+                "receiver_phone",
+                "food_order",
+                "water_order",
+                "parcel_order"
+              ],
+              properties: {
+                receiver_name: { bsonType: ["string", "null"], minLength: 1, maxLength: 100 },
+                receiver_phone: {
+                  bsonType: ["string", "null"],
+                  pattern: "^(\\+94|0)7[0-9]{8}$"
+                },
+                food_order: {
+                  bsonType: ["object", "null"],
+                  required: ["outlet_code", "outlet_name", "items"],
+                  properties: {
+                    outlet_code: { bsonType: ["string", "null"], maxLength: 80 },
+                    outlet_name: { bsonType: "string", minLength: 1, maxLength: 150 },
+                    items: {
+                      bsonType: "array",
+                      minItems: 1,
+                      maxItems: 20,
+                      items: {
+                        bsonType: "object",
+                        required: ["food_type", "other_name", "quantity", "description"],
+                        properties: {
+                          food_type: {
+                            enum: [
+                              "VEGETABLE_MEAL", "CHICKEN_MEAL", "SALMON_MEAL",
+                              "FISH_MEAL", "EGG_MEAL", "SAUSAGES_MEAL",
+                              "MEATBALL_MEAL", "NOODLES", "KOTTU", "PASTA",
+                              "PARATA", "THOSAI", "OTHER"
+                            ]
+                          },
+                          other_name: { bsonType: ["string", "null"], maxLength: 100 },
+                          quantity: { bsonType: numericTypes, minimum: 1, maximum: 20 },
+                          description: { bsonType: ["string", "null"], maxLength: 300 }
+                        }
+                      }
+                    }
+                  }
+                },
+                water_order: {
+                  bsonType: ["object", "null"],
+                  required: ["items"],
+                  properties: {
+                    items: {
+                      bsonType: "array",
+                      minItems: 1,
+                      maxItems: 20,
+                      items: {
+                        bsonType: "object",
+                        required: ["container_type", "other_description", "quantity"],
+                        properties: {
+                          container_type: {
+                            enum: ["BOTTLE_20L", "BOTTLE_10L", "BOTTLE_5L", "BELOW_5L", "OTHER"]
+                          },
+                          other_description: { bsonType: ["string", "null"], maxLength: 200 },
+                          quantity: { bsonType: numericTypes, minimum: 1, maximum: 20 }
+                        }
+                      }
+                    }
+                  }
+                },
+                parcel_order: {
+                  bsonType: ["object", "null"],
+                  required: ["parcel_type", "other_type", "weight_kg", "notes"],
+                  properties: {
+                    parcel_type: {
+                      enum: ["DOCUMENTS", "FOOD", "CLOTHING", "MEDICINE", "ELECTRONICS", "OTHER"]
+                    },
+                    other_type: { bsonType: ["string", "null"], maxLength: 100 },
+                    weight_kg: { bsonType: numericTypes, minimum: 0.1, maximum: 50 },
+                    notes: { bsonType: ["string", "null"], maxLength: 500 }
+                  }
+                }
+              }
+            },
+            pickup_location: {
+              bsonType: "object",
+              required: ["address", "latitude", "longitude"],
+              properties: {
+                address: { bsonType: "string", minLength: 1 },
+                latitude: { bsonType: numericTypes, minimum: -90, maximum: 90 },
+                longitude: { bsonType: numericTypes, minimum: -180, maximum: 180 }
+              }
+            },
+            destination: {
+              bsonType: "object",
+              required: ["address", "latitude", "longitude"],
+              properties: {
+                address: { bsonType: "string", minLength: 1 },
+                latitude: { bsonType: numericTypes, minimum: -90, maximum: 90 },
+                longitude: { bsonType: numericTypes, minimum: -180, maximum: 180 }
+              }
+            },
+            distance_km: { bsonType: numericTypes, minimum: 0 },
+            fare_amount: { bsonType: numericTypes, minimum: 0 },
+            status: {
+              enum: [
+                "REQUESTED",
+                "ACCEPTED",
+                "ARRIVED",
+                "STARTED",
+                "COMPLETED",
+                "CANCELLED"
+              ]
+            },
+            requested_at: { bsonType: "date" },
+            accepted_at: { bsonType: ["date", "null"] },
+            arrived_at: { bsonType: ["date", "null"] },
+            started_at: { bsonType: ["date", "null"] },
+            completed_at: { bsonType: ["date", "null"] },
+            cancelled_at: { bsonType: ["date", "null"] }
+          }
+        }
+      },
+      {
+        $or: [
+          {
+            request_type: "TRANSPORT",
+            delivery_category: null,
+            delivery_details: null
+          },
+          {
+            request_type: "DELIVERY",
+            delivery_category: { $in: ["FOOD", "WATER", "PARCEL"] },
+            $or: [
+              { delivery_details: { $exists: false } },
+              {
+                delivery_category: "FOOD",
+                "delivery_details.food_order": { $type: "object" },
+                "delivery_details.water_order": null,
+                "delivery_details.parcel_order": null
+              },
+              {
+                delivery_category: "WATER",
+                "delivery_details.food_order": null,
+                "delivery_details.water_order": { $type: "object" },
+                "delivery_details.parcel_order": null
+              },
+              {
+                delivery_category: "PARCEL",
+                "delivery_details.food_order": null,
+                "delivery_details.water_order": null,
+                "delivery_details.parcel_order": { $type: "object" }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "payments",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "ride_id",
+        "amount",
+        "payment_method",
+        "payment_status",
+        "confirmed_by",
+        "created_at",
+        "paid_at"
+      ],
+      properties: {
+        ride_id: { bsonType: "objectId" },
+        amount: { bsonType: numericTypes, minimum: 0 },
+        payment_method: { enum: ["CASH"] },
+        payment_status: { enum: ["PENDING", "PAID"] },
+        confirmed_by: { bsonType: ["objectId", "null"] },
+        created_at: { bsonType: "date" },
+        paid_at: { bsonType: ["date", "null"] }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "messages",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["ride_id", "sender_id", "message_text", "sent_at"],
+      properties: {
+        ride_id: { bsonType: "objectId" },
+        sender_id: { bsonType: "objectId" },
+        message_text: { bsonType: "string", minLength: 1, maxLength: 1000 },
+        sent_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "cancellations",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "ride_id",
+        "cancelled_by",
+        "reason",
+        "previous_status",
+        "cancellation_mode",
+        "cancelled_at"
+      ],
+      properties: {
+        ride_id: { bsonType: "objectId" },
+        cancelled_by: { bsonType: "objectId" },
+        reason: { bsonType: "string", minLength: 1, maxLength: 500 },
+        previous_status: {
+          enum: ["REQUESTED", "ACCEPTED", "ARRIVED", "STARTED"]
+        },
+        cancellation_mode: {
+          enum: ["IMMEDIATE", "MUTUAL", "AUTO_TIMEOUT", "ADMIN_FORCE"]
+        },
+        cancelled_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "cancellation_requests",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "ride_id",
+        "requested_by",
+        "responding_user_id",
+        "reason",
+        "status",
+        "requested_at",
+        "expires_at",
+        "responded_at",
+        "resolved_at"
+      ],
+      properties: {
+        ride_id: { bsonType: "objectId" },
+        requested_by: { bsonType: "objectId" },
+        responding_user_id: { bsonType: "objectId" },
+        reason: { bsonType: "string", minLength: 1, maxLength: 500 },
+        status: {
+          enum: [
+            "PENDING",
+            "CONFIRMED",
+            "RESUMED",
+            "AUTO_CANCELLED",
+            "ADMIN_CANCELLED"
+          ]
+        },
+        requested_at: { bsonType: "date" },
+        expires_at: { bsonType: "date" },
+        responded_at: { bsonType: ["date", "null"] },
+        resolved_at: { bsonType: ["date", "null"] }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "ratings",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["ride_id", "customer_id", "rider_id", "rating", "review", "created_at"],
+      properties: {
+        ride_id: { bsonType: "objectId" },
+        customer_id: { bsonType: "objectId" },
+        rider_id: { bsonType: "objectId" },
+        rating: { bsonType: numericTypes, minimum: 1, maximum: 5 },
+        review: { bsonType: ["string", "null"], maxLength: 1000 },
+        created_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "chat_access_requests",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "ride_id",
+        "requested_by",
+        "rider_id",
+        "reason",
+        "status",
+        "reviewed_by",
+        "requested_at",
+        "reviewed_at",
+        "approved_from",
+        "approved_until"
+      ],
+      properties: {
+        ride_id: { bsonType: "objectId" },
+        requested_by: { bsonType: "objectId" },
+        rider_id: { bsonType: "objectId" },
+        reason: { bsonType: "string", minLength: 1, maxLength: 500 },
+        status: { enum: ["PENDING", "APPROVED", "REJECTED", "EXPIRED"] },
+        reviewed_by: { bsonType: ["objectId", "null"] },
+        requested_at: { bsonType: "date" },
+        reviewed_at: { bsonType: ["date", "null"] },
+        approved_from: { bsonType: ["date", "null"] },
+        approved_until: { bsonType: ["date", "null"] }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "admin_audit_logs",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "admin_id",
+        "action",
+        "target_type",
+        "target_id",
+        "reason",
+        "before",
+        "after",
+        "created_at"
+      ],
+      properties: {
+        admin_id: { bsonType: "objectId" },
+        action: {
+          enum: [
+            "USER_STATUS_CHANGED",
+            "PAYMENT_CORRECTED",
+            "CHAT_ACCESS_REVIEWED",
+            "RIDER_APPROVAL_REVIEWED",
+            "RIDE_MESSAGES_VIEWED",
+            "RIDE_FORCE_CANCELLED"
+          ]
+        },
+        target_type: {
+          enum: ["USER", "PAYMENT", "CHAT_ACCESS_REQUEST", "RIDER", "RIDE"]
+        },
+        target_id: { bsonType: "objectId" },
+        reason: { bsonType: "string", minLength: 1, maxLength: 500 },
+        before: { bsonType: "object" },
+        after: { bsonType: "object" },
+        created_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "ignored_ride_requests",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["rider_id", "ride_id", "ignored_at"],
+      properties: {
+        rider_id: { bsonType: "objectId" },
+        ride_id: { bsonType: "objectId" },
+        ignored_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+db.runCommand({
+  collMod: "notifications",
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: [
+        "user_id", "type", "title", "message", "link", "ride_id",
+        "is_read", "read_at", "created_at"
+      ],
+      properties: {
+        user_id: { bsonType: "objectId" },
+        type: {
+          enum: [
+            "RIDE_REQUEST", "RIDE_ACCEPTED", "RIDE_STATUS",
+            "RIDE_CANCELLED", "CANCELLATION_REQUESTED",
+              "CANCELLATION_RESOLVED", "CHAT_MESSAGE", "CHAT_ACCESS",
+              "RIDER_APPROVAL", "PAYMENT_CONFIRMED", "SYSTEM"
+          ]
+        },
+        title: { bsonType: "string", minLength: 1, maxLength: 120 },
+        message: { bsonType: "string", minLength: 1, maxLength: 500 },
+        link: { bsonType: ["string", "null"], maxLength: 300 },
+        ride_id: { bsonType: ["objectId", "null"] },
+        is_read: { bsonType: "bool" },
+        read_at: { bsonType: ["date", "null"] },
+        created_at: { bsonType: "date" }
+      }
+    }
+  },
+  validationLevel: "strict",
+  validationAction: "error"
+});
+
+print("All Vanni Ride validators applied successfully.");
