@@ -31,22 +31,41 @@ export const NAV_BY_ROLE = {
 
 const ROLE_LABEL = { customer: 'Customer', rider: 'Rider', admin: 'Admin' };
 
-export default function Sidebar({ open, onNavigate }) {
+export default function Sidebar({ open, onNavigate, collapsed, onToggleCollapse }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const links = NAV_BY_ROLE[user?.role] || [];
 
   return (
-    <aside className={`sidebar ${open ? 'open' : ''}`}>
-      <div className="sidebar-brand">
-        <span className="brand-mark brand-mark-dark"><Icon name="pin" size={20} /></span> Vanni <b>Ride</b>
+    <aside className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
+      <div className="sidebar-header">
+        <div className="sidebar-brand">
+          <span className="brand-mark brand-mark-dark"><Icon name="pin" size={20} /></span>
+          <span className="sidebar-brand-text"> Vanni <b>Ride</b></span>
+        </div>
+        <button
+          className="sidebar-collapse-btn"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={16} />
+        </button>
       </div>
       <div className="sidebar-role">{ROLE_LABEL[user?.role] || 'Guest'} panel</div>
 
       <nav className="sidebar-nav">
         {links.map((l) => (
-          <NavLink key={l.to} to={l.to} onClick={onNavigate} className={({ isActive }) => (isActive ? 'active' : '')}>
-            <Icon name={l.icon} /> {l.label}
+          <NavLink
+            key={l.to}
+            to={l.to}
+            onClick={onNavigate}
+            className={({ isActive }) => (isActive ? 'active' : '')}
+            title={collapsed ? l.label : undefined}
+            aria-label={l.label}
+          >
+            <Icon name={l.icon} />
+            <span className="sidebar-link-text">{l.label}</span>
           </NavLink>
         ))}
       </nav>
@@ -54,8 +73,11 @@ export default function Sidebar({ open, onNavigate }) {
       <button
         className="sidebar-logout"
         onClick={() => { onNavigate?.(); logout(); navigate('/login', { replace: true }); }}
+        title={collapsed ? 'Logout' : undefined}
+        aria-label="Logout"
       >
-        <Icon name="logout" /> Logout
+        <Icon name="logout" />
+        <span className="sidebar-link-text">Logout</span>
       </button>
     </aside>
   );

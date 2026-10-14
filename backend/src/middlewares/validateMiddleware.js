@@ -2,15 +2,16 @@ const AppError = require('../utils/appError');
 
 
 exports.validateRegister = (req, res, next) => {
-  const { name, email, phone, password, role } = req.body;
+  const { name, phone, password, role } = req.body || {};
+  const email = String(req.body?.email || '').trim().toLowerCase();
 
   if (!name || !email || !phone || !password || !role) {
     return next(new AppError('All fields (name, email, phone, password, role) are required', 400));
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return next(new AppError('Please provide a valid email address', 400));
+  const universityEmailRegex = /^[a-zA-Z0-9._%+-]+@vau\.ac\.lk$/i;
+  if (!universityEmailRegex.test(email)) {
+    return next(new AppError('Please use your University of Vavuniya email address (@vau.ac.lk).', 400));
   }
 
   if (typeof password !== 'string' || password.length < 6) {

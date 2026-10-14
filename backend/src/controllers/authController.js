@@ -11,6 +11,13 @@ const {
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
+const UNIVERSITY_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@vau\.ac\.lk$/i;
+
+const isUniversityEmail = (email) => {
+  const normalized = normalizeEmail(email);
+  return UNIVERSITY_EMAIL_REGEX.test(normalized);
+};
+
 const serializeUser = (userDocument) => {
   const user = userDocument.toObject ? userDocument.toObject() : userDocument;
 
@@ -50,6 +57,15 @@ exports.register = async (req, res, next) => {
     const { name, phone, password } = req.body;
     const email = normalizeEmail(req.body.email);
     const role = String(req.body.role || '').toUpperCase();
+
+    if (!isUniversityEmail(email)) {
+      return next(
+        new AppError(
+          'Please use your University of Vavuniya email address (@vau.ac.lk).',
+          400
+        )
+      );
+    }
 
     const existingUser = await User.exists({ email });
     if (existingUser) {

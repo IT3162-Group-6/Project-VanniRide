@@ -1897,14 +1897,14 @@ test('completes the customer, rider, and administrator journey through HTTP APIs
   try {
     const customerRegistration = await request('POST', '/api/auth/register', null, {
       name: 'Journey Customer',
-      email: 'journey-customer@example.com',
+      email: 'journey-customer@vau.ac.lk',
       phone: '0700001701',
       password,
       role: 'CUSTOMER',
     });
     const riderRegistration = await request('POST', '/api/auth/register', null, {
       name: 'Journey Rider',
-      email: 'journey-rider@example.com',
+      email: 'journey-rider@vau.ac.lk',
       phone: '0700001702',
       password,
       role: 'RIDER',

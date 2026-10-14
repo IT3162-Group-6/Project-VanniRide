@@ -28,9 +28,17 @@ export default function Register() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    const normalizedEmail = String(form.email || '').trim().toLowerCase();
+    if (!/^[a-zA-Z0-9._%+-]+@vau\.ac\.lk$/i.test(normalizedEmail)) {
+      setError('Please use your University of Vavuniya email address (@vau.ac.lk).');
+      return;
+    }
     setBusy(true);
     try {
-      const user = await register(form);
+      const user = await register({
+        ...form,
+        email: normalizedEmail,
+      });
       showToast('Account created — welcome to Vanni Ride!');
       navigate(HOME_BY_ROLE[user.role], { replace: true });
     } catch (err) {

@@ -633,6 +633,58 @@ h1,h2,h3,h4{letter-spacing:-.015em}
 .sidebar-nav a.active{background:var(--green-600);box-shadow:0 8px 16px -10px rgba(0,0,0,.6)}
 .sidebar-logout{border-top:1px solid rgba(255,255,255,.1);border-radius:0;padding-top:16px;margin:0 6px 4px}
 
+/* ---- sidebar collapse controls ---- */
+.sidebar-header{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 2px 0 0}
+.sidebar-brand-text{white-space:nowrap;overflow:hidden}
+.sidebar-collapse-btn{
+  display:none;width:28px;height:28px;border-radius:8px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);color:#b9c9bd;cursor:pointer;
+  flex:0 0 28px;align-items:center;justify-content:center;
+  transition:background .15s ease,color .15s ease;
+}
+.sidebar-collapse-btn:hover{background:rgba(255,255,255,.14);color:#fff}
+
+/* show collapse button only on desktop where sidebar is visible by default */
+@media (min-width:641px){
+  .sidebar-collapse-btn{display:flex}
+}
+
+/* ---- sidebar collapsed state (desktop only) ---- */
+@media (min-width:641px){
+  .app-shell{transition:grid-template-columns .2s ease}
+  .sidebar{transition:width .2s ease,padding .2s ease}
+
+  .app-shell.sidebar-collapsed{grid-template-columns:68px 1fr}
+
+  .sidebar.collapsed{width:68px;padding:22px 8px 16px;overflow:visible}
+  .sidebar.collapsed .sidebar-brand-text,
+  .sidebar.collapsed .sidebar-role,
+  .sidebar.collapsed .sidebar-link-text{
+    opacity:0;width:0;height:0;overflow:hidden;position:absolute;pointer-events:none;
+  }
+  .sidebar.collapsed .sidebar-header{justify-content:center}
+  .sidebar.collapsed .sidebar-brand{justify-content:center;padding:0}
+  .sidebar.collapsed .sidebar-nav a{justify-content:center;padding:11px 0;position:relative}
+  .sidebar.collapsed .sidebar-logout{justify-content:center;padding:12px 0;margin:0 0 4px;width:100%}
+  .sidebar.collapsed .sidebar-collapse-btn{margin:6px auto 0}
+
+  /* tooltip on hover in collapsed state */
+  .sidebar.collapsed .sidebar-nav a::after,
+  .sidebar.collapsed .sidebar-logout::after{
+    content:attr(title);
+    position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);
+    background:var(--green-900);color:#fff;font-size:.78rem;font-weight:600;
+    padding:5px 10px;border-radius:6px;white-space:nowrap;
+    opacity:0;pointer-events:none;transition:opacity .15s ease;z-index:100;
+    box-shadow:0 4px 12px rgba(0,0,0,.25);
+  }
+  .sidebar.collapsed .sidebar-nav a:hover::after,
+  .sidebar.collapsed .sidebar-logout:hover::after{opacity:1}
+
+  /* keep active indicator visible */
+  .sidebar.collapsed .sidebar-nav a.active{background:var(--green-600);box-shadow:0 8px 16px -10px rgba(0,0,0,.6)}
+}
+
 /* ---- app topbar ---- */
 .app-topbar h1{font-size:1.18rem;font-weight:800}
 .icon-btn{border-radius:10px}
@@ -733,3 +785,35 @@ h1,h2,h3,h4{letter-spacing:-.015em}
   .promo-art{display:none}
   .fare-summary{grid-template-columns:1fr 1fr}
 }
+
+/* ---- notification dropdown ---- */
+.notif-wrap{position:relative}
+.notif-panel{
+  position:absolute;right:0;top:calc(100% + 10px);width:360px;max-width:calc(100vw - 24px);
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow);z-index:60;overflow:hidden;
+}
+.notif-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.notif-link{border:0;background:transparent;color:var(--green-600);font-weight:700;font-size:.8rem;cursor:pointer}
+.notif-link:disabled{color:var(--ink-soft);opacity:.5;cursor:default}
+.notif-list{max-height:380px;overflow-y:auto}
+.notif-empty{padding:28px 16px;text-align:center;color:var(--ink-soft);font-size:.88rem;margin:0}
+.notif-item{
+  display:flex;gap:10px;width:100%;text-align:left;padding:12px 16px;border:0;border-bottom:1px solid var(--line);
+  background:#fff;cursor:pointer;font:inherit;color:inherit;
+}
+.notif-item:last-child{border-bottom:0}
+.notif-item:hover{background:var(--mint-50)}
+.notif-item.unread{background:var(--mint-100)}
+.notif-dot{width:8px;height:8px;border-radius:50%;background:transparent;margin-top:6px;flex:none}
+.notif-item.unread .notif-dot{background:var(--green-600)}
+.notif-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.notif-title{font-weight:700;font-size:.88rem}
+.notif-msg{font-size:.82rem;color:var(--ink-soft)}
+.notif-time{font-size:.72rem;color:var(--ink-soft)}
+@media (max-width:640px){
+  .notif-wrap{position:static}
+  .notif-panel{position:fixed;left:12px;right:12px;top:68px;width:auto}
+}
+
+/* menu button always visible in the app topbar */
+.app-topbar > .icon-btn:first-child{flex:none}

@@ -800,4 +800,23 @@ export const adminApi = {
   },
 };
 
-export default { authApi, riderApi, mapApi, ridesApi, chatApi, ratingApi, paymentsApi, adminApi };
+export const notificationsApi = {
+  async list({ limit = 20 } = {}) {
+    if (USE_MOCK_DATA) return { notifications: [], unreadCount: 0 };
+    const res = await http('/notifications', { params: { limit } });
+    return {
+      notifications: res?.data?.notifications || [],
+      unreadCount: res?.data?.unreadCount ?? res?.unreadCount ?? 0,
+    };
+  },
+  async markRead(id) {
+    if (USE_MOCK_DATA) return null;
+    return http(`/notifications/${id}/read`, { method: 'PATCH' });
+  },
+  async markAllRead() {
+    if (USE_MOCK_DATA) return null;
+    return http('/notifications/read-all', { method: 'PATCH' });
+  },
+};
+
+export default { notificationsApi, authApi, riderApi, mapApi, ridesApi, chatApi, ratingApi, paymentsApi, adminApi };

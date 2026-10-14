@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
+import NotificationBell from './NotificationBell';
 import { useAuth, HOME_BY_ROLE } from '../context/AuthContext';
 
 /**
@@ -19,10 +20,7 @@ export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMen
         </button>
         <h1>{title}</h1>
         <div className="app-topbar-actions">
-          <button className="icon-btn" aria-label="Notifications">
-            <Icon name="bell" />
-            <span className="badge">2</span>
-          </button>
+          <NotificationBell />
           <Link to={`/${user?.role}/profile`} className="avatar">
             {user?.name?.[0]?.toUpperCase() || 'U'}
           </Link>
