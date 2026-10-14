@@ -325,18 +325,12 @@ const reverseOpenRouteServicePlace = async (latitude, longitude, options) => {
   return place;
 };
 
-const searchPlaces = async (query, options = {}) => {
-  const limit = Math.min(
-    10,
-    Math.max(1, Number(options.limit || config.geocodingResultLimit) || 5)
-  );
-  const provider = options.provider || config.mapProvider;
-  if (provider === 'openrouteservice') {
-    return searchOpenRouteServicePlaces(query, options, limit);
-  }
-  if (provider !== 'osrm-nominatim') {
-    throw new AppError('The configured map provider is not supported', 500);
-  }
+const getNominatimFallbackOptions = (options = {}) => ({
+  ...options,
+  baseUrl: options.fallbackBaseUrl || config.geocodingBaseUrl,
+});
+
+const searchNominatimPlaces = async (query, options, limit) => {
   const payload = await requestJson(
     '/search',
     {
@@ -360,14 +354,7 @@ const searchPlaces = async (query, options = {}) => {
     .filter(Boolean);
 };
 
-const reverseGeocode = async (latitude, longitude, options = {}) => {
-  const provider = options.provider || config.mapProvider;
-  if (provider === 'openrouteservice') {
-    return reverseOpenRouteServicePlace(latitude, longitude, options);
-  }
-  if (provider !== 'osrm-nominatim') {
-    throw new AppError('The configured map provider is not supported', 500);
-  }
+const reverseNominatimPlace = async (latitude, longitude, options) => {
   const payload = await requestJson(
     '/reverse',
     { lat: latitude, lon: longitude, format: 'jsonv2', addressdetails: 1 },
@@ -378,6 +365,56 @@ const reverseGeocode = async (latitude, longitude, options = {}) => {
     throw new AppError('No address was found for the selected location', 404);
   }
   return place;
+};
+
+const searchPlaces = async (query, options = {}) => {
+  const limit = Math.min(
+    10,
+    Math.max(1, Number(options.limit || config.geocodingResultLimit) || 5)
+  );
+  const provider = options.provider || config.mapProvider;
+  if (provider === 'openrouteservice') {
+    try {
+      return await searchOpenRouteServicePlaces(query, options, limit);
+    } catch (primaryError) {
+      try {
+        return await searchNominatimPlaces(
+          query,
+          getNominatimFallbackOptions(options),
+          limit
+        );
+      } catch {
+        throw primaryError;
+      }
+    }
+  }
+  if (provider !== 'osrm-nominatim') {
+    throw new AppError('The configured map provider is not supported', 500);
+  }
+  return searchNominatimPlaces(query, options, limit);
+};
+
+const reverseGeocode = async (latitude, longitude, options = {}) => {
+  const provider = options.provider || config.mapProvider;
+  if (provider === 'openrouteservice') {
+    try {
+      return await reverseOpenRouteServicePlace(latitude, longitude, options);
+    } catch (primaryError) {
+      try {
+        return await reverseNominatimPlace(
+          latitude,
+          longitude,
+          getNominatimFallbackOptions(options)
+        );
+      } catch {
+        throw primaryError;
+      }
+    }
+  }
+  if (provider !== 'osrm-nominatim') {
+    throw new AppError('The configured map provider is not supported', 500);
+  }
+  return reverseNominatimPlace(latitude, longitude, options);
 };
 
 const clearGeocodingCache = () => {
