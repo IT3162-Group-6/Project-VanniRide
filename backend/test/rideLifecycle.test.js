@@ -523,7 +523,7 @@ test('adapts OpenRouteService routes and Northern Province autocomplete', async 
   assert.equal(route.durationMinutes, 3);
   assert.equal(
     routingRequest.url,
-    'https://openrouteservice.test/openrouteservice/v2/directions/driving-car/geojson'
+    'https://openrouteservice.test/v2/directions/driving-car/geojson'
   );
   assert.equal(routingRequest.options.method, 'POST');
   assert.equal(routingRequest.options.headers.authorization, 'test-api-key');
@@ -2291,6 +2291,7 @@ test('rejects unsafe production configuration before server startup', () => {
     allowNonUniversityEmails: false,
     mapProvider: 'openrouteservice',
     openRouteServiceBaseUrl: 'https://api.heigit.org',
+    openRouteServiceRoutingBaseUrl: 'https://api.openrouteservice.org',
     openRouteServiceApiKey: 'test-api-key',
   }));
 });

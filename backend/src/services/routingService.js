@@ -30,7 +30,7 @@ const calculateOpenRouteServiceRoute = async (
   }
 
   const baseUrl = normalizeBaseUrl(
-    options.baseUrl || config.openRouteServiceBaseUrl
+    options.baseUrl || config.openRouteServiceRoutingBaseUrl
   );
   const apiKey = String(
     options.apiKey || config.openRouteServiceApiKey || ''
@@ -71,7 +71,7 @@ const calculateOpenRouteServiceRoute = async (
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImplementation(
-      `${baseUrl}/openrouteservice/v2/directions/${profile}/geojson`,
+      `${baseUrl}/v2/directions/${profile}/geojson`,
       {
         method: 'POST',
         headers: {

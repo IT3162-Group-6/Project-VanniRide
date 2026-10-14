@@ -38,6 +38,9 @@ const config = {
   openRouteServiceBaseUrl:
     process.env.OPENROUTESERVICE_BASE_URL ||
     'https://api.heigit.org',
+  openRouteServiceRoutingBaseUrl:
+    process.env.OPENROUTESERVICE_ROUTING_BASE_URL ||
+    'https://api.openrouteservice.org',
   openRouteServiceApiKey,
   openRouteServiceProfile:
     process.env.OPENROUTESERVICE_PROFILE || 'driving-car',
@@ -104,6 +107,19 @@ const validateRuntimeConfig = (candidate = config) => {
       }
     } catch {
       errors.push('OPENROUTESERVICE_BASE_URL must be a valid URL');
+    }
+    try {
+      const routingProviderUrl = new URL(
+        candidate.openRouteServiceRoutingBaseUrl ||
+          'https://api.openrouteservice.org'
+      );
+      if (!['http:', 'https:'].includes(routingProviderUrl.protocol)) {
+        errors.push(
+          'OPENROUTESERVICE_ROUTING_BASE_URL must use HTTP or HTTPS'
+        );
+      }
+    } catch {
+      errors.push('OPENROUTESERVICE_ROUTING_BASE_URL must be a valid URL');
     }
     if (!String(candidate.openRouteServiceApiKey || '').trim()) {
       errors.push('OPENROUTESERVICE_API_KEY is required');
