@@ -118,11 +118,14 @@ function RequestRideForm({ requestedRideType }) {
     if (value.trim().length < 3) setSearchBusy(false);
   }
 
-  async function resolvePoint(target, point) {
+  async function resolvePoint(target, point, advanceSelection = false) {
     setError('');
     setLocationBusy(true);
     const fallback = { ...point, address: coordinateLabel(point) };
     setLocation(target, fallback);
+    if (advanceSelection) {
+      setActiveLocation(target === 'pickup' ? 'destination' : 'pickup');
+    }
     try {
       const place = await mapApi.reverse(point.latitude, point.longitude);
       setLocation(target, {
@@ -145,7 +148,7 @@ function RequestRideForm({ requestedRideType }) {
     });
     setSearchResults([]);
     setSearchQuery('');
-    if (activeLocation === 'pickup') setActiveLocation('destination');
+    setActiveLocation(activeLocation === 'pickup' ? 'destination' : 'pickup');
   }
 
   function chooseFoodPickup(place) {
@@ -261,7 +264,7 @@ function RequestRideForm({ requestedRideType }) {
         pickup={form.pickupLocation}
         destination={form.destination}
         routeGeometry={preview?.routeGeometry}
-        onSelect={(point) => void resolvePoint(activeLocation, point)}
+        onSelect={(point) => void resolvePoint(activeLocation, point, true)}
         onMovePickup={(point) => void resolvePoint('pickup', point)}
         onMoveDestination={(point) => void resolvePoint('destination', point)}
       />
@@ -396,7 +399,12 @@ function RequestRideForm({ requestedRideType }) {
             <div className="fare-row"><span>Destination</span><span>{form.destination.address}</span></div>
             {form.rideType === 'DELIVERY' && <>
               {form.deliveryCategory === 'PARCEL' && (
-                <div className="delivery-review-contact"><span>Receiver</span><b>{deliveryDetails.receiverName} · {deliveryDetails.receiverPhone}</b></div>
+                <div className="delivery-review-contact">
+                  <span>Receiver</span>
+                  <b>{deliveryDetails.receiverMode === 'SELF'
+                    ? 'Me · account phone number'
+                    : `${deliveryDetails.receiverName} · ${deliveryDetails.receiverPhone}`}</b>
+                </div>
               )}
               <DeliveryOrderSummary category={form.deliveryCategory} details={deliveryDetails} compact />
               {preview.fareBreakdown && <div className="delivery-price-breakdown">

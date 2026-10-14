@@ -9,6 +9,11 @@ token, restores the current account from `GET /api/users/profile`, and clears
 expired sessions. API roles are normalized to the lowercase role names already
 used by the existing frontend routes.
 
+The login page includes password recovery. The forgot-password form always
+shows an account-neutral response and creates an administrator review request.
+After identity verification, an administrator assigns a temporary password
+from the Users page. Resolving the request revokes existing sessions.
+
 Rider registration includes vehicle type, model, registration number, and
 colour. A newly registered rider can sign in but remains pending and offline
 until administrator approval.
@@ -38,6 +43,23 @@ client values cannot be forged.
 Socket.IO delivers ride progress, cancellation, notification, chat, and
 available-request changes immediately. A 20-second timed refresh remains as a
 recovery fallback if the live connection is interrupted.
+
+A persistent banner appears while the browser reports that the device is
+offline and clears automatically after reconnection. When a pending request is
+cancelled or accepted by another rider, its stored notification is replaced in
+real time and the request-detail page reports that it is no longer available.
+
+New stored notifications also appear as dismissible in-app popups. Ride-request
+popups take riders to the available-request list, chat popups open the relevant
+conversation, and other popup types open the notification page. The top-bar
+bell opens the five most recent notifications without leaving the current page
+and includes a link to the full notification page.
+
+Every role has a Settings page. Notification popup categories, sound, and
+vibration are saved per account on the current device and apply immediately.
+Disabling optional popups does not remove stored notifications from the bell or
+notification page. Cancellation, account/access decision, and payment alerts
+remain popup-enabled; users may still disable their sound and vibration.
 
 Active requests and request-detail pages display the stored pickup and
 destination on OpenStreetMap. Riders can open the appropriate pickup or
@@ -82,14 +104,16 @@ request status and customer communication.
 Customer and rider chat pages now load their real ride conversations and poll
 for new messages. Messaging is enabled for accepted, arrived, and started rides.
 Completed conversations remain readable, but become writable only while an
-administrator-approved post-completion access window is active. A customer can
-submit the access reason from the completed conversation, including for a lost
-item, and both participants see whether the request is still pending.
+administrator-approved post-completion access window is active. Either the
+customer or rider can submit the access reason from the completed conversation,
+including for a lost item, and both participants see whether the request is
+still pending.
 
-After a completed ride, the customer history page accepts one one-to-five-star
-rider rating with an optional review. The rider dashboard shows the backend's
-current average and total rating count. These additions reuse the existing
-history and chat layouts without changing the frontend theme.
+After a completed ride or delivery, the customer sees a skippable one-to-five
+star rating dialog with an optional review. Skipping dismisses that ride's
+prompt on the current browser, while the customer can still rate it later from
+Ride History. The rider dashboard shows the backend's current average and total
+rating count.
 
 ## Administrator operations
 

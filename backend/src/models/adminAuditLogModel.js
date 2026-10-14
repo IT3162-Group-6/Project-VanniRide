@@ -17,6 +17,7 @@ const adminAuditLogSchema = new mongoose.Schema(
         'RIDER_APPROVAL_REVIEWED',
         'RIDE_MESSAGES_VIEWED',
         'RIDE_FORCE_CANCELLED',
+        'PASSWORD_RESET_RESOLVED',
       ],
     },
     target_type: {

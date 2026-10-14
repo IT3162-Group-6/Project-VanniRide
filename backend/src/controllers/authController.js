@@ -4,6 +4,8 @@ const env = require('../config/env');
 const AppError = require('../utils/appError');
 const User = require('../models/userModel');
 const Rider = require('../models/riderModel');
+const PasswordResetToken = require('../models/passwordResetTokenModel');
+const PasswordResetRequest = require('../models/passwordResetRequestModel');
 const {
   normalizeVehicle,
   serializeRiderProfile,
@@ -12,8 +14,15 @@ const {
   isValidEmail,
   registrationEmailIsAllowed,
 } = require('../utils/universityEmail');
+const {
+  hashResetToken,
+  isResetTokenFormatValid,
+  validateNewPassword,
+} = require('../services/passwordResetService');
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+const PASSWORD_RESET_RESPONSE =
+  'If an active account matches that email, an administrator will review the password reset request.';
 
 const serializeUser = (userDocument) => {
   const user = userDocument.toObject ? userDocument.toObject() : userDocument;
@@ -184,6 +193,98 @@ exports.logout = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: 'Logged out successfully',
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    if (!email) {
+      return next(new AppError('Please provide an email address', 400));
+    }
+
+    if (isValidEmail(email)) {
+      const user = await User.findOne({
+        email,
+        account_status: 'ACTIVE',
+      }).select('_id');
+
+      if (user) {
+        await PasswordResetRequest.findOneAndUpdate(
+          { user_id: user._id },
+          {
+            $set: {
+              status: 'PENDING',
+              requested_at: new Date(),
+              resolved_at: null,
+              resolved_by: null,
+            },
+          },
+          { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+        );
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: PASSWORD_RESET_RESPONSE,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const token = String(req.body.token || '');
+    if (!isResetTokenFormatValid(token)) {
+      return next(new AppError('Password reset link is invalid or expired', 400));
+    }
+
+    let password;
+    try {
+      password = validateNewPassword(req.body.password);
+    } catch (validationError) {
+      return next(new AppError(validationError.message, 400));
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const now = new Date();
+    const resetRecord = await PasswordResetToken.findOneAndUpdate(
+      {
+        token_hash: hashResetToken(token),
+        used_at: null,
+        expires_at: { $gt: now },
+      },
+      { $set: { used_at: now } },
+      { returnDocument: 'after' }
+    );
+    if (!resetRecord) {
+      return next(new AppError('Password reset link is invalid or expired', 400));
+    }
+
+    const result = await User.updateOne(
+      { _id: resetRecord.user_id, account_status: 'ACTIVE' },
+      {
+        $set: { password_hash: passwordHash },
+        $inc: { token_version: 1 },
+      }
+    );
+    if (result.matchedCount !== 1) {
+      return next(new AppError('Password reset link is invalid or expired', 400));
+    }
+
+    await PasswordResetToken.updateMany(
+      { user_id: resetRecord.user_id, used_at: null },
+      { $set: { used_at: now } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password reset successfully. You can now log in.',
     });
   } catch (error) {
     return next(error);

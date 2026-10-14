@@ -7,6 +7,7 @@ import {
   getToken,
   isMockAuth,
   NOTIFICATIONS_CHANGED_EVENT,
+  NOTIFICATION_UPDATED_EVENT,
 } from '../services/api';
 
 export function RealtimeProvider({ children }) {
@@ -27,12 +28,19 @@ export function RealtimeProvider({ children }) {
         detail: notification,
       }));
     };
+    const announceNotificationUpdate = (notification) => {
+      window.dispatchEvent(new CustomEvent(NOTIFICATION_UPDATED_EVENT, {
+        detail: notification,
+      }));
+    };
 
     socket.on('notification_created', announceNotification);
+    socket.on('notification_updated', announceNotificationUpdate);
     socket.connect();
 
     return () => {
       socket.off('notification_created', announceNotification);
+      socket.off('notification_updated', announceNotificationUpdate);
       socket.disconnect();
     };
   }, [socket]);

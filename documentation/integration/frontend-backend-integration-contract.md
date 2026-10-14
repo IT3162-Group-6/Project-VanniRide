@@ -183,11 +183,12 @@ distance is not a routing fallback.
 
 For `DELIVERY`, both route preview and ride creation must send the same
 `deliveryDetails` object. It contains exactly one category-specific object:
-`foodOrder`, `waterOrder`, or `parcelOrder`. A parcel also requires
-`receiverName` and `receiverPhone`; food and water deliveries use the
-registered customer as the receiver. The backend validates item quantities,
-custom `OTHER` descriptions, parcel weight, and the parcel receiver's Sri
-Lankan mobile format before calculating or saving the request.
+`foodOrder`, `waterOrder`, or `parcelOrder`. A parcel also sends `receiverMode`
+as `SELF` or `OTHER`. `SELF` securely uses the authenticated customer's
+account name and phone; `OTHER` requires `receiverName` and `receiverPhone`.
+The backend validates item quantities, custom `OTHER` descriptions, parcel
+weight, and the resolved parcel receiver's Sri Lankan mobile format before
+calculating or saving the request.
 
 Delivery fare uses a LKR 150 base, LKR 60 per road-route kilometre, and a
 category handling charge: LKR 25 per food parcel, LKR 30 per water container,
@@ -210,7 +211,8 @@ tracking remains outside scope.
 
 The existing `riders` collection is the rider profile and is extended with:
 
-- `vehicle.type`: required trimmed string, maximum 50 characters;
+- `vehicle.type`: required trimmed string, maximum 50 characters; the current
+  registration client offers `Motorcycle` and `Three-wheeler`;
 - `vehicle.model`: required trimmed string, maximum 100 characters;
 - `vehicle.registration_number`: required normalized uppercase string, maximum
   30 characters;
@@ -307,9 +309,10 @@ room.
 
 ### 5.1 Existing chat-access management
 
-The existing post-completion chat-access request workflow remains unchanged.
-It manages whether the customer and rider may resume messaging after a
-completed ride.
+Either the customer or assigned rider may request post-completion chat access
+from a completed conversation. Only one request per ride may remain pending.
+An administrator decision applies to both participants and, when approved,
+reopens messaging for 24 hours.
 
 ### 5.2 Admin conversation viewing
 
@@ -445,18 +448,52 @@ GET   /api/notifications
 PATCH /api/notifications/:notificationId/read
 PATCH /api/notifications/read-all
 POST  /api/admin/notifications/broadcast
+POST  /api/auth/forgot-password
+POST  /api/auth/reset-password
+GET   /api/admin/password-reset-requests
+PATCH /api/admin/password-reset-requests/:requestId
 ```
 
 All existing version-one endpoints remain in force.
 
+### Password-recovery behavior
+
+The login page links to a public forgot-password form. Its response remains the
+same for known and unknown addresses. Eligible accounts create a pending item
+on the administrator Users page. After verifying the requester through an
+established university channel, an administrator assigns a temporary password
+and records a verification note. Resolving the request revokes existing
+sessions and creates an audit entry. Email token recovery remains dormant for a
+future phase.
+
 ### Notification-centre behavior
 
-The navigation bell opens a role-specific notification page and displays the
-stored unread count. A user can open and mark one notification as read or mark
-all notifications as read. Notifications are created for ride and delivery
+The navigation bell displays the stored unread count. Clicking it displays the five most recent
+notifications in an in-page dropdown, whose `See all notifications` action
+opens the role-specific notification page. A user can open and mark one
+notification as read or mark all notifications as read. Notifications are created for ride and delivery
 requests, acceptance and status changes, cancellations, chat events, rider
 approval decisions, cash confirmation, and administrator app updates. An
 administrator may broadcast an update to one role or all roles.
+
+Every newly created stored notification is also presented as a dismissible
+in-app popup. A ride-request popup opens the rider's available-request list, a
+chat popup opens the matching ride conversation, and other popup types open the
+notification page. This includes new-request alerts for available riders and
+new-message alerts for both participants during an active ride or delivery.
+
+The role-specific Settings page stores popup, category, sound, and vibration
+preferences for the current account on the current device. Preference changes
+affect presentation only: the backend continues storing every notification.
+Cancellation, account/access decision, and payment alerts bypass the optional
+popup master switch. Settings also provides profile and password-recovery
+shortcuts, application version information, and logout.
+
+If a requested ride is cancelled or accepted, every original rider-request
+notification is updated. Other riders see a cancelled or no-longer-available
+message that returns them to the available requests page; opening a stale ride
+URL also returns HTTP `409` with the same availability meaning. Connected
+clients receive the replacement through `notification_updated`.
 
 ## 10. Added constants
 
@@ -476,7 +513,7 @@ administrator may broadcast an update to one role or all roles.
 - existing: `USER_STATUS_CHANGED`, `PAYMENT_CORRECTED`,
   `CHAT_ACCESS_REVIEWED`
 - added: `RIDER_APPROVAL_REVIEWED`, `RIDE_MESSAGES_VIEWED`,
-  `RIDE_FORCE_CANCELLED`
+  `RIDE_FORCE_CANCELLED`, `PASSWORD_RESET_RESOLVED`
 
 ### Administrative audit target types
 
@@ -492,8 +529,10 @@ Backend configuration adds:
 - secret `OPENROUTESERVICE_API_KEY`;
 - `OPENROUTESERVICE_PROFILE`;
 - `GEOCODING_MIN_INTERVAL_MS`, no lower than the selected provider policy;
-- `GEOCODING_CACHE_TTL_MS`; and
-- map-result limits and provider timeouts.
+- `GEOCODING_CACHE_TTL_MS`;
+- map-result limits and provider timeouts; and
+- optional `FRONTEND_URL`, secret `RESEND_API_KEY`, and
+  `PASSWORD_RESET_FROM_EMAIL` reserved for future email recovery.
 
 The `osrm-nominatim` option and its provider-specific settings are retained
 only as a local-development fallback. Public Nominatim must not power deployed
@@ -523,6 +562,9 @@ contract rather than embedding a secret in browser code.
 - Route preview and ride creation have bounded network timeouts.
 - Browser geolocation is used only after consent and is not continuously
   tracked.
+- Password recovery uses neutral account lookup responses, requires an
+  administrator verification note, audits each resolution, and revokes existing
+  sessions when a temporary password is assigned.
 
 ## 13. Phase acceptance criteria
 
@@ -552,6 +594,8 @@ Implementation of this contract is complete only when:
   `https://operations.osmfoundation.org/policies/tiles/`
 - Nominatim Usage Policy:
   `https://operations.osmfoundation.org/policies/nominatim/`
+- Resend Email API:
+  `https://resend.com/docs/api-reference/emails/send-email`
 - Leaflet Quick Start Guide:
   `https://leafletjs.com/examples/quick-start/`
 - OSRM HTTP API:

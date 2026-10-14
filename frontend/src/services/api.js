@@ -20,6 +20,7 @@ const TOKEN_KEY = 'vr_token';
 const DB_KEY = 'vr_db';
 export const AUTH_EXPIRED_EVENT = 'vanni-ride:auth-expired';
 export const NOTIFICATIONS_CHANGED_EVENT = 'vanni-ride:notifications-changed';
+export const NOTIFICATION_UPDATED_EVENT = 'vanni-ride:notification-updated';
 
 export const RIDE_STATUS = {
   PENDING: 'pending',
@@ -248,6 +249,27 @@ export const mapApi = {
    AUTH
    ============================================================ */
 export const authApi = {
+  async forgotPassword(email) {
+    if (USE_MOCK_AUTH) {
+      await delay(200);
+      return 'If an active account matches that email, an administrator will review the password reset request.';
+    }
+    const response = await http('/auth/forgot-password', {
+      method: 'POST',
+      body: { email: String(email).trim() },
+    });
+    return response.message;
+  },
+
+  async resetPassword(token, password) {
+    if (USE_MOCK_AUTH) throw new ApiError('Password recovery is unavailable in demo mode', 400);
+    const response = await http('/auth/reset-password', {
+      method: 'POST',
+      body: { token, password },
+    });
+    return response.message;
+  },
+
   async login({ email, password }) {
     if (!USE_MOCK_AUTH) {
       const response = await http('/auth/login', {
@@ -762,6 +784,16 @@ export const adminApi = {
     u.status = status;
     save(d);
     return publicUser(u);
+  },
+  async passwordResetRequests() {
+    const response = await http('/admin/password-reset-requests');
+    return response.data?.passwordResetRequests || [];
+  },
+  async resolvePasswordResetRequest(requestId, temporaryPassword, reason) {
+    const response = await http(`/admin/password-reset-requests/${requestId}`, {
+      method: 'PATCH', body: { temporaryPassword, reason },
+    });
+    return response.data?.passwordResetRequest;
   },
   async riders(approvalStatus) {
     const response = await http('/admin/riders', { params: { approvalStatus } });

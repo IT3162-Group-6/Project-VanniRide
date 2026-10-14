@@ -119,7 +119,7 @@ const normalizeParcelOrder = (value) => {
   };
 };
 
-const normalizeDeliveryDetails = (value, category) => {
+const normalizeDeliveryDetails = (value, category, customer = null) => {
   if (!value || typeof value !== 'object') {
     throw new AppError('Delivery details are required', 400);
   }
@@ -162,8 +162,19 @@ const normalizeDeliveryDetails = (value, category) => {
       items: normalizeItems(value.waterOrder?.items, normalizeWaterItem),
     };
   } else if (category === 'PARCEL') {
-    normalized.receiver_name = requiredText(value.receiverName, 'Receiver name', 100);
-    normalized.receiver_phone = normalizePhone(value.receiverPhone);
+    const receiverMode = String(
+      value.receiverMode || (value.receiverName || value.receiverPhone ? 'OTHER' : '')
+    ).toUpperCase();
+    if (!['SELF', 'OTHER'].includes(receiverMode)) {
+      throw new AppError('Receiver must be SELF or OTHER', 400);
+    }
+    if (receiverMode === 'SELF') {
+      normalized.receiver_name = requiredText(customer?.name, 'Account name', 100);
+      normalized.receiver_phone = normalizePhone(customer?.phone);
+    } else {
+      normalized.receiver_name = requiredText(value.receiverName, 'Receiver name', 100);
+      normalized.receiver_phone = normalizePhone(value.receiverPhone);
+    }
     normalized.parcel_order = normalizeParcelOrder(value.parcelOrder);
   }
 

@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, HOME_BY_ROLE } from '../context/authStore';
 import { useAppState } from '../context/appStateStore';
 import { isMockAuth } from '../services/api';
+import AuthShell from '../components/AuthShell';
 
 const DEMO = [
   { role: 'Customer', email: 'customer@vau.ac.lk' },
@@ -35,7 +36,7 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-wrap">
+    <AuthShell>
       <div className="auth-card">
         <h2>Welcome back</h2>
         <p>Log in with your university email to continue.</p>
@@ -52,7 +53,10 @@ export default function Login() {
             />
           </div>
           <div className="field">
-            <label>Password</label>
+            <div className="field-label-row">
+              <label>Password</label>
+              <Link to="/forgot-password">Forgot password?</Link>
+            </div>
             <input
               type="password" placeholder="••••••••" required
               value={form.password}
@@ -85,6 +89,6 @@ export default function Login() {
           New here? <Link to="/register">Create an account</Link>
         </div>
       </div>
-    </div>
+    </AuthShell>
   );
 }

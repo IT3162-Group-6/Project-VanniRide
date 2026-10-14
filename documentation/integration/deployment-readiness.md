@@ -72,9 +72,12 @@ Keep OpenStreetMap attribution visible.
 2. Run collection creation, migration, validation, and index scripts in the
    order documented by `database/README.md`.
 3. Do not run `database/sample-data/seed-data.js` in production.
-4. Create the initial administrator with `npm run seed:admin` and a strong
-   password supplied through temporary environment variables.
-5. Remove those temporary administrator variables after the command finishes.
+4. Create or rotate the three administrators with `npm run seed:admins` and
+   unique strong passwords supplied through temporary numbered environment
+   variables documented in `backend/.env.example`.
+5. Record the three email addresses and passwords in the team's approved
+   password manager, then remove the temporary administrator variables after
+   the command finishes.
 
 ## Release commands
 
@@ -117,8 +120,10 @@ npm run build
 8. Admin statistics, audited chat viewing, force cancellation, and payment
    correction work.
 9. Expired and revoked tokens return to login.
-10. Application and database logs contain no passwords, JWTs, or connection
-    strings.
+10. Forgot-password email reaches an active account, its link works once, and
+    existing sessions are rejected after the password changes.
+11. Application and database logs contain no passwords, JWTs, reset tokens, or
+    connection strings.
 
 ## Hosting decisions still required from the team
 
@@ -126,5 +131,7 @@ npm run build
 - Frontend hosting provider and public application domain
 - Production MongoDB provider, region, backups, and access controls
 - Controlled routing/geocoding capacity for expected usage
+- Resend account, verified sending domain, API key, and sender address for
+  password recovery
 - Central log retention and alerting
 - Reverse-proxy or platform rate limiting for login and public API endpoints

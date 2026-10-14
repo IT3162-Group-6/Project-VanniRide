@@ -1,8 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import Icon from './Icon';
 import { useAuth, HOME_BY_ROLE } from '../context/authStore';
-import { NOTIFICATIONS_CHANGED_EVENT, notificationsApi } from '../services/api';
+import {
+  NOTIFICATIONS_CHANGED_EVENT,
+  NOTIFICATION_UPDATED_EVENT,
+  notificationsApi,
+} from '../services/api';
+import {
+  ICON_BY_NOTIFICATION_TYPE,
+  notificationListPath,
+  relativeNotificationTime,
+} from '../utils/notifications';
 
 /**
  * variant="public" — marketing header (Home / Login / Register)
@@ -11,27 +20,75 @@ import { NOTIFICATIONS_CHANGED_EVENT, notificationsApi } from '../services/api';
 export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMenu }) {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [recentNotifications, setRecentNotifications] = useState([]);
+  const notificationMenu = useRef(null);
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   useEffect(() => {
     if (variant !== 'app' || !user) return undefined;
     let alive = true;
     const refreshCount = () => {
-      notificationsApi.list(1)
-        .then((result) => alive && setUnreadCount(result.unreadCount))
+      notificationsApi.list(5)
+        .then((result) => {
+          if (!alive) return;
+          setUnreadCount(result.unreadCount);
+          setRecentNotifications(result.notifications);
+        })
         .catch(() => {});
     };
     refreshCount();
     const timer = window.setInterval(refreshCount, 20_000);
     window.addEventListener('focus', refreshCount);
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshCount);
+    window.addEventListener(NOTIFICATION_UPDATED_EVENT, refreshCount);
     return () => {
       alive = false;
       window.clearInterval(timer);
       window.removeEventListener('focus', refreshCount);
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshCount);
+      window.removeEventListener(NOTIFICATION_UPDATED_EVENT, refreshCount);
     };
   }, [user, variant]);
+
+  useEffect(() => {
+    if (!notificationOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!notificationMenu.current?.contains(event.target)) setNotificationOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setNotificationOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [notificationOpen]);
+
+  const toggleNotifications = () => {
+    setNotificationOpen((current) => !current);
+    void notificationsApi.list(5).then((result) => {
+      setUnreadCount(result.unreadCount);
+      setRecentNotifications(result.notifications);
+    }).catch(() => {});
+  };
+
+  const openRecentNotification = async (notification) => {
+    if (!notification.isRead) {
+      try {
+        const updated = await notificationsApi.markRead(notification.id);
+        setRecentNotifications((current) => current.map((item) => item.id === updated.id ? updated : item));
+        setUnreadCount((current) => Math.max(0, current - 1));
+      } catch {
+        // Navigation remains available if marking the notification fails.
+      }
+    }
+    setNotificationOpen(false);
+    navigate(notification.link || notificationListPath(user.role));
+  };
 
   if (variant === 'app') {
     return (
@@ -41,10 +98,55 @@ export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMen
         </button>
         <h1>{title}</h1>
         <div className="app-topbar-actions">
-          <Link to={`/${user?.role}/notifications`} className="icon-btn" aria-label="Notifications">
-            <Icon name="bell" />
-            {unreadCount > 0 && <span className="badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
-          </Link>
+          <div className="notification-menu" ref={notificationMenu}>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Notifications"
+              aria-haspopup="dialog"
+              aria-expanded={notificationOpen}
+              onClick={toggleNotifications}
+            >
+              <Icon name="bell" />
+              {unreadCount > 0 && <span className="badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+            </button>
+            {notificationOpen && (
+              <section className="notification-dropdown" aria-label="Recent notifications">
+                <div className="notification-dropdown-head">
+                  <b>Notifications</b>
+                  {unreadCount > 0 && <span>{unreadCount} unread</span>}
+                </div>
+                <div className="notification-dropdown-list">
+                  {recentNotifications.length === 0 ? (
+                    <p className="notification-dropdown-empty">No notifications yet.</p>
+                  ) : recentNotifications.map((notification) => (
+                    <button
+                      type="button"
+                      className={`notification-dropdown-item ${notification.isRead ? '' : 'unread'}`}
+                      key={notification.id}
+                      onClick={() => void openRecentNotification(notification)}
+                    >
+                      <span className="notification-dropdown-icon">
+                        <Icon name={ICON_BY_NOTIFICATION_TYPE[notification.type] || 'bell'} size={17} />
+                      </span>
+                      <span>
+                        <b>{notification.title}</b>
+                        <small>{notification.message}</small>
+                        <em>{relativeNotificationTime(notification.createdAt)}</em>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <Link
+                  className="notification-dropdown-all"
+                  to={notificationListPath(user.role)}
+                  onClick={() => setNotificationOpen(false)}
+                >
+                  See all notifications
+                </Link>
+              </section>
+            )}
+          </div>
           <Link to={`/${user?.role}/profile`} className="avatar">
             {user?.name?.[0]?.toUpperCase() || 'U'}
           </Link>

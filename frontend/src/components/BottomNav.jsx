@@ -7,19 +7,19 @@ const LINKS = {
     { to: '/customer/dashboard', icon: 'home', label: 'Home' },
     { to: '/customer/request', icon: 'plus', label: 'Request' },
     { to: '/customer/chat', icon: 'chat', label: 'Chat' },
-    { to: '/customer/profile', icon: 'user', label: 'Profile' },
+    { to: '/customer/settings', icon: 'settings', label: 'Settings' },
   ],
   rider: [
     { to: '/rider/dashboard', icon: 'home', label: 'Home' },
     { to: '/rider/requests', icon: 'list', label: 'Requests' },
     { to: '/rider/chat', icon: 'chat', label: 'Chat' },
-    { to: '/rider/profile', icon: 'user', label: 'Profile' },
+    { to: '/rider/settings', icon: 'settings', label: 'Settings' },
   ],
   admin: [
     { to: '/admin/dashboard', icon: 'home', label: 'Home' },
     { to: '/admin/rides', icon: 'car', label: 'Rides' },
     { to: '/admin/users', icon: 'user', label: 'Users' },
-    { to: '/admin/profile', icon: 'settings', label: 'Profile' },
+    { to: '/admin/settings', icon: 'settings', label: 'Settings' },
   ],
 };
 

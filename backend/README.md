@@ -33,10 +33,18 @@ readiness response requires an active MongoDB connection.
 - `ROUTING_BASE_URL` - OSRM-compatible routing service
 - `GEOCODING_USER_AGENT` and `GEOCODING_CONTACT` - identification for the
   geocoding provider
+- `FRONTEND_URL`, `RESEND_API_KEY`, and `PASSWORD_RESET_FROM_EMAIL` - optional
+  future transactional email recovery settings
 
 See `.env.example` for the full configuration. The server validates critical
 production settings before opening its port. Browser origins not listed in
 `CORS_ORIGINS` are rejected for both HTTP and Socket.IO.
+
+Password recovery currently creates an account-neutral administrator request.
+An administrator verifies the requester, sets a temporary password from the
+Users page, and records a verification note. Resolving the request revokes all
+existing sessions and is written to the administrator audit log. The dormant
+email-token implementation can be enabled later after a sender is verified.
 
 ## Verification
 
@@ -52,12 +60,18 @@ customer-to-rider HTTP journey coverage.
 
 ## Administrative setup
 
-Create or rotate the initial administrator with environment values documented
-in `.env.example`:
+Create or rotate the three predefined administrators with the numbered
+environment values documented in `.env.example`. The command is idempotent:
+existing administrators are updated and their previous sessions are revoked.
+Passwords are read from environment secrets and are never printed.
 
 ```powershell
-npm run seed:admin
+npm run seed:admins
 ```
+
+All three administrators sign in through the normal `/login` page using their
+configured email address and password. `npm run seed:admin` remains an alias for
+the same three-account command.
 
 For disposable local demonstration accounts, follow
 `documentation/integration/end-to-end-test-guide.md`. Never run demo seed data

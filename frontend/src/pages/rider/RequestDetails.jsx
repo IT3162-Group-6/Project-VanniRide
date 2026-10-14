@@ -35,7 +35,13 @@ export default function RequestDetails() {
     }
   }
 
-  if (error) return <div className="alert alert-error">{error}</div>;
+  if (error) return (
+    <div className="card request-unavailable-card">
+      <div className="alert alert-error">{error}</div>
+      <p className="muted">Refresh the available-request list to see requests that can still be accepted.</p>
+      <button className="btn btn-primary" onClick={() => navigate('/rider/requests')}>Back to available requests</button>
+    </div>
+  );
   if (!ride) return <p className="muted">Loading…</p>;
 
   return (

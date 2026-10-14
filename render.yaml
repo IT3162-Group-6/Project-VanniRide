@@ -26,6 +26,12 @@ services:
         value: "false"
       - key: CORS_ORIGINS
         sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: PASSWORD_RESET_EXPIRES_MINUTES
+        value: "30"
+      - key: PASSWORD_RESET_COOLDOWN_SECONDS
+        value: "60"
       - key: MAP_PROVIDER
         value: openrouteservice
       - key: OPENROUTESERVICE_BASE_URL

@@ -7,6 +7,7 @@ export const NAV_BY_ROLE = {
     { to: '/customer/chat', icon: 'chat', label: 'Messages' },
     { to: '/customer/history', icon: 'list', label: 'Request History' },
     { to: '/customer/profile', icon: 'user', label: 'Profile' },
+    { to: '/customer/settings', icon: 'settings', label: 'Settings' },
   ],
   rider: [
     { to: '/rider/dashboard', icon: 'grid', label: 'Dashboard' },
@@ -15,6 +16,7 @@ export const NAV_BY_ROLE = {
     { to: '/rider/chat', icon: 'chat', label: 'Messages' },
     { to: '/rider/history', icon: 'clock', label: 'Request History' },
     { to: '/rider/profile', icon: 'user', label: 'Profile' },
+    { to: '/rider/settings', icon: 'settings', label: 'Settings' },
   ],
   admin: [
     { to: '/admin/dashboard', icon: 'grid', label: 'Dashboard' },
@@ -22,6 +24,7 @@ export const NAV_BY_ROLE = {
     { to: '/admin/customers', icon: 'user', label: 'Customers' },
     { to: '/admin/riders', icon: 'bike', label: 'Riders' },
     { to: '/admin/rides', icon: 'car', label: 'Rides' },
-    { to: '/admin/profile', icon: 'settings', label: 'Profile' },
+    { to: '/admin/profile', icon: 'user', label: 'Profile' },
+    { to: '/admin/settings', icon: 'settings', label: 'Settings' },
   ],
 };

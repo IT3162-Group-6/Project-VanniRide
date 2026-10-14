@@ -56,11 +56,18 @@ test('validates delivery fields and builds only the selected category payload', 
     foodOrder: details.foodOrder,
   });
 
+  assert.equal(validateDeliveryDetails(details, 'PARCEL'), '');
+  assert.deepEqual(buildDeliveryPayload(details, 'PARCEL'), {
+    receiverMode: 'SELF',
+    parcelOrder: details.parcelOrder,
+  });
+  details.receiverMode = 'OTHER';
   assert.equal(validateDeliveryDetails(details, 'PARCEL'), 'Enter the receiver name.');
   details.receiverName = 'Parcel Receiver';
   details.receiverPhone = '077 123 4567';
   assert.equal(validateDeliveryDetails(details, 'PARCEL'), '');
   assert.deepEqual(buildDeliveryPayload(details, 'PARCEL'), {
+    receiverMode: 'OTHER',
     receiverName: 'Parcel Receiver',
     receiverPhone: '0771234567',
     parcelOrder: details.parcelOrder,

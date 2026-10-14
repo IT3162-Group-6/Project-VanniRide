@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const {
@@ -10,12 +11,15 @@ const CancellationRequest = require('../models/cancellationRequestModel');
 const ChatAccessRequest = require('../models/chatAccessRequestModel');
 const Message = require('../models/messageModel');
 const Payment = require('../models/paymentModel');
+const PasswordResetRequest = require('../models/passwordResetRequestModel');
+const PasswordResetToken = require('../models/passwordResetTokenModel');
 const Rating = require('../models/ratingModel');
 const Ride = require('../models/rideModel');
 const Rider = require('../models/riderModel');
 const User = require('../models/userModel');
 const {
   expireElapsedChatAccess,
+  getChatAccessParties,
   serializeChatAccessRequest,
 } = require('../services/chatService');
 const { CHAT_ACCESS_DURATION_MS } = require('../constants/rideConstants');
@@ -31,9 +35,11 @@ const {
   serializeRiderProfile,
 } = require('../services/riderService');
 const { serializeDeliveryDetails } = require('../utils/deliveryDetails');
+const { validateNewPassword } = require('../services/passwordResetService');
 const {
   notifyManySafely,
   notifySafely,
+  resolveRideRequestNotificationsSafely,
 } = require('../services/notificationService');
 
 const normalizeReason = (value) => {
@@ -168,6 +174,145 @@ exports.getAllUsers = catchAsync(async (req, res) => {
     success: true,
     results: users.length,
     data: { users: users.map(serializeUser) },
+  });
+});
+
+exports.getPasswordResetRequests = catchAsync(async (req, res) => {
+  const requests = await PasswordResetRequest.find({ status: 'PENDING' })
+    .sort({ requested_at: 1 })
+    .lean();
+  const userIds = requests.map((request) => request.user_id);
+  const users = await User.find({ _id: { $in: userIds } }).lean();
+  const usersById = new Map(
+    users.map((user) => [user._id.toString(), serializeUser(user)])
+  );
+  const results = requests
+    .map((request) => ({
+      id: request._id.toString(),
+      status: request.status,
+      requestedAt: request.requested_at,
+      user: usersById.get(request.user_id.toString()) || null,
+    }))
+    .filter((request) => request.user);
+
+  return res.status(200).json({
+    success: true,
+    results: results.length,
+    data: { passwordResetRequests: results },
+  });
+});
+
+exports.resolvePasswordResetRequest = catchAsync(async (req, res) => {
+  const { userId: adminId } = getAuthenticatedUser(req, ['ADMIN']);
+  validateObjectId(req.params.requestId, 'password reset request ID');
+  const reason = normalizeReason(req.body.reason);
+
+  let temporaryPassword;
+  try {
+    temporaryPassword = validateNewPassword(req.body.temporaryPassword);
+  } catch (validationError) {
+    throw new AppError(validationError.message, 400);
+  }
+
+  const request = await PasswordResetRequest.findOne({
+    _id: req.params.requestId,
+    status: 'PENDING',
+  }).lean();
+  if (!request) {
+    throw new AppError('Password reset request is no longer pending', 404);
+  }
+  if (adminId.equals(request.user_id)) {
+    throw new AppError('Administrators cannot resolve their own password reset request', 403);
+  }
+
+  const user = await User.findOne({
+    _id: request.user_id,
+    account_status: 'ACTIVE',
+  }).select('+password_hash');
+  if (!user) {
+    throw new AppError('The requesting account is not active', 409);
+  }
+
+  const resolvedAt = new Date();
+  const claimedRequest = await PasswordResetRequest.findOneAndUpdate(
+    { _id: request._id, status: 'PENDING' },
+    {
+      $set: {
+        status: 'RESOLVED',
+        resolved_at: resolvedAt,
+        resolved_by: adminId,
+      },
+    },
+    { returnDocument: 'after' }
+  );
+  if (!claimedRequest) {
+    throw new AppError('Password reset request was already resolved', 409);
+  }
+
+  const previousPasswordHash = user.password_hash;
+  const previousTokenVersion = user.token_version;
+  try {
+    user.password_hash = await bcrypt.hash(temporaryPassword, 12);
+    user.token_version += 1;
+    await user.save();
+    await PasswordResetToken.updateMany(
+      { user_id: user._id, used_at: null },
+      { $set: { used_at: resolvedAt } }
+    );
+    await createAuditLog({
+      admin_id: adminId,
+      action: 'PASSWORD_RESET_RESOLVED',
+      target_type: 'USER',
+      target_id: user._id,
+      reason,
+      before: { token_version: previousTokenVersion },
+      after: { token_version: user.token_version },
+    });
+  } catch (error) {
+    await Promise.allSettled([
+      User.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            password_hash: previousPasswordHash,
+            token_version: previousTokenVersion,
+          },
+        }
+      ),
+      PasswordResetRequest.updateOne(
+        { _id: request._id, status: 'RESOLVED', resolved_by: adminId },
+        {
+          $set: {
+            status: 'PENDING',
+            resolved_at: null,
+            resolved_by: null,
+          },
+        }
+      ),
+    ]);
+    throw error;
+  }
+
+  await notifySafely({
+    userId: user._id,
+    type: 'SYSTEM',
+    title: 'Password reset completed',
+    message: 'An administrator reset your password. Existing sessions were signed out.',
+    link: '/settings',
+    io: req.app?.get('io'),
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: 'Temporary password set and existing sessions revoked',
+    data: {
+      passwordResetRequest: {
+        id: claimedRequest._id.toString(),
+        status: 'RESOLVED',
+        resolvedAt,
+        user: serializeUser(user),
+      },
+    },
   });
 });
 
@@ -598,6 +743,13 @@ exports.forceCancelRide = catchAsync(async (req, res) => {
   }
   emitRideStatusChanged(req, cancelledRide);
   emitRideForceCancelled(req, cancelledRide, reason);
+  if (previousRide.status === 'REQUESTED') {
+    await resolveRideRequestNotificationsSafely({
+      rideId: cancelledRide._id,
+      outcome: 'CANCELLED',
+      io: req.app?.get('io'),
+    });
+  }
   await notifyManySafely({
     userIds: [cancelledRide.customer_id, cancelledRide.rider_id],
     type: 'RIDE_CANCELLED',
@@ -870,24 +1022,27 @@ exports.reviewChatAccessRequest = catchAsync(async (req, res) => {
   }
 
   emitChatAccessUpdated(req, ride, updatedRequest);
+  const parties = getChatAccessParties(ride, request.requested_by);
   await notifySafely({
-    userId: ride.customer_id,
+    userId: parties.requesterId,
     type: 'CHAT_ACCESS',
     title: status === 'APPROVED' ? 'Chat access approved' : 'Chat access request rejected',
     message: status === 'APPROVED'
       ? 'Post-completion chat is available for the next 24 hours.'
       : `Your post-completion chat request was rejected. Reason: ${reason}`,
-    link: status === 'APPROVED' ? '/customer/chat' : '/customer/history',
+    link: status === 'APPROVED'
+      ? `/${parties.requesterRole.toLowerCase()}/chat?rideId=${ride._id}`
+      : `/${parties.requesterRole.toLowerCase()}/history`,
     rideId: ride._id,
     io: req.app?.get('io'),
   });
-  if (status === 'APPROVED' && ride.rider_id) {
+  if (status === 'APPROVED' && parties.counterpartId) {
     await notifySafely({
-      userId: ride.rider_id,
+      userId: parties.counterpartId,
       type: 'CHAT_ACCESS',
       title: 'Post-completion chat reopened',
-      message: 'The customer received approval to contact you for the next 24 hours.',
-      link: '/rider/chat',
+      message: 'Post-completion chat is available again for the next 24 hours.',
+      link: `/${parties.counterpartRole.toLowerCase()}/chat?rideId=${ride._id}`,
       rideId: ride._id,
       io: req.app?.get('io'),
     });

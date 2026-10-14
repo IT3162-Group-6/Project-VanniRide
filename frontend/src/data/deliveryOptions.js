@@ -46,6 +46,7 @@ export const WATER_PICKUP_LOCATIONS = Object.freeze([
 ]);
 
 export const createDefaultDeliveryDetails = () => ({
+  receiverMode: 'SELF',
   receiverName: '',
   receiverPhone: '',
   foodOrder: {
@@ -86,9 +87,14 @@ export function validateDeliveryDetails(details, category) {
   }
 
   if (category === 'PARCEL') {
-    if (!details.receiverName.trim()) return 'Enter the receiver name.';
-    if (!/^(?:\+94|0)7\d{8}$/.test(details.receiverPhone.replace(/[\s-]/g, ''))) {
-      return 'Enter a valid Sri Lankan mobile number for the receiver.';
+    if (!['SELF', 'OTHER'].includes(details.receiverMode)) {
+      return 'Choose who will receive the parcel.';
+    }
+    if (details.receiverMode === 'OTHER') {
+      if (!details.receiverName.trim()) return 'Enter the receiver name.';
+      if (!/^(?:\+94|0)7\d{8}$/.test(details.receiverPhone.replace(/[\s-]/g, ''))) {
+        return 'Enter a valid Sri Lankan mobile number for the receiver.';
+      }
     }
     if (details.parcelOrder.parcelType === 'OTHER' && !details.parcelOrder.otherType.trim()) {
       return 'Enter the custom parcel type.';
@@ -102,8 +108,13 @@ export function buildDeliveryPayload(details, category) {
   if (category === 'FOOD') return { foodOrder: details.foodOrder };
   if (category === 'WATER') return { waterOrder: details.waterOrder };
   return {
-    receiverName: details.receiverName.trim(),
-    receiverPhone: details.receiverPhone.replace(/[\s-]/g, ''),
+    receiverMode: details.receiverMode,
+    ...(details.receiverMode === 'OTHER'
+      ? {
+          receiverName: details.receiverName.trim(),
+          receiverPhone: details.receiverPhone.replace(/[\s-]/g, ''),
+        }
+      : {}),
     parcelOrder: details.parcelOrder,
   };
 }

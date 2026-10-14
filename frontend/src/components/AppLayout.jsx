@@ -12,6 +12,7 @@ const TITLES = {
   '/customer/history': 'Request History',
   '/customer/profile': 'Profile',
   '/customer/notifications': 'Notifications',
+  '/customer/settings': 'Settings',
   '/rider/dashboard': 'Rider Dashboard',
   '/rider/requests': 'Available Requests',
   '/rider/active': 'Active Request',
@@ -19,6 +20,7 @@ const TITLES = {
   '/rider/history': 'Request History',
   '/rider/profile': 'Profile',
   '/rider/notifications': 'Notifications',
+  '/rider/settings': 'Settings',
   '/admin/dashboard': 'Admin Dashboard',
   '/admin/users': 'All Users',
   '/admin/customers': 'Customers',
@@ -26,6 +28,7 @@ const TITLES = {
   '/admin/rides': 'Rides',
   '/admin/profile': 'Profile',
   '/admin/notifications': 'Notifications',
+  '/admin/settings': 'Settings',
 };
 
 export default function AppLayout() {

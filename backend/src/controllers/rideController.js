@@ -43,6 +43,7 @@ const {
 const {
   notifyManySafely,
   notifySafely,
+  resolveRideRequestNotificationsSafely,
 } = require('../services/notificationService');
 
 const ACTIVE_RIDE_STATUSES = ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'STARTED'];
@@ -188,6 +189,10 @@ const ensureRideAccess = async (ride, userId, role) => {
         return;
       }
     }
+
+    if (ride.status !== 'REQUESTED' || ride.rider_id) {
+      throw new AppError('This request is no longer available', 409);
+    }
   }
 
   throw new AppError('You are not authorized to access this ride', 403);
@@ -225,7 +230,7 @@ exports.requestRide = catchAsync(async (req, res) => {
 
   const deliveryDetails =
     rideType === 'DELIVERY'
-      ? normalizeDeliveryDetails(req.body.deliveryDetails, deliveryCategory)
+      ? normalizeDeliveryDetails(req.body.deliveryDetails, deliveryCategory, req.user)
       : null;
 
   const activeRideExists = await Ride.exists({
@@ -540,6 +545,12 @@ exports.acceptRide = catchAsync(async (req, res) => {
   }
 
   emitRideStatusChanged(req, ride);
+  await resolveRideRequestNotificationsSafely({
+    rideId: ride._id,
+    outcome: 'ACCEPTED',
+    acceptedByUserId: userId,
+    io: req.app?.get('io'),
+  });
   await notifySafely({
     userId: ride.customer_id,
     type: 'RIDE_ACCEPTED',
@@ -718,6 +729,13 @@ exports.cancelRide = catchAsync(async (req, res) => {
       reason,
     });
     emitRideStatusChanged(req, result.ride);
+    if (ride.status === 'REQUESTED') {
+      await resolveRideRequestNotificationsSafely({
+        rideId: ride._id,
+        outcome: 'CANCELLED',
+        io: req.app?.get('io'),
+      });
+    }
     const otherUserId = isCustomer ? ride.rider_id : ride.customer_id;
     if (otherUserId) {
       await notifySafely({

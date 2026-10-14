@@ -260,6 +260,31 @@ test('clears an expired token and reports useful connection errors', async () =>
   assert.equal(getToken(), null);
 });
 
+test('requests and completes password recovery without storing a session token', async () => {
+  const requests = [];
+  global.fetch = async (url, options) => {
+    requests.push({ url: String(url), options });
+    return jsonResponse({
+      success: true,
+      message: String(url).endsWith('/forgot-password')
+        ? 'If an active account matches that email, an administrator will review the password reset request.'
+        : 'Password reset successfully. You can now log in.',
+    });
+  };
+
+  const forgotMessage = await authApi.forgotPassword('  person@vau.ac.lk  ');
+  const resetMessage = await authApi.resetPassword('a'.repeat(64), 'new-password-123');
+
+  assert.match(forgotMessage, /If an active account/);
+  assert.match(resetMessage, /reset successfully/);
+  assert.deepEqual(JSON.parse(requests[0].options.body), { email: 'person@vau.ac.lk' });
+  assert.deepEqual(JSON.parse(requests[1].options.body), {
+    token: 'a'.repeat(64),
+    password: 'new-password-123',
+  });
+  assert.equal(getToken(), null);
+});
+
 test('uses backend map results and creates a ride without trusting client fare values', async () => {
   localStorage.setItem('vr_token', 'customer-map-token');
   const requests = [];
@@ -590,6 +615,8 @@ test('connects administrator management, review, audit, and statistics APIs', as
     if (path.endsWith('/admin/ratings')) return jsonResponse({ success: true, data: { ratings: [{ id: 'rate1', rideId: 'ride1', rating: 5 }] } });
     if (path.endsWith('/admin/chat-access-requests/a1')) return jsonResponse({ success: true, data: { chatAccessRequest: { id: 'a1', rideId: 'ride1', status: 'APPROVED' } } });
     if (path.endsWith('/admin/chat-access-requests')) return jsonResponse({ success: true, data: { chatAccessRequests: [{ id: 'a1', rideId: 'ride1', status: 'PENDING' }] } });
+    if (path.endsWith('/admin/password-reset-requests/pr1')) return jsonResponse({ success: true, data: { passwordResetRequest: { id: 'pr1', status: 'RESOLVED' } } });
+    if (path.endsWith('/admin/password-reset-requests')) return jsonResponse({ success: true, data: { passwordResetRequests: [{ id: 'pr1', status: 'PENDING', user: { id: 'c1', name: 'Customer', email: 'c@example.com' } }] } });
     if (path.endsWith('/admin/statistics')) return jsonResponse({ success: true, data: { statistics: { users: { customers: 2, riders: 1, admins: 1 }, rides: { total: 4, active: 1, completed: 2, cancelled: 1 }, payments: { totalPaidAmount: 600, pending: 1 }, riderApprovals: { pending: 1 }, chatAccessRequests: { pending: 1 }, ratings: { averageRating: 5 } } } });
     throw new Error(`Unexpected request ${request.url}`);
   };
@@ -609,8 +636,14 @@ test('connects administrator management, review, audit, and statistics APIs', as
   assert.equal((await adminApi.chatAccessRequests())[0].status, 'PENDING');
   assert.equal((await adminApi.reviewChatAccess('a1', 'APPROVE', 'Lost item')).status, 'APPROVED');
   assert.equal((await adminApi.stats()).pendingChatRequests, 1);
+  assert.equal((await adminApi.passwordResetRequests())[0].status, 'PENDING');
+  assert.equal((await adminApi.resolvePasswordResetRequest('pr1', 'temporary-pass-123', 'Identity verified')).status, 'RESOLVED');
 
   assert.deepEqual(JSON.parse(requests[2].options.body), { accountStatus: 'SUSPENDED', reason: 'Policy' });
   assert.deepEqual(JSON.parse(requests[3].options.body), { decision: 'APPROVE', reason: 'Documents valid' });
   assert.ok(requests[5].url.includes('reason=Safety+review'));
+  assert.deepEqual(JSON.parse(requests.at(-1).options.body), {
+    temporaryPassword: 'temporary-pass-123',
+    reason: 'Identity verified',
+  });
 });

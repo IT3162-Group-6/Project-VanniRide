@@ -64,10 +64,86 @@ const notifyManySafely = async (details) => {
   }
 };
 
+const resolveRideRequestNotifications = async ({
+  rideId,
+  outcome,
+  acceptedByUserId = null,
+  io = null,
+}) => {
+  const normalizedOutcome = String(outcome || '').toUpperCase();
+  if (!['ACCEPTED', 'CANCELLED'].includes(normalizedOutcome)) {
+    throw new Error('Ride-request notification outcome must be ACCEPTED or CANCELLED');
+  }
+
+  const filter = { ride_id: rideId, type: 'RIDE_REQUEST' };
+  const unreadUpdate = {
+    is_read: false,
+    read_at: null,
+    link: '/rider/requests',
+  };
+
+  if (normalizedOutcome === 'CANCELLED') {
+    await Notification.updateMany(filter, {
+      $set: {
+        ...unreadUpdate,
+        title: 'Request cancelled',
+        message: 'The customer cancelled this request before it was accepted.',
+      },
+    });
+  } else {
+    await Notification.updateMany(
+      acceptedByUserId
+        ? { ...filter, user_id: { $ne: acceptedByUserId } }
+        : filter,
+      {
+        $set: {
+          ...unreadUpdate,
+          title: 'Request no longer available',
+          message: 'Another rider accepted this request.',
+        },
+      }
+    );
+    if (acceptedByUserId) {
+      await Notification.updateMany(
+        { ...filter, user_id: acceptedByUserId },
+        {
+          $set: {
+            title: 'Request accepted by you',
+            message: 'Open your active request to continue.',
+            link: `/rider/active?rideId=${rideId}`,
+            is_read: true,
+            read_at: new Date(),
+          },
+        }
+      );
+    }
+  }
+
+  const notifications = await Notification.find(filter).lean();
+  notifications.forEach((notification) => {
+    io?.to(userRoom(notification.user_id.toString())).emit(
+      'notification_updated',
+      serializeNotification(notification)
+    );
+  });
+  return notifications;
+};
+
+const resolveRideRequestNotificationsSafely = async (details) => {
+  try {
+    return await resolveRideRequestNotifications(details);
+  } catch (error) {
+    console.error(`Ride-request notification update failed: ${error.message}`);
+    return [];
+  }
+};
+
 module.exports = {
   createNotification,
   createNotifications,
   notifySafely,
   notifyManySafely,
+  resolveRideRequestNotifications,
+  resolveRideRequestNotificationsSafely,
   serializeNotification,
 };

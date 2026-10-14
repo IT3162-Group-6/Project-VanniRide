@@ -96,7 +96,7 @@ exports.previewRoute = catchAsync(async (req, res) => {
   }
   const deliveryDetails =
     rideType === 'DELIVERY'
-      ? normalizeDeliveryDetails(req.body.deliveryDetails, deliveryCategory)
+      ? normalizeDeliveryDetails(req.body.deliveryDetails, deliveryCategory, req.user)
       : null;
 
   const pickupLocation = normalizeLocation(req.body.pickupLocation, 'Pickup');

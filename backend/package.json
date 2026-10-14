@@ -9,7 +9,8 @@
   "scripts": {
     "test": "node --test --test-isolation=none",
     "start": "node server.js",
-    "seed:admin": "node scripts/createAdmin.js"
+    "seed:admin": "node scripts/createAdmin.js",
+    "seed:admins": "node scripts/createAdmin.js"
   },
   "keywords": [],
   "author": "",

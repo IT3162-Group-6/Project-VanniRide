@@ -8,10 +8,16 @@ import MarketingLayout from './components/MarketingLayout';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Toast from './components/Toast';
+import NetworkStatus from './components/NetworkStatus';
+import NotificationPopups from './components/NotificationPopups';
+import RatingPrompt from './components/RatingPrompt';
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Home = lazy(() => import('./pages/Home'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Settings = lazy(() => import('./pages/Settings'));
 const CustomerDashboard = lazy(() => import('./pages/customer/CustomerDashboard'));
 const RequestRide = lazy(() => import('./pages/customer/RequestRide'));
 const CustomerActiveRide = lazy(() => import('./pages/customer/ActiveRide'));
@@ -39,6 +45,9 @@ export default function App() {
       <AuthProvider>
         <RealtimeProvider>
           <BrowserRouter>
+            <NetworkStatus />
+            <NotificationPopups />
+            <RatingPrompt />
             <Suspense fallback={<p className="muted page-loading">Loading page…</p>}>
             <Routes>
             {/* ---------- public ---------- */}
@@ -46,6 +55,8 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
             </Route>
 
             {/* ---------- customer ---------- */}
@@ -61,6 +72,7 @@ export default function App() {
               <Route path="history" element={<CustomerHistory />} />
               <Route path="profile" element={<CustomerProfile />} />
               <Route path="notifications" element={<Notifications />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
 
             {/* ---------- rider ---------- */}
@@ -77,6 +89,7 @@ export default function App() {
               <Route path="history" element={<RiderHistory />} />
               <Route path="profile" element={<RiderProfile />} />
               <Route path="notifications" element={<Notifications />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
 
             {/* ---------- admin ---------- */}
@@ -93,6 +106,7 @@ export default function App() {
               <Route path="rides/:id" element={<RideDetails />} />
               <Route path="profile" element={<AdminProfile />} />
               <Route path="notifications" element={<Notifications />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

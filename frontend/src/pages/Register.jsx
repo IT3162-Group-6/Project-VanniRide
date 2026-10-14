@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, HOME_BY_ROLE } from '../context/authStore';
 import { useAppState } from '../context/appStateStore';
+import AuthShell from '../components/AuthShell';
+import VehicleTypeSelector from '../components/VehicleTypeSelector';
 
 export default function Register() {
   const { register } = useAuth();
@@ -13,7 +15,7 @@ export default function Register() {
     phone: '',
     password: '',
     role: 'customer',
-    vehicle: { type: '', model: '', registrationNumber: '', color: '' },
+    vehicle: { type: 'Motorcycle', model: '', registrationNumber: '', color: '' },
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,7 +43,7 @@ export default function Register() {
   }
 
   return (
-    <div className="auth-wrap">
+    <AuthShell>
       <div className="auth-card">
         <h2>Create your account</h2>
         <p>Sign up with your university email to get started.</p>
@@ -89,7 +91,13 @@ export default function Register() {
             <>
               <div className="field">
                 <label>Vehicle type</label>
-                <input type="text" placeholder="e.g. Motorcycle" required value={form.vehicle.type} onChange={setVehicle('type')} />
+                <VehicleTypeSelector
+                  value={form.vehicle.type}
+                  onChange={(type) => setForm({
+                    ...form,
+                    vehicle: { ...form.vehicle, type },
+                  })}
+                />
               </div>
               <div className="field">
                 <label>Vehicle model</label>
@@ -115,6 +123,6 @@ export default function Register() {
           Already have an account? <Link to="/login">Log in</Link>
         </div>
       </div>
-    </div>
+    </AuthShell>
   );
 }

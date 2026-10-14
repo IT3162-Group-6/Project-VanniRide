@@ -52,6 +52,30 @@ const normalizeMessageText = (value) => {
   return messageText;
 };
 
+const getChatAccessParties = (ride, requesterId) => {
+  const customerId = ride.customer_id?.toString();
+  const riderId = ride.rider_id?.toString();
+  const normalizedRequesterId = requesterId?.toString();
+
+  if (normalizedRequesterId === customerId) {
+    return {
+      requesterId: customerId,
+      requesterRole: 'CUSTOMER',
+      counterpartId: riderId,
+      counterpartRole: 'RIDER',
+    };
+  }
+  if (normalizedRequesterId === riderId) {
+    return {
+      requesterId: riderId,
+      requesterRole: 'RIDER',
+      counterpartId: customerId,
+      counterpartRole: 'CUSTOMER',
+    };
+  }
+  throw new AppError('Chat access requester is not a ride participant', 409);
+};
+
 const expireElapsedChatAccess = async (rideId, now = new Date()) => {
   const filter = {
     status: 'APPROVED',
@@ -101,6 +125,7 @@ module.exports = {
   assertChatSendingAllowed,
   expireElapsedChatAccess,
   findActiveChatAccess,
+  getChatAccessParties,
   normalizeMessageText,
   serializeChatAccessRequest,
   serializeMessage,

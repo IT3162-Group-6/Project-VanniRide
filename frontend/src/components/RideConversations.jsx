@@ -259,7 +259,7 @@ export default function RideConversations({ role }) {
           </div>
         )}
 
-        {ride && role === 'customer' && ride.status === 'completed' && !access?.canSend && (
+        {ride && ride.status === 'completed' && !access?.canSend && (
           <div className="card chat-access-card">
             <b>Post-completion contact requires admin permission</b>
             {access?.pendingRequest ? (
@@ -280,12 +280,6 @@ export default function RideConversations({ role }) {
                 </button>
               </>
             )}
-          </div>
-        )}
-
-        {ride && role === 'rider' && ride.status === 'completed' && !access?.canSend && (
-          <div className="alert alert-error">
-            This completed conversation is read-only until an administrator approves the customer's contact request.
           </div>
         )}
 

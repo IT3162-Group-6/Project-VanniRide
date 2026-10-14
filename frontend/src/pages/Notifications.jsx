@@ -5,33 +5,13 @@ import { useAppState } from '../context/appStateStore';
 import { useAuth } from '../context/authStore';
 import {
   NOTIFICATIONS_CHANGED_EVENT,
+  NOTIFICATION_UPDATED_EVENT,
   notificationsApi,
 } from '../services/api';
-
-const ICON_BY_TYPE = {
-  RIDE_REQUEST: 'route',
-  RIDE_ACCEPTED: 'check',
-  RIDE_STATUS: 'pin',
-  RIDE_CANCELLED: 'close',
-  CANCELLATION_REQUESTED: 'clock',
-  CANCELLATION_RESOLVED: 'check',
-  CHAT_MESSAGE: 'chat',
-  CHAT_ACCESS: 'chat',
-  RIDER_APPROVAL: 'bike',
-  PAYMENT_CONFIRMED: 'wallet',
-  SYSTEM: 'bell',
-};
-
-const relativeTime = (value) => {
-  const milliseconds = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(0, Math.floor(milliseconds / 60_000));
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
-};
+import {
+  ICON_BY_NOTIFICATION_TYPE,
+  relativeNotificationTime,
+} from '../utils/notifications';
 
 export default function Notifications() {
   const navigate = useNavigate();
@@ -65,13 +45,15 @@ export default function Notifications() {
       const notification = event.detail;
       if (!notification?.id) return;
       setItems((current) => current.some((item) => item.id === notification.id)
-        ? current
+        ? current.map((item) => item.id === notification.id ? notification : item)
         : [notification, ...current]);
     };
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, receiveNotification);
+    window.addEventListener(NOTIFICATION_UPDATED_EVENT, receiveNotification);
     return () => {
       window.clearTimeout(initialLoad);
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, receiveNotification);
+      window.removeEventListener(NOTIFICATION_UPDATED_EVENT, receiveNotification);
     };
   }, []);
 
@@ -170,11 +152,11 @@ export default function Notifications() {
               className={`notification-item ${notification.isRead ? '' : 'unread'}`}
               onClick={() => void openNotification(notification)}
             >
-              <span className="notification-icon"><Icon name={ICON_BY_TYPE[notification.type] || 'bell'} /></span>
+              <span className="notification-icon"><Icon name={ICON_BY_NOTIFICATION_TYPE[notification.type] || 'bell'} /></span>
               <span className="notification-copy">
                 <b>{notification.title}</b>
                 <span>{notification.message}</span>
-                <small>{relativeTime(notification.createdAt)}</small>
+                <small>{relativeNotificationTime(notification.createdAt)}</small>
               </span>
               {!notification.isRead && <span className="notification-dot" aria-label="Unread" />}
             </button>

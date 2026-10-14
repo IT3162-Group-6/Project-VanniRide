@@ -11,6 +11,7 @@ const User = require('../models/userModel');
 const {
   assertChatSendingAllowed,
   findActiveChatAccess,
+  getChatAccessParties,
   normalizeMessageText,
   serializeChatAccessRequest,
   serializeMessage,
@@ -111,7 +112,7 @@ exports.sendMessage = catchAsync(async (req, res) => {
 });
 
 exports.requestPostCompletionAccess = catchAsync(async (req, res) => {
-  const { userId, role } = getAuthenticatedUser(req, ['CUSTOMER']);
+  const { userId, role } = getAuthenticatedUser(req, ['CUSTOMER', 'RIDER']);
   const ride = await getParticipantRide(req.params.rideId, userId, role);
 
   if (ride.status !== 'COMPLETED') {
@@ -139,6 +140,19 @@ exports.requestPostCompletionAccess = catchAsync(async (req, res) => {
       409
     );
   }
+
+  const pendingAccess = await ChatAccessRequest.exists({
+    ride_id: ride._id,
+    status: 'PENDING',
+  });
+  if (pendingAccess) {
+    throw new AppError(
+      'A post-completion chat access request is already pending',
+      409
+    );
+  }
+
+  const parties = getChatAccessParties(ride, userId);
 
   let chatAccessRequest;
   try {
@@ -171,7 +185,7 @@ exports.requestPostCompletionAccess = catchAsync(async (req, res) => {
     userIds: admins.map((admin) => admin._id),
     type: 'CHAT_ACCESS',
     title: 'Chat access review needed',
-    message: 'A customer requested post-completion chat access.',
+    message: `A ${parties.requesterRole.toLowerCase()} requested post-completion chat access.`,
     link: '/admin/dashboard',
     rideId: ride._id,
     io: req.app?.get('io'),

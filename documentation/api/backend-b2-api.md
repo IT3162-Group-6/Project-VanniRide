@@ -21,6 +21,10 @@ The B2 controllers also enforce the role and MongoDB ObjectId requirements.
 
 - `POST /api/auth/register` - Register a `CUSTOMER` or `RIDER` account.
 - `POST /api/auth/login` - Return a JWT for an active account.
+- `POST /api/auth/forgot-password` - Accept an email and always return the same
+  account-neutral response; eligible accounts create an administrator request.
+- `POST /api/auth/reset-password` - Consume a single-use reset token and set a
+  new password of 8-128 characters; retained for future email recovery.
 - `POST /api/auth/logout` - Invalidate all tokens issued with the current token
   version.
 - `GET /api/users/profile` - Return the authenticated user profile.
@@ -29,11 +33,16 @@ The B2 controllers also enforce the role and MongoDB ObjectId requirements.
   and `UNAVAILABLE`; only an approved, non-busy rider may use it.
 - `PUT /api/users/rider/profile` - Rider-only vehicle update. A changed vehicle
   returns the rider to `PENDING` approval and `UNAVAILABLE`.
+- `GET /api/admin/password-reset-requests` - List pending administrator-assisted
+  password reset requests.
+- `PATCH /api/admin/password-reset-requests/:requestId` - Set a temporary
+  password after identity verification, revoke sessions, and audit the action.
 
 Rider registration requires `vehicle.type`, `vehicle.model`,
 `vehicle.registrationNumber`, and `vehicle.color`. New riders remain
 `PENDING` and cannot receive or accept ride requests until an administrator
-approves them.
+approves them. The current registration client presents `Motorcycle` and
+`Three-wheeler` as the supported vehicle-type choices.
 
 All protected endpoints require `Authorization: Bearer <token>`. Tokens are
 rejected if the user no longer exists, the account is suspended, the embedded
@@ -43,6 +52,12 @@ Public registration accepts only addresses under the configured
 `UNIVERSITY_EMAIL_DOMAIN` (`vau.ac.lk` by default). Local development and tests
 may set `ALLOW_NON_UNIVERSITY_EMAILS=true` so team members can create temporary
 accounts. This bypass is disabled and rejected when `NODE_ENV=production`.
+
+Password reset tokens contain 32 random bytes. Only their SHA-256 hashes are
+stored in the `password_reset_tokens` collection, whose expiry index removes
+elapsed records. Successful reset increments the user's token version and
+therefore invalidates previously issued JWTs. Requests are subject to a
+per-account cooldown and never reveal whether an email is registered.
 
 ## Ride workflow
 
@@ -110,9 +125,10 @@ service.
 
 `rideType` may be `TRANSPORT` or `DELIVERY`. A delivery must include
 `deliveryCategory` with `FOOD`, `WATER`, or `PARCEL`, plus matching
-`deliveryDetails`. Parcel deliveries supply `receiverName` and a Sri Lankan
-mobile `receiverPhone`; food and water deliveries use the registered customer
-as the receiver and do not require these fields.
+`deliveryDetails`. Parcel deliveries send `receiverMode` as `SELF` or `OTHER`.
+For `SELF`, the backend uses the authenticated customer's account name and
+phone. For `OTHER`, the request also supplies `receiverName` and a Sri Lankan
+mobile `receiverPhone`.
 
 Food and water use an `items` array with 1-20 lines and a `quantity` of 1-20
 per line. Food types are `VEGETABLE_MEAL`, `CHICKEN_MEAL`, `SALMON_MEAL`,
@@ -225,14 +241,17 @@ Ride requests and lifecycle changes, cancellations, chat messages and access
 decisions, rider approval decisions, cash confirmation, and app updates create
 notifications. The `notification_created` Socket.IO event is also sent to the
 affected user's private room when the user is connected.
+Pending `RIDE_REQUEST` notifications are rewritten after cancellation or
+acceptance so riders do not keep actionable stale links. The
+`notification_updated` event sends each replacement to the affected rider.
 
 ## Chat endpoints
 
 - `GET /api/rides/:rideId/messages` - Customer or assigned rider
 - `POST /api/rides/:rideId/messages` - Customer or assigned rider during an
   active assigned ride, or during an active approved post-completion window
-- `POST /api/rides/:rideId/chat-access-requests` - Ride customer requests
-  temporary post-completion access and supplies a reason
+- `POST /api/rides/:rideId/chat-access-requests` - The ride customer or assigned
+  rider requests temporary post-completion access and supplies a reason
 
 ```json
 {
@@ -243,7 +262,8 @@ affected user's private room when the user is connected.
 Only text messages are supported. History remains readable after the ride.
 Completed rides are read-only unless an administrator approves a request; an
 approval allows both ride participants to send messages for 24 hours. Cancelled
-rides always remain read-only.
+rides always remain read-only. Only one request for a ride may be awaiting
+administrator review at a time.
 
 ## Socket.io
 

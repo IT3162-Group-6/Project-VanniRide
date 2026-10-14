@@ -10,6 +10,11 @@ router.use(restrictTo('ADMIN'));
 
 router.get('/users', adminController.getAllUsers);
 router.patch('/users/:userId/status', adminController.updateUserStatus);
+router.get('/password-reset-requests', adminController.getPasswordResetRequests);
+router.patch(
+  '/password-reset-requests/:requestId',
+  adminController.resolvePasswordResetRequest
+);
 router.get('/riders', adminController.getAllRiders);
 router.patch(
   '/riders/:riderUserId/approval',

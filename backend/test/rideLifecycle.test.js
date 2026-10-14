@@ -2293,6 +2293,10 @@ test('rejects unsafe production configuration before server startup', () => {
     openRouteServiceBaseUrl: 'https://api.heigit.org',
     openRouteServiceRoutingBaseUrl: 'https://api.heigit.org',
     openRouteServiceApiKey: 'test-api-key',
+    resendApiKey: 're_test_key',
+    passwordResetFromEmail: 'no-reply@example.com',
+    frontendUrl: 'https://app.example.com',
+    passwordResetEmailConfigured: true,
   }));
 });
 

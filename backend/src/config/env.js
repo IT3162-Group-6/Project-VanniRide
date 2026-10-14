@@ -18,6 +18,14 @@ const nodeEnv = process.env.NODE_ENV || 'development';
 const openRouteServiceApiKey = String(
   process.env.OPENROUTESERVICE_API_KEY || ''
 ).trim();
+const corsOrigins = parseOrigins(process.env.CORS_ORIGINS);
+const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
+const passwordResetFromEmail = String(
+  process.env.PASSWORD_RESET_FROM_EMAIL || ''
+).trim();
+const frontendUrl = String(
+  process.env.FRONTEND_URL || corsOrigins[0] || 'http://localhost:5173'
+).trim().replace(/\/$/, '');
 
 const config = {
   port: process.env.PORT || 5000,
@@ -72,10 +80,22 @@ const config = {
   cancellationSweepIntervalMs: Number(
     process.env.CANCELLATION_SWEEP_INTERVAL_MS || 30000
   ),
-  corsOrigins: parseOrigins(process.env.CORS_ORIGINS).length
-    ? parseOrigins(process.env.CORS_ORIGINS)
+  corsOrigins: corsOrigins.length
+    ? corsOrigins
     : ['http://localhost:5173', 'http://127.0.0.1:5173'],
   corsOriginsConfigured: Boolean(String(process.env.CORS_ORIGINS || '').trim()),
+  resendApiKey,
+  passwordResetFromEmail,
+  frontendUrl,
+  passwordResetExpiresMinutes: Number(
+    process.env.PASSWORD_RESET_EXPIRES_MINUTES || 30
+  ),
+  passwordResetCooldownSeconds: Number(
+    process.env.PASSWORD_RESET_COOLDOWN_SECONDS || 60
+  ),
+  passwordResetEmailConfigured: Boolean(
+    resendApiKey && passwordResetFromEmail && frontendUrl
+  ),
 };
 
 const validateRuntimeConfig = (candidate = config) => {
@@ -96,6 +116,27 @@ const validateRuntimeConfig = (candidate = config) => {
     candidate.cancellationSweepIntervalMs < 1000
   ) {
     errors.push('CANCELLATION_SWEEP_INTERVAL_MS must be at least 1000');
+  }
+  if (
+    !Number.isFinite(candidate.passwordResetExpiresMinutes) ||
+    candidate.passwordResetExpiresMinutes < 5 ||
+    candidate.passwordResetExpiresMinutes > 120
+  ) {
+    errors.push('PASSWORD_RESET_EXPIRES_MINUTES must be from 5 through 120');
+  }
+  if (
+    !Number.isFinite(candidate.passwordResetCooldownSeconds) ||
+    candidate.passwordResetCooldownSeconds < 30
+  ) {
+    errors.push('PASSWORD_RESET_COOLDOWN_SECONDS must be at least 30');
+  }
+  try {
+    const publicUrl = new URL(candidate.frontendUrl);
+    if (!['http:', 'https:'].includes(publicUrl.protocol)) {
+      errors.push('FRONTEND_URL must use HTTP or HTTPS');
+    }
+  } catch {
+    errors.push('FRONTEND_URL must be a valid URL');
   }
   if (!['openrouteservice', 'osrm-nominatim'].includes(candidate.mapProvider)) {
     errors.push('MAP_PROVIDER must be openrouteservice or osrm-nominatim');
@@ -150,6 +191,15 @@ const validateRuntimeConfig = (candidate = config) => {
     }
     if (candidate.mapProvider !== 'openrouteservice') {
       errors.push('MAP_PROVIDER must be openrouteservice in production');
+    }
+    if (
+      candidate.passwordResetFromEmail &&
+      !/^\S+@\S+\.\S+$/.test(candidate.passwordResetFromEmail)
+    ) {
+      errors.push('PASSWORD_RESET_FROM_EMAIL must be a valid email address');
+    }
+    if (!String(candidate.frontendUrl || '').startsWith('https://')) {
+      errors.push('FRONTEND_URL must use HTTPS in production');
     }
   }
   if (errors.length) {

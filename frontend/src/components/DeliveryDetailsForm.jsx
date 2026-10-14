@@ -22,15 +22,28 @@ function QuantityControl({ label, value, onChange, min = 1, max = 20, step = 1 }
 function ReceiverFields({ details, setDetails }) {
   const update = (key, value) => setDetails((current) => ({ ...current, [key]: value }));
   return (
-    <div className="delivery-receiver-grid">
-      <div className="field">
-        <label>Receiver name</label>
-        <input value={details.receiverName} maxLength={100} onChange={(event) => update('receiverName', event.target.value)} placeholder="Person receiving the order" />
+    <div className="delivery-receiver-section">
+      <label className="field-label">Who will receive this parcel?</label>
+      <div className="receiver-mode-grid" role="group" aria-label="Parcel receiver">
+        <button type="button" className={details.receiverMode === 'SELF' ? 'selected' : ''} aria-pressed={details.receiverMode === 'SELF'} onClick={() => update('receiverMode', 'SELF')}>
+          <b>Me</b><span>Use my account details</span>
+        </button>
+        <button type="button" className={details.receiverMode === 'OTHER' ? 'selected' : ''} aria-pressed={details.receiverMode === 'OTHER'} onClick={() => update('receiverMode', 'OTHER')}>
+          <b>Another person</b><span>Enter their contact details</span>
+        </button>
       </div>
-      <div className="field">
-        <label>Receiver phone</label>
-        <input type="tel" value={details.receiverPhone} onChange={(event) => update('receiverPhone', event.target.value)} placeholder="077 123 4567" />
-      </div>
+      {details.receiverMode === 'OTHER' && (
+        <div className="delivery-receiver-grid">
+          <div className="field">
+            <label>Receiver name</label>
+            <input value={details.receiverName} maxLength={100} onChange={(event) => update('receiverName', event.target.value)} placeholder="Person receiving the order" />
+          </div>
+          <div className="field">
+            <label>Receiver phone</label>
+            <input type="tel" value={details.receiverPhone} onChange={(event) => update('receiverPhone', event.target.value)} placeholder="077 123 4567" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
