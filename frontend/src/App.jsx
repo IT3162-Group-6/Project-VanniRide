@@ -11,6 +11,7 @@ import Toast from './components/Toast';
 import NetworkStatus from './components/NetworkStatus';
 import NotificationPopups from './components/NotificationPopups';
 import RatingPrompt from './components/RatingPrompt';
+import PwaManager from './components/PwaManager';
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Home = lazy(() => import('./pages/Home'));
 const Login = lazy(() => import('./pages/Login'));
@@ -45,6 +46,7 @@ export default function App() {
       <AuthProvider>
         <RealtimeProvider>
           <BrowserRouter>
+            <PwaManager />
             <NetworkStatus />
             <NotificationPopups />
             <RatingPrompt />
