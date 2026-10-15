@@ -52,7 +52,7 @@ export default defineConfig({
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,png,webp,svg,ico,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/legacy-install\.html/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\//,

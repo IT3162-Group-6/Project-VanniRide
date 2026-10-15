@@ -11,7 +11,9 @@ server.
 - Android 8 and 9 are limited to Chrome 138 and can fail to launch the installed
   WebAPK shell. On these versions, Vanni Ride suppresses the PWA install action
   and offers a guided home-screen browser shortcut instead. Full standalone PWA
-  support therefore requires Android 10 or newer.
+  support therefore requires Android 10 or newer. When migrating a device that
+  already installed the WebAPK, uninstall it and clear Vanni Ride's Chrome site
+  data once so the previous service worker cannot retain the old launch route.
 - On iPhone and iPad, the app explains the Safari flow: **Share** then
   **Add to Home Screen**.
 - When launched from the installed icon, the app runs in standalone portrait
