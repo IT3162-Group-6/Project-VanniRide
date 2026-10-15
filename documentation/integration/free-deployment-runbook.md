@@ -10,6 +10,17 @@ The current academic/demo deployment uses:
 The root `render.yaml` remains a supported alternative backend deployment
 manifest, but it is not used by the current hosted application.
 
+## Source branch policy
+
+Both Railway and Cloudflare Pages deploy the GitHub `main` branch. The former
+`frontend-backend-integration` deployment branch has been retired; do not
+recreate or deploy from it.
+
+Before pushing directly to `main`, run the relevant frontend and backend tests,
+lint the frontend, and confirm that the frontend production build succeeds.
+Use a reviewed pull request instead when a change is large, risky, or being
+developed by more than one contributor.
+
 Do not commit database passwords, API keys, JWT secrets, or administrator
 credentials. Enter them only in the relevant service dashboard.
 
@@ -17,7 +28,8 @@ credentials. Enter them only in the relevant service dashboard.
 
 1. Create and secure the MongoDB Atlas Free cluster.
 2. Create an OpenRouteService account and API key.
-3. Push the reviewed branch to GitHub.
+3. Merge the reviewed change into GitHub `main` or push a tested change directly
+   to `main`.
 4. Create the Railway backend from the GitHub repository with `backend` as its
    root directory and `npm start` as its start command.
 5. Create the Cloudflare Pages frontend from the same GitHub repository.
@@ -49,6 +61,7 @@ The service must report HTTP 200 at `/health` before a release is accepted.
 Use these dashboard values:
 
 ```text
+Production branch: main
 Root directory: frontend
 Build command: npm run build
 Build output directory: dist
