@@ -8,6 +8,10 @@ server.
 
 - Android browsers that support the install event show an in-app **Install**
   suggestion. The browser still performs and controls the final installation.
+- Android 8 and 9 are limited to Chrome 138 and can fail to launch the installed
+  WebAPK shell. On these versions, Vanni Ride suppresses the PWA install action
+  and offers a guided home-screen browser shortcut instead. Full standalone PWA
+  support therefore requires Android 10 or newer.
 - On iPhone and iPad, the app explains the Safari flow: **Share** then
   **Add to Home Screen**.
 - When launched from the installed icon, the app runs in standalone portrait

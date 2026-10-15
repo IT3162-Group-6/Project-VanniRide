@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   INSTALL_DISMISS_DURATION_MS,
+  getAndroidMajorVersion,
   isAndroidDevice,
   isIosDevice,
+  isLegacyAndroidPwaDevice,
   isStandaloneMode,
   rememberInstallPromptDismissal,
   wasInstallPromptDismissed,
@@ -24,6 +26,15 @@ test('detects iPhones and touch-capable iPads reporting as a Mac', () => {
 test('detects Android devices without treating desktop browsers as Android', () => {
   assert.equal(isAndroidDevice({ userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7)' }), true);
   assert.equal(isAndroidDevice({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }), false);
+});
+
+test('identifies Android versions that need the browser-shortcut fallback', () => {
+  const androidEight = { userAgent: 'Mozilla/5.0 (Linux; Android 8.0.0; LDN-LX2) Chrome/138.0.7204.179' };
+  const androidFourteen = { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7)' };
+  assert.equal(getAndroidMajorVersion(androidEight), 8);
+  assert.equal(isLegacyAndroidPwaDevice(androidEight), true);
+  assert.equal(isLegacyAndroidPwaDevice(androidFourteen), false);
+  assert.equal(isLegacyAndroidPwaDevice({ userAgent: 'Mozilla/5.0 (iPhone)' }), false);
 });
 
 test('remembers an install dismissal for seven days', () => {

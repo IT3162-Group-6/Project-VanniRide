@@ -4,6 +4,7 @@ import { useAppState } from '../context/appStateStore';
 import {
   isAndroidDevice,
   isIosDevice,
+  isLegacyAndroidPwaDevice,
   isStandaloneMode,
   rememberInstallPromptDismissal,
   wasInstallPromptDismissed,
@@ -17,6 +18,7 @@ export default function PwaManager() {
   const [dismissed, setDismissed] = useState(() => wasInstallPromptDismissed());
   const iosInstructions = isIosDevice() && !installed;
   const androidInstructions = isAndroidDevice() && !installed;
+  const legacyAndroid = isLegacyAndroidPwaDevice() && !installed;
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -30,7 +32,7 @@ export default function PwaManager() {
   useEffect(() => {
     const handleInstallPrompt = (event) => {
       event.preventDefault();
-      setInstallPrompt(event);
+      if (!legacyAndroid) setInstallPrompt(event);
     };
     const handleInstalled = () => {
       setInstalled(true);
@@ -48,7 +50,7 @@ export default function PwaManager() {
       window.removeEventListener('appinstalled', handleInstalled);
       displayMode?.removeEventListener?.('change', handleDisplayMode);
     };
-  }, [showToast]);
+  }, [legacyAndroid, showToast]);
 
   useEffect(() => {
     if (!offlineReady) return;
@@ -89,6 +91,8 @@ export default function PwaManager() {
 
   const installMessage = installPrompt
     ? 'Add the app to your phone for quick access and a full-screen experience.'
+    : legacyAndroid
+      ? 'This Android version cannot reliably run the installed app. Create a home-screen shortcut that opens safely in Chrome.'
     : iosInstructions
       ? 'In Safari, tap Share and then “Add to Home Screen”.'
       : 'In Chrome, tap the three-dot menu and choose “Install app” or “Add to Home screen”.';
@@ -101,7 +105,9 @@ export default function PwaManager() {
         <span>{installMessage}</span>
       </div>
       <div className="pwa-banner-actions">
-        {installPrompt && <button type="button" className="btn btn-primary btn-sm" onClick={installApp}>Install</button>}
+        {legacyAndroid
+          ? <a className="btn btn-primary btn-sm" href="/legacy-install.html">Create shortcut</a>
+          : installPrompt && <button type="button" className="btn btn-primary btn-sm" onClick={installApp}>Install</button>}
         <button type="button" className="pwa-dismiss" aria-label="Dismiss install suggestion" onClick={dismissInstall}><Icon name="close" size={17} /></button>
       </div>
     </aside>

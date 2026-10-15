@@ -20,6 +20,16 @@ export function isAndroidDevice(navigatorObject = globalThis.navigator) {
   return /Android/i.test(navigatorObject?.userAgent || '');
 }
 
+export function getAndroidMajorVersion(navigatorObject = globalThis.navigator) {
+  const match = (navigatorObject?.userAgent || '').match(/Android\s+(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+export function isLegacyAndroidPwaDevice(navigatorObject = globalThis.navigator) {
+  const version = getAndroidMajorVersion(navigatorObject);
+  return version !== null && version < 10;
+}
+
 export function wasInstallPromptDismissed(
   storage = globalThis.localStorage,
   now = Date.now()
