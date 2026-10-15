@@ -1931,6 +1931,7 @@ test('audits bounded admin management, dispute, approval, and statistics operati
   assert.equal(statistics.body.data.statistics.cancellations.total, 1);
   assert.equal(statistics.body.data.statistics.ratings.averageRating, 5);
   assert.equal(statistics.body.data.statistics.chatAccessRequests.pending, 0);
+  assert.equal(statistics.body.data.statistics.riderAvailability.available, 1);
 
   const audits = await AdminAuditLog.find().sort({ created_at: 1 }).lean();
   assert.deepEqual(

@@ -753,8 +753,15 @@ ul{margin:0;padding:0;list-style:none}
 .profile-head .icon-btn{margin-left:auto}
 
 /* settings */
-.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
-.settings-card{padding:0;overflow:hidden}
+.settings-page{max-width:1080px;margin:0 auto}
+.settings-intro{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding:4px 2px}
+.settings-intro h2{color:var(--green-900);font-size:1.45rem}
+.settings-intro p{margin:5px 0 0;color:var(--ink-soft);font-size:.86rem}
+.settings-page-alert{margin-bottom:18px}
+.settings-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:20px;align-items:start}
+.settings-card{grid-column:span 6;padding:0;overflow:hidden;border-color:#d7e2da;box-shadow:0 8px 24px -20px rgba(18,42,28,.45)}
+.settings-card-wide{grid-column:1/-1}
+.settings-card-compact{align-self:start}
 .settings-card-head{display:flex;gap:12px;padding:20px 20px 16px;border-bottom:1px solid var(--line)}
 .settings-card-head>span{display:flex;width:38px;height:38px;flex:none;align-items:center;justify-content:center;border-radius:12px;background:var(--mint-100);color:var(--green-700)}
 .settings-card-head h3{color:var(--green-900);font-size:1rem}
@@ -774,6 +781,10 @@ ul{margin:0;padding:0;list-style:none}
 .settings-critical-note svg{flex:none;margin-top:2px}
 .settings-critical-note span{display:flex;flex-direction:column;gap:2px;font-size:.72rem;line-height:1.4}
 .settings-critical-note b{font-size:.78rem}
+.settings-form{padding:20px;gap:16px}
+.settings-form .field{margin-bottom:0}
+.settings-form>.btn{justify-self:start;min-width:170px;margin-top:2px}
+.settings-form>.muted{margin:0;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--mint-50)}
 .settings-links-card>a{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line);color:var(--ink);font-size:.84rem}
 .settings-links-card>a:hover{background:var(--mint-50)}
 .settings-links-card>a>span{display:flex;align-items:center;gap:10px}
@@ -785,6 +796,16 @@ ul{margin:0;padding:0;list-style:none}
 .settings-version{display:flex;justify-content:space-between;padding:16px 20px;color:var(--ink-soft);font-size:.82rem}
 .settings-version b{color:var(--green-800)}
 .settings-about-card>.btn{width:calc(100% - 40px);margin:0 20px 20px;gap:8px}
+.availability-banner{display:flex;align-items:center;gap:14px;margin:0 0 18px;padding:15px 16px;border:1px solid #cfe0d3;border-radius:var(--radius-md);background:var(--mint-50);color:var(--green-900)}
+.availability-banner>svg{flex:none;color:var(--green-700)}
+.availability-banner>div{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.availability-banner b{font-size:.9rem}
+.availability-banner span{color:var(--ink-soft);font-size:.78rem;line-height:1.45}
+.availability-banner-offline{border-color:#e2d7bd;background:#fffaf0}
+.availability-banner-warning{border-color:#ead2ce;background:#fff7f5}
+.tabs-disabled{opacity:.45;pointer-events:none}
+.stat-card-availability{border-color:#b9d8c1;background:var(--mint-50)}
+.stat-card small{display:block;margin-top:5px;color:var(--ink-soft);font-size:.68rem;line-height:1.35}
 
 /* auth extras */
 .demo-box{margin-top:18px;padding:14px;background:var(--mint-50);border-radius:var(--radius-sm);font-size:.82rem}
@@ -818,13 +839,18 @@ ul{margin:0;padding:0;list-style:none}
 
 @media(max-width:900px){
   .profile-grid{grid-template-columns:1fr}
-  .settings-grid{grid-template-columns:1fr}
+  .settings-card{grid-column:1/-1}
 }
 @media(max-width:560px){
   .req-right{align-items:flex-end}
   .role-grid{grid-template-columns:1fr}
   .toolbar{flex-direction:column;align-items:stretch}
   .search-input{width:100%}
+  .settings-grid{gap:14px}
+  .settings-card-head,.settings-form{padding:17px}
+  .settings-switch-row{padding-left:17px;padding-right:17px}
+  .availability-banner{align-items:flex-start;flex-wrap:wrap}
+  .availability-banner>.btn{width:100%}
 }
 
 /* ============================================================

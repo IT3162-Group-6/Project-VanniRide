@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import RideCard from '../../components/RideCard';
+import { useRealtimeEvent } from '../../context/realtimeHooks';
 import { adminApi } from '../../services/api';
 
 export default function AdminDashboard() {
@@ -10,7 +11,7 @@ export default function AdminDashboard() {
   const [chatRequests, setChatRequests] = useState([]);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const loadDashboard = useCallback(() => {
     Promise.all([adminApi.stats(), adminApi.rides(), adminApi.chatAccessRequests()])
       .then(([statistics, rideList, requests]) => {
         setStats(statistics);
@@ -19,6 +20,15 @@ export default function AdminDashboard() {
       })
       .catch((requestError) => setError(requestError.message));
   }, []);
+
+  useEffect(() => {
+    loadDashboard();
+    const timer = setInterval(loadDashboard, 30000);
+    return () => clearInterval(timer);
+  }, [loadDashboard]);
+
+  useRealtimeEvent('rider_availability_changed', loadDashboard);
+  useRealtimeEvent('ride_status_changed', loadDashboard);
 
   async function reviewChat(request, decision) {
     const action = decision === 'APPROVE' ? 'approving' : 'rejecting';
@@ -40,6 +50,9 @@ export default function AdminDashboard() {
       <div className="stat-grid">
         <div className="stat-card"><span>Customers</span><b>{stats.customers}</b></div>
         <div className="stat-card"><span>Riders</span><b>{stats.riders}</b></div>
+        <div className="stat-card stat-card-availability"><span>Available riders</span><b>{stats.availableRiders}</b></div>
+        <div className="stat-card"><span>Busy riders</span><b>{stats.busyRiders}</b></div>
+        <div className="stat-card"><span>Offline riders</span><b>{stats.offlineRiders}</b></div>
         <div className="stat-card"><span>Total rides</span><b>{stats.totalRides}</b></div>
         <div className="stat-card"><span>Active now</span><b>{stats.activeRides}</b></div>
         <div className="stat-card"><span>Completed</span><b>{stats.completedRides}</b></div>

@@ -131,6 +131,21 @@ const emitRiderApprovalUpdated = (req, rider) => {
     .emit('rider_approval_updated', payload);
 };
 
+const emitRiderAvailabilityChanged = (req, rider) => {
+  const io = getIo(req);
+  if (!io) return;
+  const riderUserId = rider.user_id || rider.userId;
+  const availabilityStatus = rider.availability_status || rider.availabilityStatus;
+  if (!riderUserId || !availabilityStatus) return;
+  io.to('role_CUSTOMER')
+    .to('role_ADMIN')
+    .emit('rider_availability_changed', {
+      riderUserId: riderUserId.toString(),
+      availabilityStatus,
+      updatedAt: new Date().toISOString(),
+    });
+};
+
 const emitRideForceCancelled = (req, ride, reason) => {
   const io = getIo(req);
   if (!io) return;
@@ -155,6 +170,7 @@ module.exports = {
   emitCancellationResolved,
   emitCancellationResolvedWithIo,
   emitRideStatusChanged,
+  emitRiderAvailabilityChanged,
   emitRiderApprovalUpdated,
   emitRideForceCancelled,
   rideRoom,

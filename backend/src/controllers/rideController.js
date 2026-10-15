@@ -30,6 +30,7 @@ const {
   emitCancellationRequested,
   emitCancellationResolved,
   emitRideStatusChanged,
+  emitRiderAvailabilityChanged,
 } = require('../utils/socketEvents');
 const {
   createImmediateCancellation,
@@ -576,6 +577,7 @@ exports.acceptRide = catchAsync(async (req, res) => {
     throw new AppError('This ride is no longer available', 409);
   }
 
+  emitRiderAvailabilityChanged(req, rider);
   emitRideStatusChanged(req, ride);
   await resolveRideRequestNotificationsSafely({
     rideId: ride._id,
@@ -680,7 +682,8 @@ exports.updateRideStatus = catchAsync(async (req, res) => {
     }
 
     try {
-      await releaseRiderAfterRide(userId);
+      const availabilityStatus = await releaseRiderAfterRide(userId);
+      emitRiderAvailabilityChanged(req, { userId, availabilityStatus });
     } catch (error) {
       await Ride.updateOne(
         {

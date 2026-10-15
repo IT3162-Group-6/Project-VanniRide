@@ -548,6 +548,7 @@ test('connects rider availability, requests, lifecycle, earnings, vehicle, and c
   const requests = [];
   global.fetch = async (url, options) => {
     const request = { url: String(url), options }; requests.push(request);
+    if (request.url.endsWith('/users/rider-availability-summary')) return jsonResponse({success:true,data:{riderAvailability:{available:3,busy:1,offline:2,approved:6}}});
     if (request.url.endsWith('/users/rider/availability')) return jsonResponse({success:true,data:{riderProfile:{approvalStatus:'APPROVED',availabilityStatus:'AVAILABLE'}}});
     if (request.url.endsWith('/users/rider/profile')) return jsonResponse({success:true,data:{riderProfile:{approvalStatus:'PENDING',availabilityStatus:'UNAVAILABLE',vehicle:{model:'Dio',registrationNumber:'NP-9'}},reapprovalTriggered:true}});
     if (request.url.endsWith('/users/rider/earnings')) return jsonResponse({success:true,data:{summary:{totalEarnings:500,pendingReceiptAmount:200},earnings:[]}});
@@ -559,6 +560,7 @@ test('connects rider availability, requests, lifecycle, earnings, vehicle, and c
     if (request.url.endsWith('/rides/r1/payment')) return jsonResponse({success:true,data:{payment:{id:'p1',paymentMethod:'CASH',paymentStatus:'PAID',amount:200}}});
     throw new Error(`Unexpected request ${request.url}`);
   };
+  assert.deepEqual(await riderApi.availabilitySummary(), { available: 3, busy: 1, offline: 2, approved: 6 });
   assert.equal((await riderApi.setAvailability(true)).availabilityStatus, 'available');
   assert.equal((await riderApi.updateVehicle({type:'Motorcycle',model:'Dio',registrationNumber:'NP-9',color:'Black'})).reapprovalTriggered, true);
   assert.equal((await riderApi.earnings()).summary.totalEarnings, 500);
@@ -679,7 +681,7 @@ test('connects administrator management, review, audit, and statistics APIs', as
     if (path.endsWith('/admin/chat-access-requests')) return jsonResponse({ success: true, data: { chatAccessRequests: [{ id: 'a1', rideId: 'ride1', status: 'PENDING' }] } });
     if (path.endsWith('/admin/password-reset-requests/pr1')) return jsonResponse({ success: true, data: { passwordResetRequest: { id: 'pr1', status: 'RESOLVED' } } });
     if (path.endsWith('/admin/password-reset-requests')) return jsonResponse({ success: true, data: { passwordResetRequests: [{ id: 'pr1', status: 'PENDING', user: { id: 'c1', name: 'Customer', email: 'c@example.com' } }] } });
-    if (path.endsWith('/admin/statistics')) return jsonResponse({ success: true, data: { statistics: { users: { customers: 2, riders: 1, admins: 1 }, rides: { total: 4, active: 1, completed: 2, cancelled: 1 }, payments: { totalPaidAmount: 600, pending: 1 }, riderApprovals: { pending: 1 }, chatAccessRequests: { pending: 1 }, ratings: { averageRating: 5 } } } });
+    if (path.endsWith('/admin/statistics')) return jsonResponse({ success: true, data: { statistics: { users: { customers: 2, riders: 1, admins: 1 }, rides: { total: 4, active: 1, completed: 2, cancelled: 1 }, payments: { totalPaidAmount: 600, pending: 1 }, riderApprovals: { pending: 1 }, riderAvailability: { available: 2, busy: 1, offline: 3 }, chatAccessRequests: { pending: 1 }, ratings: { averageRating: 5 } } } });
     throw new Error(`Unexpected request ${request.url}`);
   };
 
@@ -697,7 +699,11 @@ test('connects administrator management, review, audit, and statistics APIs', as
   assert.equal((await adminApi.ratings())[0].rating, 5);
   assert.equal((await adminApi.chatAccessRequests())[0].status, 'PENDING');
   assert.equal((await adminApi.reviewChatAccess('a1', 'APPROVE', 'Lost item')).status, 'APPROVED');
-  assert.equal((await adminApi.stats()).pendingChatRequests, 1);
+  const statistics = await adminApi.stats();
+  assert.equal(statistics.pendingChatRequests, 1);
+  assert.equal(statistics.availableRiders, 2);
+  assert.equal(statistics.busyRiders, 1);
+  assert.equal(statistics.offlineRiders, 3);
   assert.equal((await adminApi.passwordResetRequests())[0].status, 'PENDING');
   assert.equal((await adminApi.resolvePasswordResetRequest('pr1', 'Identity verified')).status, 'RESOLVED');
 

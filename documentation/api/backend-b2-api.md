@@ -42,6 +42,9 @@ The B2 controllers also enforce the role and MongoDB ObjectId requirements.
   profile for approval.
 - `PATCH /api/users/rider/availability` - Rider-only switch between `AVAILABLE`
   and `UNAVAILABLE`; only an approved, non-busy rider may use it.
+- `GET /api/users/rider-availability-summary` - Return aggregate counts of
+  approved riders by `AVAILABLE`, `BUSY`, and `UNAVAILABLE` status. No rider
+  identity or location data is exposed.
 - `PUT /api/users/rider/profile` - Rider-only vehicle update. A changed vehicle
   returns the rider to `PENDING` approval and `UNAVAILABLE`.
 - `GET /api/admin/password-reset-requests` - List pending administrator-assisted
@@ -344,7 +347,8 @@ All endpoints below require an authenticated `ADMIN` account:
 - `GET /api/admin/chat-access-requests`
 - `PATCH /api/admin/chat-access-requests/:requestId`
 - `POST /api/admin/notifications/broadcast`
-- `GET /api/admin/statistics`
+- `GET /api/admin/statistics` - Includes aggregate approved rider availability
+  counts in `statistics.riderAvailability`.
 
 Account status request:
 

@@ -16,6 +16,7 @@ const {
   normalizeVehicle,
   serializeRiderProfile,
 } = require('../services/riderService');
+const { emitRiderAvailabilityChanged } = require('../utils/socketEvents');
 
 exports.getProfile = async (req, res, next) => {
   try {
@@ -72,6 +73,30 @@ exports.updateRecoverySettings = async (req, res, next) => {
       success: true,
       message: 'Recovery details updated successfully',
       data: { user: serializeUser(user, req.user.role) },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.getRiderAvailabilitySummary = async (req, res, next) => {
+  try {
+    const rows = await Rider.aggregate([
+      { $match: { approval_status: 'APPROVED' } },
+      { $group: { _id: '$availability_status', count: { $sum: 1 } } },
+    ]);
+    const byStatus = Object.fromEntries(rows.map((row) => [row._id, row.count]));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        riderAvailability: {
+          available: byStatus.AVAILABLE || 0,
+          busy: byStatus.BUSY || 0,
+          offline: byStatus.UNAVAILABLE || 0,
+          approved: rows.reduce((total, row) => total + row.count, 0),
+        },
+      },
     });
   } catch (error) {
     return next(error);
@@ -202,6 +227,8 @@ exports.updateRiderAvailability = async (req, res, next) => {
         new AppError('A busy rider cannot manually change availability', 409)
       );
     }
+
+    emitRiderAvailabilityChanged(req, rider);
 
     return res.status(200).json({
       success: true,

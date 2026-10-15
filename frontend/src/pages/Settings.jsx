@@ -106,8 +106,17 @@ export default function Settings() {
   };
 
   return (
-    <div className="settings-grid">
-      <section className="card settings-card">
+    <div className="settings-page">
+      <header className="settings-intro">
+        <div>
+          <h2>Settings</h2>
+          <p>Manage notifications, account access, and security preferences.</p>
+        </div>
+      </header>
+      {accountError && <div className="alert alert-error settings-page-alert">{accountError}</div>}
+
+      <div className="settings-grid">
+      <section className="card settings-card settings-card-compact">
         <div className="settings-card-head">
           <span><Icon name="bell" /></span>
           <div><h3>Notification preferences</h3><p>Choose which optional alerts appear as popups on this device.</p></div>
@@ -147,7 +156,7 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="card settings-card">
+      <section className="card settings-card settings-card-compact">
         <div className="settings-card-head">
           <span><Icon name="settings" /></span>
           <div><h3>Alert feedback</h3><p>Control how popup notifications get your attention.</p></div>
@@ -166,7 +175,7 @@ export default function Settings() {
         />
       </section>
 
-      <section className="card settings-card settings-links-card">
+      <section className="card settings-card settings-card-compact settings-links-card">
         <div className="settings-card-head">
           <span><Icon name="user" /></span>
           <div><h3>Account and security</h3><p>Manage your profile and account access.</p></div>
@@ -174,12 +183,11 @@ export default function Settings() {
         <Link to={profilePath}><span><Icon name="user" /><b>Profile</b></span><Icon name="back" className="settings-link-arrow" /></Link>
       </section>
 
-      <section className="card settings-card">
+      <section className="card settings-card settings-card-wide">
         <div className="settings-card-head">
           <span><Icon name="shield" /></span>
           <div><h3>Change password</h3><p>Confirm your current password before choosing a new one.</p></div>
         </div>
-        {accountError && <div className="alert alert-error">{accountError}</div>}
         <form onSubmit={submitPassword} className="settings-form">
           <div className="field"><label>Current password</label><input type="password" required autoComplete="current-password" value={passwordForm.currentPassword} onChange={(event) => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })} /></div>
           <div className="field"><label>New password</label><input type="password" required minLength={8} maxLength={128} autoComplete="new-password" value={passwordForm.newPassword} onChange={(event) => setPasswordForm({ ...passwordForm, newPassword: event.target.value })} /></div>
@@ -189,7 +197,7 @@ export default function Settings() {
       </section>
 
       {user.role !== 'admin' && (
-        <section className="card settings-card">
+        <section className="card settings-card settings-card-wide">
           <div className="settings-card-head">
             <span><Icon name="shield" /></span>
             <div><h3>Password recovery details</h3><p>These details must match before an administrator receives a reset request.</p></div>
@@ -205,7 +213,7 @@ export default function Settings() {
       )}
 
       {user.role !== 'admin' && roles.length < 2 && (
-        <section className="card settings-card">
+        <section className="card settings-card settings-card-wide">
           <div className="settings-card-head">
             <span><Icon name={missingRole === 'rider' ? 'bike' : 'user'} /></span>
             <div><h3>Enable {missingRole} access</h3><p>Use this same email and password for both customer and rider panels.</p></div>
@@ -225,7 +233,7 @@ export default function Settings() {
         </section>
       )}
 
-      <section className="card settings-card settings-about-card">
+      <section className="card settings-card settings-card-compact settings-about-card">
         <div className="settings-card-head">
           <span><Icon name="pin" /></span>
           <div><h3>About Vanni Ride</h3><p>Campus transport and delivery application.</p></div>
@@ -239,6 +247,7 @@ export default function Settings() {
           <Icon name="logout" size={18} /> Log out
         </button>
       </section>
+      </div>
     </div>
   );
 }

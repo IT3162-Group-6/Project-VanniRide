@@ -106,6 +106,10 @@ remains `STARTED` until the cancellation request is resolved.
 Accepting a ride changes `AVAILABLE` to `BUSY`. Completion or final cancellation
 changes `BUSY` back to `AVAILABLE`.
 
+Authenticated customers and administrators may see aggregate approved rider
+counts. These counts communicate current service availability without exposing
+individual rider identities or locations.
+
 ### Rider approval
 
 - `PENDING`
@@ -443,6 +447,7 @@ created through protected setup tooling.
 - `PUT /api/users/profile`
 - `PUT /api/users/rider/profile`
 - `PATCH /api/users/rider/availability`
+- `GET /api/users/rider-availability-summary`
 - `GET /api/users/cancellation-allowance`
 
 ### Rides
@@ -505,7 +510,7 @@ reported separately as pending receipts.
 - `GET /api/admin/ratings`
 - `GET /api/admin/chat-access-requests`
 - `PATCH /api/admin/chat-access-requests/:requestId`
-- `GET /api/admin/statistics`
+- `GET /api/admin/statistics` - includes approved rider availability counts
 
 Administrator mutations require a non-empty `reason`. Account management only
 allows `ACTIVE` and `SUSPENDED`, invalidates existing sessions by incrementing

@@ -13,6 +13,10 @@ router.put('/recovery-settings', userController.updateRecoverySettings);
 router.post('/roles', userController.addAccountRole);
 router.get('/history', historyController.getMyHistory);
 router.get(
+  '/rider-availability-summary',
+  userController.getRiderAvailabilitySummary
+);
+router.get(
   '/cancellation-allowance',
   userController.getCancellationAllowance
 );

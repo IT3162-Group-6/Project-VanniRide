@@ -495,6 +495,26 @@ export const authApi = {
 };
 
 export const riderApi = {
+  async availabilitySummary() {
+    if (USE_MOCK_AUTH) {
+      const riders = db().users.filter((user) => (user.roles || [user.role]).includes('rider'));
+      return {
+        available: riders.filter((user) => user.online).length,
+        busy: 0,
+        offline: riders.filter((user) => !user.online).length,
+        approved: riders.filter((user) => user.status === 'active').length,
+      };
+    }
+    const response = await http('/users/rider-availability-summary');
+    const summary = response.data?.riderAvailability || {};
+    return {
+      available: Number(summary.available || 0),
+      busy: Number(summary.busy || 0),
+      offline: Number(summary.offline || 0),
+      approved: Number(summary.approved || 0),
+    };
+  },
+
   async setAvailability(available) {
     const response = await http('/users/rider/availability', {
       method: 'PATCH',
@@ -975,6 +995,9 @@ export const adminApi = {
         riders: stats.users?.riders || 0,
         admins: stats.users?.admins || 0,
         pendingRiders: stats.riderApprovals?.pending || 0,
+        availableRiders: stats.riderAvailability?.available || 0,
+        busyRiders: stats.riderAvailability?.busy || 0,
+        offlineRiders: stats.riderAvailability?.offline || 0,
         totalRides: stats.rides?.total || 0,
         activeRides: stats.rides?.active || 0,
         completedRides: stats.rides?.completed || 0,
@@ -993,6 +1016,9 @@ export const adminApi = {
       customers: d.users.filter((u) => u.role === 'customer').length,
       riders: d.users.filter((u) => u.role === 'rider').length,
       pendingRiders: d.users.filter((u) => u.role === 'rider' && u.status === 'pending').length,
+      availableRiders: d.users.filter((u) => u.role === 'rider' && u.online).length,
+      busyRiders: 0,
+      offlineRiders: d.users.filter((u) => u.role === 'rider' && !u.online).length,
       totalRides: d.rides.length,
       activeRides: d.rides.filter((r) => [RIDE_STATUS.PENDING, RIDE_STATUS.ACCEPTED, RIDE_STATUS.ONTHEWAY, RIDE_STATUS.PICKED].includes(r.status)).length,
       completedRides: completed.length,

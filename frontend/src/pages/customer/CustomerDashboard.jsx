@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
 import RiderArt from '../../components/RiderArt';
 import RideCard from '../../components/RideCard';
 import { useAuth } from '../../context/authStore';
-import { ridesApi } from '../../services/api';
+import { useRealtimeEvent } from '../../context/realtimeHooks';
+import { riderApi, ridesApi } from '../../services/api';
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
@@ -13,16 +14,18 @@ export default function CustomerDashboard() {
   const [activeRides, setActiveRides] = useState([]);
   const [summary, setSummary] = useState(null);
   const [allowance, setAllowance] = useState(null);
+  const [riderAvailability, setRiderAvailability] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let alive = true;
-    Promise.all([ridesApi.history(), ridesApi.cancellationAllowance()])
-      .then(([history, cancellationAllowance]) => {
+    Promise.all([ridesApi.history(), ridesApi.cancellationAllowance(), riderApi.availabilitySummary()])
+      .then(([history, cancellationAllowance, availability]) => {
         if (!alive) return;
         setRides(history.rides);
         setSummary(history.summary);
         setAllowance(cancellationAllowance);
+        setRiderAvailability(availability);
         setActiveRides(
           history.rides.filter((ride) =>
             ['pending', 'accepted', 'ontheway', 'picked'].includes(ride.status)
@@ -32,6 +35,20 @@ export default function CustomerDashboard() {
       .catch((requestError) => alive && setError(requestError.message));
     return () => { alive = false; };
   }, [user.id]);
+
+  const refreshRiderAvailability = useCallback(() => {
+    riderApi.availabilitySummary()
+      .then(setRiderAvailability)
+      .catch((requestError) => setError(requestError.message));
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(refreshRiderAvailability, 30000);
+    return () => clearInterval(timer);
+  }, [refreshRiderAvailability]);
+
+  useRealtimeEvent('rider_availability_changed', refreshRiderAvailability);
+  useRealtimeEvent('ride_status_changed', refreshRiderAvailability);
 
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
@@ -71,6 +88,7 @@ export default function CustomerDashboard() {
       ))}
 
       <div className="stat-grid">
+        <div className="stat-card stat-card-availability"><span>Riders available now</span><b>{riderAvailability?.available ?? '—'}</b><small>Approved riders accepting requests</small></div>
         <div className="stat-card"><span>Total requests</span><b>{summary?.rides.total ?? rides.length}</b></div>
         <div className="stat-card"><span>Completed</span><b>{summary?.rides.completed ?? completed.length}</b></div>
         <div className="stat-card"><span>Cash paid</span><b>LKR {Number(summary?.payments.totalPaidAmount || 0).toFixed(2)}</b></div>
