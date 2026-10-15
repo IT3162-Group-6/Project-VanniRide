@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useAppState } from '../context/appStateStore';
 import {
+  isAndroidDevice,
   isIosDevice,
   isStandaloneMode,
   rememberInstallPromptDismissal,
@@ -15,6 +16,7 @@ export default function PwaManager() {
   const [installed, setInstalled] = useState(() => isStandaloneMode());
   const [dismissed, setDismissed] = useState(() => wasInstallPromptDismissed());
   const iosInstructions = isIosDevice() && !installed;
+  const androidInstructions = isAndroidDevice() && !installed;
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -83,18 +85,20 @@ export default function PwaManager() {
     );
   }
 
-  if (installed || dismissed || (!installPrompt && !iosInstructions)) return null;
+  if (installed || dismissed || (!installPrompt && !iosInstructions && !androidInstructions)) return null;
+
+  const installMessage = installPrompt
+    ? 'Add the app to your phone for quick access and a full-screen experience.'
+    : iosInstructions
+      ? 'In Safari, tap Share and then “Add to Home Screen”.'
+      : 'In Chrome, tap the three-dot menu and choose “Install app” or “Add to Home screen”.';
 
   return (
     <aside className="pwa-banner" role="status" aria-live="polite">
       <div className="pwa-banner-icon"><Icon name="pin" /></div>
       <div className="pwa-banner-copy">
         <b>Install Vanni Ride</b>
-        <span>
-          {installPrompt
-            ? 'Add the app to your phone for quick access and a full-screen experience.'
-            : 'On iPhone or iPad, tap Share and then “Add to Home Screen”.'}
-        </span>
+        <span>{installMessage}</span>
       </div>
       <div className="pwa-banner-actions">
         {installPrompt && <button type="button" className="btn btn-primary btn-sm" onClick={installApp}>Install</button>}

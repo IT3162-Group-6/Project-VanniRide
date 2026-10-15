@@ -16,6 +16,10 @@ export function isIosDevice(navigatorObject = globalThis.navigator) {
     || (platform === 'MacIntel' && touchPoints > 1);
 }
 
+export function isAndroidDevice(navigatorObject = globalThis.navigator) {
+  return /Android/i.test(navigatorObject?.userAgent || '');
+}
+
 export function wasInstallPromptDismissed(
   storage = globalThis.localStorage,
   now = Date.now()

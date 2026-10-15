@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   INSTALL_DISMISS_DURATION_MS,
+  isAndroidDevice,
   isIosDevice,
   isStandaloneMode,
   rememberInstallPromptDismissal,
@@ -18,6 +19,11 @@ test('detects iPhones and touch-capable iPads reporting as a Mac', () => {
   assert.equal(isIosDevice({ userAgent: 'Mozilla/5.0 (iPhone)', platform: 'iPhone' }), true);
   assert.equal(isIosDevice({ userAgent: 'Mozilla/5.0', platform: 'MacIntel', maxTouchPoints: 5 }), true);
   assert.equal(isIosDevice({ userAgent: 'Mozilla/5.0 (Linux; Android 14)', platform: 'Linux armv8l' }), false);
+});
+
+test('detects Android devices without treating desktop browsers as Android', () => {
+  assert.equal(isAndroidDevice({ userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7)' }), true);
+  assert.equal(isAndroidDevice({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }), false);
 });
 
 test('remembers an install dismissal for seven days', () => {
