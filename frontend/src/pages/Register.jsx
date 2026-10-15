@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, HOME_BY_ROLE } from '../context/authStore';
 import { useAppState } from '../context/appStateStore';
 import AuthShell from '../components/AuthShell';
 import VehicleTypeSelector from '../components/VehicleTypeSelector';
+import { authApi } from '../services/api';
 
 export default function Register() {
   const { register } = useAuth();
@@ -15,10 +16,26 @@ export default function Register() {
     phone: '',
     password: '',
     role: 'customer',
+    identityNumber: '',
+    securityQuestion: '',
+    securityAnswer: '',
     vehicle: { type: 'Motorcycle', model: '', registrationNumber: '', color: '' },
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [questions, setQuestions] = useState([]);
+
+  useEffect(() => {
+    authApi.securityQuestions()
+      .then((items) => {
+        setQuestions(items);
+        setForm((current) => ({
+          ...current,
+          securityQuestion: current.securityQuestion || items[0]?.id || '',
+        }));
+      })
+      .catch((requestError) => setError(requestError.message));
+  }, []);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const setVehicle = (key) => (e) =>
@@ -71,11 +88,29 @@ export default function Register() {
             <input type="password" placeholder="At least 6 characters" minLength={6} required value={form.password} onChange={set('password')} />
           </div>
 
+          <div className="field">
+            <label>University, student, or staff ID number</label>
+            <input type="text" maxLength={32} required value={form.identityNumber} onChange={set('identityNumber')} />
+            <small className="muted">Used with your security answer when requesting password recovery.</small>
+          </div>
+          <div className="field">
+            <label>Security question</label>
+            <select required value={form.securityQuestion} onChange={set('securityQuestion')}>
+              {questions.map((question) => <option key={question.id} value={question.id}>{question.label}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label>Security answer</label>
+            <input type="password" minLength={2} maxLength={100} required autoComplete="off" value={form.securityAnswer} onChange={set('securityAnswer')} />
+            <small className="muted">Answers are case-insensitive and are stored securely.</small>
+          </div>
+
           <label className="field-label">I want to join as</label>
           <div className="role-grid">
             {[
               { value: 'customer', title: 'Customer', sub: 'Book rides & deliveries' },
               { value: 'rider', title: 'Rider', sub: 'Earn by riding' },
+              { value: 'both', title: 'Both', sub: 'Switch between customer & rider' },
             ].map((r) => (
               <button
                 type="button" key={r.value}
@@ -87,7 +122,7 @@ export default function Register() {
             ))}
           </div>
 
-          {form.role === 'rider' && (
+          {(form.role === 'rider' || form.role === 'both') && (
             <>
               <div className="field">
                 <label>Vehicle type</label>

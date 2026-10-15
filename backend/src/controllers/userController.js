@@ -1,7 +1,14 @@
+const bcrypt = require('bcryptjs');
 const AppError = require('../utils/appError');
 const User = require('../models/userModel');
 const Rider = require('../models/riderModel');
-const { serializeUser } = require('./authController');
+const { getUserRoles, serializeUser } = require('./authController');
+const {
+  hashRecoveryValue,
+  validateIdentityNumber,
+  validateSecurityAnswer,
+  validateSecurityQuestion,
+} = require('../services/accountSecurityService');
 const {
   getCancellationAllowance,
 } = require('../services/cancellationService');
@@ -12,12 +19,13 @@ const {
 
 exports.getProfile = async (req, res, next) => {
   try {
+    const roles = getUserRoles(req.user);
     const rider =
-      req.user.role === 'RIDER'
+      roles.includes('RIDER')
         ? await Rider.findOne({ user_id: req.user._id })
         : null;
 
-    if (req.user.role === 'RIDER' && !rider) {
+    if (roles.includes('RIDER') && !rider) {
       return next(new AppError('Rider profile not found', 404));
     }
 
@@ -29,6 +37,89 @@ exports.getProfile = async (req, res, next) => {
       },
     });
   } catch (error) {
+    return next(error);
+  }
+};
+
+exports.updateRecoverySettings = async (req, res, next) => {
+  try {
+    const currentPassword = String(req.body.currentPassword || '');
+    let identityNumber;
+    let securityQuestion;
+    let securityAnswer;
+    try {
+      identityNumber = validateIdentityNumber(req.body.identityNumber);
+      securityQuestion = validateSecurityQuestion(req.body.securityQuestion);
+      securityAnswer = validateSecurityAnswer(req.body.securityAnswer);
+    } catch (validationError) {
+      return next(new AppError(validationError.message, 400));
+    }
+
+    const user = await User.findById(req.user._id).select('+password_hash');
+    if (!user || !(await bcrypt.compare(currentPassword, user.password_hash))) {
+      return next(new AppError('Current password is incorrect', 400));
+    }
+    const [identityNumberHash, securityAnswerHash] = await Promise.all([
+      hashRecoveryValue(identityNumber),
+      hashRecoveryValue(securityAnswer),
+    ]);
+    user.identity_number_hash = identityNumberHash;
+    user.security_question = securityQuestion;
+    user.security_answer_hash = securityAnswerHash;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Recovery details updated successfully',
+      data: { user: serializeUser(user, req.user.role) },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.addAccountRole = async (req, res, next) => {
+  let createdRider = null;
+  try {
+    const role = String(req.body.role || '').toUpperCase();
+    if (!['CUSTOMER', 'RIDER'].includes(role)) {
+      return next(new AppError('Role must be CUSTOMER or RIDER', 400));
+    }
+    const user = await User.findById(req.user._id);
+    const roles = getUserRoles(user);
+    if (roles.includes(role)) {
+      return next(new AppError('This role is already enabled for your account', 409));
+    }
+
+    if (role === 'RIDER') {
+      createdRider = await Rider.create({
+        user_id: user._id,
+        availability_status: 'UNAVAILABLE',
+        vehicle: normalizeVehicle(req.body.vehicle),
+        approval_status: 'PENDING',
+        review_reason: null,
+        reviewed_by: null,
+        reviewed_at: null,
+      });
+    }
+    user.roles = [...roles, role];
+    await user.save();
+
+    return res.status(201).json({
+      success: true,
+      message: role === 'RIDER'
+        ? 'Rider access submitted for administrator approval'
+        : 'Customer access enabled',
+      data: {
+        user: serializeUser(user, req.user.role),
+        riderProfile: serializeRiderProfile(createdRider),
+      },
+    });
+  } catch (error) {
+    if (createdRider?._id) await Rider.deleteOne({ _id: createdRider._id });
+    if (error?.code === 11000 && error?.keyPattern?.['vehicle.registration_number']) {
+      return next(new AppError('Vehicle registration number is already registered', 409));
+    }
     return next(error);
   }
 };
@@ -61,7 +152,7 @@ exports.updateProfile = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
-      data: { user: serializeUser(user) },
+      data: { user: serializeUser(user, req.user.role) },
     });
   } catch (error) {
     return next(error);

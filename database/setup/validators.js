@@ -24,6 +24,15 @@ db.runCommand({
         phone: { bsonType: "string", minLength: 1 },
         password_hash: { bsonType: "string", minLength: 1 },
         role: { enum: ["CUSTOMER", "RIDER", "ADMIN"] },
+        roles: {
+          bsonType: "array",
+          minItems: 1,
+          uniqueItems: true,
+          items: { enum: ["CUSTOMER", "RIDER", "ADMIN"] }
+        },
+        identity_number_hash: { bsonType: ["string", "null"] },
+        security_question: { bsonType: ["string", "null"] },
+        security_answer_hash: { bsonType: ["string", "null"] },
         account_status: { enum: ["ACTIVE", "SUSPENDED"] },
         token_version: { bsonType: numericTypes, minimum: 0 },
         created_at: { bsonType: "date" },

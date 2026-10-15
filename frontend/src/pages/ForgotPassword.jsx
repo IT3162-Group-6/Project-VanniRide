@@ -1,20 +1,38 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
 import { authApi } from '../services/api';
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState('');
+  const [form, setForm] = useState({
+    email: '',
+    identityNumber: '',
+    securityQuestion: '',
+    securityAnswer: '',
+  });
+  const [questions, setQuestions] = useState([]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    authApi.securityQuestions()
+      .then((items) => {
+        setQuestions(items);
+        setForm((current) => ({
+          ...current,
+          securityQuestion: current.securityQuestion || items[0]?.id || '',
+        }));
+      })
+      .catch((requestError) => setError(requestError.message));
+  }, []);
 
   const submit = async (event) => {
     event.preventDefault();
     setBusy(true);
     setError('');
     try {
-      setMessage(await authApi.forgotPassword(email));
+      setMessage(await authApi.forgotPassword(form));
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -26,11 +44,11 @@ export default function ForgotPassword() {
     <AuthShell>
       <div className="auth-card">
         <h2>Request password help</h2>
-        <p>Enter your account email. An administrator will review the request and provide a temporary password.</p>
+        <p>Enter the recovery details configured on your account. Matching requests are sent to an administrator for manual verification.</p>
         {message ? (
           <>
             <div className="alert alert-ok">{message}</div>
-            <p className="muted auth-help">Contact an administrator through your usual university channel. For privacy, this page does not confirm whether an account exists.</p>
+            <p className="muted auth-help">Contact an administrator through your usual university channel. After verification, they can provide an expiring one-time reset link. For privacy, this page does not confirm which detail matched.</p>
           </>
         ) : (
           <form onSubmit={submit}>
@@ -43,8 +61,44 @@ export default function ForgotPassword() {
                 placeholder="you@vau.ac.lk"
                 required
                 autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                value={form.email}
+                onChange={(event) => setForm({ ...form, email: event.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="forgot-identity">University, student, or staff ID number</label>
+              <input
+                id="forgot-identity"
+                type="text"
+                required
+                maxLength={32}
+                autoComplete="off"
+                value={form.identityNumber}
+                onChange={(event) => setForm({ ...form, identityNumber: event.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="forgot-question">Security question</label>
+              <select
+                id="forgot-question"
+                required
+                value={form.securityQuestion}
+                onChange={(event) => setForm({ ...form, securityQuestion: event.target.value })}
+              >
+                {questions.map((question) => <option key={question.id} value={question.id}>{question.label}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="forgot-answer">Security answer</label>
+              <input
+                id="forgot-answer"
+                type="password"
+                required
+                minLength={2}
+                maxLength={100}
+                autoComplete="off"
+                value={form.securityAnswer}
+                onChange={(event) => setForm({ ...form, securityAnswer: event.target.value })}
               />
             </div>
             <button type="submit" className="btn btn-primary btn-block" disabled={busy}>

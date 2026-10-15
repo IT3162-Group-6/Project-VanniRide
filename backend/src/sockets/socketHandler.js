@@ -27,7 +27,7 @@ const getToken = (socket) => {
 
 const findCurrentSocketUser = async (tokenUser) => {
   const user = await User.findById(tokenUser.id)
-    .select('role account_status token_version')
+    .select('role roles account_status token_version')
     .lean();
   if (!user) {
     throw new Error('The user belonging to this token no longer exists');
@@ -36,18 +36,18 @@ const findCurrentSocketUser = async (tokenUser) => {
     throw new Error('This account is suspended');
   }
   if (
-    user.role !== tokenUser.role ||
+    !(Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role]).includes(tokenUser.role) ||
     !Number.isInteger(tokenUser.tokenVersion) ||
     user.token_version !== tokenUser.tokenVersion
   ) {
     throw new Error('This session is no longer valid');
   }
   const riderApproved =
-    user.role !== 'RIDER' ||
+    tokenUser.role !== 'RIDER' ||
     Boolean(
       await Rider.exists({ user_id: user._id, approval_status: 'APPROVED' })
     );
-  return { ...user, riderApproved };
+  return { ...user, role: tokenUser.role, riderApproved };
 };
 
 const findParticipantRide = async (rideId, socketUser) => {

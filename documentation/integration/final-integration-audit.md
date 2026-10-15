@@ -1,7 +1,7 @@
 # Vanni Ride Final Integration Audit
 
 Date: 2026-10-03  
-Branch: `frontend-backend-integration`  
+Audited branch at the time: `frontend-backend-integration` (now retired; current work is on `main`)
 Authority: Vanni Ride Pre-Development Master Specification plus the team's
 confirmed decisions recorded in the canonical integration contract
 

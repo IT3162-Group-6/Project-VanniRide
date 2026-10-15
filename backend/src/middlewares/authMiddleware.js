@@ -49,10 +49,14 @@ exports.protect = async (req, res, next) => {
       return next(new AppError('This session is no longer valid', 401));
     }
 
-    if (decoded.role !== currentUser.role) {
+    const roles = Array.isArray(currentUser.roles) && currentUser.roles.length
+      ? currentUser.roles
+      : [currentUser.role];
+    if (!roles.includes(decoded.role)) {
       return next(new AppError('Invalid authentication token', 401));
     }
 
+    currentUser.role = decoded.role;
     req.user = currentUser;
     return next();
   } catch (error) {

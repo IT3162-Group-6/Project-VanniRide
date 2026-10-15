@@ -60,6 +60,11 @@ The `users` collection stores common information about all registered users.
 - `RIDER`
 - `ADMIN`
 
+Customer and rider access may coexist on one user. The legacy `role` field
+stores the default role, while `roles` stores every authorized role. The active
+role is selected in the signed session token. Administrator access remains
+separate.
+
 ## Account Status
 
 - `ACTIVE`
@@ -84,6 +89,8 @@ MongoDB JSON Schema validation checks:
 - phone must be a non-empty string
 - password_hash must be a non-empty string
 - role must be `CUSTOMER`, `RIDER`, or `ADMIN`
+- roles, when present, must contain only `CUSTOMER`, `RIDER`, or `ADMIN`
+- recovery ID numbers and security answers are stored only as password hashes
 - account_status must be `ACTIVE` or `SUSPENDED`
 - created_at must be a date
 

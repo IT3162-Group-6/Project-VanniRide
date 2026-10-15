@@ -1,4 +1,4 @@
-const bcrypt = require('bcryptjs');
+const env = require('../config/env');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const {
@@ -35,7 +35,10 @@ const {
   serializeRiderProfile,
 } = require('../services/riderService');
 const { serializeDeliveryDetails } = require('../utils/deliveryDetails');
-const { validateNewPassword } = require('../services/passwordResetService');
+const { questionLabel } = require('../services/accountSecurityService');
+const {
+  createResetToken,
+} = require('../services/passwordResetService');
 const {
   notifyManySafely,
   notifySafely,
@@ -64,6 +67,7 @@ const serializeUser = (userDocument) => {
     email: user.email,
     phone: user.phone,
     role: user.role,
+    roles: Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role],
     accountStatus: user.account_status,
     createdAt: user.created_at,
     updatedAt: user.updated_at,
@@ -191,6 +195,9 @@ exports.getPasswordResetRequests = catchAsync(async (req, res) => {
       id: request._id.toString(),
       status: request.status,
       requestedAt: request.requested_at,
+      identityNumber: request.identity_number,
+      securityQuestion: request.security_question,
+      securityQuestionLabel: questionLabel(request.security_question),
       user: usersById.get(request.user_id.toString()) || null,
     }))
     .filter((request) => request.user);
@@ -207,13 +214,6 @@ exports.resolvePasswordResetRequest = catchAsync(async (req, res) => {
   validateObjectId(req.params.requestId, 'password reset request ID');
   const reason = normalizeReason(req.body.reason);
 
-  let temporaryPassword;
-  try {
-    temporaryPassword = validateNewPassword(req.body.temporaryPassword);
-  } catch (validationError) {
-    throw new AppError(validationError.message, 400);
-  }
-
   const request = await PasswordResetRequest.findOne({
     _id: req.params.requestId,
     status: 'PENDING',
@@ -228,7 +228,7 @@ exports.resolvePasswordResetRequest = catchAsync(async (req, res) => {
   const user = await User.findOne({
     _id: request.user_id,
     account_status: 'ACTIVE',
-  }).select('+password_hash');
+  });
   if (!user) {
     throw new AppError('The requesting account is not active', 409);
   }
@@ -249,36 +249,35 @@ exports.resolvePasswordResetRequest = catchAsync(async (req, res) => {
     throw new AppError('Password reset request was already resolved', 409);
   }
 
-  const previousPasswordHash = user.password_hash;
-  const previousTokenVersion = user.token_version;
+  const { token, tokenHash } = createResetToken();
+  const expiresAt = new Date(
+    resolvedAt.getTime() + env.passwordResetExpiresMinutes * 60 * 1000
+  );
+  let resetTokenRecord = null;
   try {
-    user.password_hash = await bcrypt.hash(temporaryPassword, 12);
-    user.token_version += 1;
-    await user.save();
     await PasswordResetToken.updateMany(
       { user_id: user._id, used_at: null },
       { $set: { used_at: resolvedAt } }
     );
+    resetTokenRecord = await PasswordResetToken.create({
+      user_id: user._id,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+    });
     await createAuditLog({
       admin_id: adminId,
       action: 'PASSWORD_RESET_RESOLVED',
       target_type: 'USER',
       target_id: user._id,
       reason,
-      before: { token_version: previousTokenVersion },
-      after: { token_version: user.token_version },
+      before: { reset_access: 'PENDING_ADMIN_REVIEW' },
+      after: { reset_access: 'APPROVED', expires_at: expiresAt },
     });
   } catch (error) {
     await Promise.allSettled([
-      User.updateOne(
-        { _id: user._id },
-        {
-          $set: {
-            password_hash: previousPasswordHash,
-            token_version: previousTokenVersion,
-          },
-        }
-      ),
+      resetTokenRecord?._id
+        ? PasswordResetToken.deleteOne({ _id: resetTokenRecord._id })
+        : Promise.resolve(),
       PasswordResetRequest.updateOne(
         { _id: request._id, status: 'RESOLVED', resolved_by: adminId },
         {
@@ -296,16 +295,18 @@ exports.resolvePasswordResetRequest = catchAsync(async (req, res) => {
   await notifySafely({
     userId: user._id,
     type: 'SYSTEM',
-    title: 'Password reset completed',
-    message: 'An administrator reset your password. Existing sessions were signed out.',
-    link: '/settings',
+    title: 'Password reset approved',
+    message: 'An administrator approved your password reset request. Obtain the one-time reset link through the verified university channel.',
+    link: '/login',
     io: req.app?.get('io'),
   });
 
   return res.status(200).json({
     success: true,
-    message: 'Temporary password set and existing sessions revoked',
+    message: 'Password reset access approved',
     data: {
+      resetUrl: `${env.frontendUrl}/reset-password?token=${encodeURIComponent(token)}`,
+      expiresAt,
       passwordResetRequest: {
         id: claimedRequest._id.toString(),
         status: 'RESOLVED',
@@ -1075,13 +1076,19 @@ exports.getAdminStatistics = catchAsync(async (req, res) => {
             _id: null,
             total: { $sum: 1 },
             customers: {
-              $sum: { $cond: [{ $eq: ['$role', 'CUSTOMER'] }, 1, 0] },
+              $sum: {
+                $cond: [{ $in: ['CUSTOMER', { $ifNull: ['$roles', ['$role']] }] }, 1, 0],
+              },
             },
             riders: {
-              $sum: { $cond: [{ $eq: ['$role', 'RIDER'] }, 1, 0] },
+              $sum: {
+                $cond: [{ $in: ['RIDER', { $ifNull: ['$roles', ['$role']] }] }, 1, 0],
+              },
             },
             admins: {
-              $sum: { $cond: [{ $eq: ['$role', 'ADMIN'] }, 1, 0] },
+              $sum: {
+                $cond: [{ $in: ['ADMIN', { $ifNull: ['$roles', ['$role']] }] }, 1, 0],
+              },
             },
             active: {
               $sum: {

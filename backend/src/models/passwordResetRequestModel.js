@@ -30,6 +30,15 @@ const passwordResetRequestSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    identity_number: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    security_question: {
+      type: String,
+      required: true,
+    },
   },
   { collection: 'password_reset_requests', versionKey: false }
 );

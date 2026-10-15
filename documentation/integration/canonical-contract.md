@@ -9,7 +9,7 @@ Authority: Vanni Ride Pre-Development Master Specification plus confirmed team d
 This document is the single contract for integrating the Vanni Ride backend and
 MongoDB work. Where an older branch, document, model, validator, API example, or
 Postman request disagrees with this contract, this contract takes precedence on
-the `frontend-backend-integration` branch. The approved frontend integration
+the `main` branch. The approved frontend integration
 details are defined in `frontend-backend-integration-contract.md`.
 
 Database documents use `snake_case`. API request and response bodies use
@@ -20,7 +20,8 @@ Database documents use `snake_case`. API request and response bodies use
 - Backend: Node.js, Express, Mongoose, Socket.IO
 - Database: MongoDB
 - Authentication: JWT with server-side token invalidation on logout
-- Roles: `CUSTOMER`, `RIDER`, `ADMIN`
+- Roles: `CUSTOMER`, `RIDER`, `ADMIN`; customer and rider may coexist on one
+  account, while administrator access remains separate
 - Account statuses: `ACTIVE`, `SUSPENDED`
 - Payment method: cash only
 - Chat: text only
@@ -139,6 +140,10 @@ Required fields:
 - `phone`: non-empty string
 - `password_hash`: bcrypt password hash
 - `role`: `CUSTOMER`, `RIDER`, or `ADMIN`
+- `roles`: authorized role array; legacy records fall back to `role`
+- `identity_number_hash`: bcrypt recovery ID hash when recovery is configured
+- `security_question`: approved recovery question identifier
+- `security_answer_hash`: bcrypt normalized recovery answer hash
 - `account_status`: `ACTIVE` or `SUSPENDED`
 - `token_version`: non-negative integer used to invalidate JWTs
 - `created_at`: date
@@ -626,8 +631,7 @@ Room membership never replaces authorization checks against MongoDB.
 
 ## 13. Integration and Definition of Done
 
-Work is integrated on `frontend-backend-integration`. Teammate source branches
-are not modified. A feature is done only when:
+Work is integrated on `main`. A feature is done only when:
 
 1. Its implementation follows this contract.
 2. Unit/API tests pass.

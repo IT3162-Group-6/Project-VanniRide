@@ -9,6 +9,8 @@ router.use(protect);
 
 router.get('/profile', userController.getProfile);
 router.put('/profile', userController.updateProfile);
+router.put('/recovery-settings', userController.updateRecoverySettings);
+router.post('/roles', userController.addAccountRole);
 router.get('/history', historyController.getMyHistory);
 router.get(
   '/cancellation-allowance',

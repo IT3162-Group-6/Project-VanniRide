@@ -9,10 +9,18 @@ token, restores the current account from `GET /api/users/profile`, and clears
 expired sessions. API roles are normalized to the lowercase role names already
 used by the existing frontend routes.
 
-The login page includes password recovery. The forgot-password form always
-shows an account-neutral response and creates an administrator review request.
-After identity verification, an administrator assigns a temporary password
-from the Users page. Resolving the request revokes existing sessions.
+The login page includes password recovery. A request is created only when the
+email, ID number, selected security question, and answer match, while the page
+always shows the same account-neutral response. After manual verification, an
+administrator grants an expiring one-time reset link from the Users page.
+Completing the reset revokes existing sessions. Logged-in users can also change
+their password with the current password and update recovery details in
+Settings.
+
+Registration supports Customer, Rider, or Both. Dual-role users share one
+email and password and can switch panels from the sidebar. Existing single-role
+users can enable the missing role from Settings; new rider access remains
+pending until administrator approval.
 
 Rider registration includes vehicle type, model, registration number, and
 colour. A newly registered rider can sign in but remains pending and offline

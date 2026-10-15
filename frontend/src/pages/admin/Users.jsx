@@ -15,7 +15,8 @@ export default function Users() {
   const [users, setUsers] = useState([]);
   const [resetRequests, setResetRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [resetForm, setResetForm] = useState({ temporaryPassword: '', reason: '' });
+  const [resetForm, setResetForm] = useState({ reason: '' });
+  const [approvedReset, setApprovedReset] = useState(null);
   const [resetBusy, setResetBusy] = useState(false);
   const [tab, setTab] = useState('all');
   const [q, setQ] = useState('');
@@ -31,7 +32,7 @@ export default function Users() {
   }, []);
 
   const shown = useMemo(() => users
-    .filter((u) => (tab === 'all' ? true : u.role === tab))
+    .filter((u) => (tab === 'all' ? true : (u.roles || [u.role]).includes(tab)))
     .filter((u) => (u.name + u.email).toLowerCase().includes(q.toLowerCase())), [users, tab, q]);
 
   async function toggle(user) {
@@ -51,15 +52,15 @@ export default function Users() {
     setResetBusy(true);
     setError('');
     try {
-      await adminApi.resolvePasswordResetRequest(
+      const approved = await adminApi.resolvePasswordResetRequest(
         selectedRequest.id,
-        resetForm.temporaryPassword,
         resetForm.reason.trim()
       );
       setResetRequests((requests) => requests.filter((request) => request.id !== selectedRequest.id));
-      showToast(`Temporary password set for ${selectedRequest.user.name}`);
+      setApprovedReset({ ...approved, userName: selectedRequest.user.name });
+      showToast(`Reset access approved for ${selectedRequest.user.name}`);
       setSelectedRequest(null);
-      setResetForm({ temporaryPassword: '', reason: '' });
+      setResetForm({ reason: '' });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -72,7 +73,15 @@ export default function Users() {
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="card-head"><h3>Password reset requests ({resetRequests.length})</h3></div>
         {error && <div className="alert alert-error">{error}</div>}
-        <p className="muted">Verify the requester through an established university channel before assigning a temporary password.</p>
+        <p className="muted">The ID and security answer matched before the request was created. Verify the person through an established university channel before granting a one-time reset link.</p>
+        {approvedReset && (
+          <div className="alert alert-ok password-reset-link-result">
+            <b>Reset access approved for {approvedReset.userName}</b>
+            <span>Share this link only through the verified channel. It expires {new Date(approvedReset.expiresAt).toLocaleString()}.</span>
+            <input aria-label="Approved reset link" readOnly value={approvedReset.resetUrl || ''} onFocus={(event) => event.target.select()} />
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => navigator.clipboard?.writeText(approvedReset.resetUrl).then(() => showToast('Reset link copied')).catch(() => showToast('Select and copy the link manually'))}>Copy reset link</button>
+          </div>
+        )}
         {!resetRequests.length ? (
           <p className="muted">No pending password reset requests.</p>
         ) : (
@@ -85,7 +94,7 @@ export default function Users() {
                     <td><b>{request.user.name}</b></td>
                     <td>{request.user.email}</td>
                     <td>{new Date(request.requestedAt).toLocaleString()}</td>
-                    <td><button className="btn btn-outline btn-sm" onClick={() => { setSelectedRequest(request); setResetForm({ temporaryPassword: '', reason: '' }); }}>Resolve</button></td>
+                    <td><button className="btn btn-outline btn-sm" onClick={() => { setSelectedRequest(request); setResetForm({ reason: '' }); setApprovedReset(null); }}>Review</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -95,10 +104,10 @@ export default function Users() {
 
         {selectedRequest && (
           <form onSubmit={resolvePasswordReset} className="password-reset-admin-form">
-            <h4>Set temporary password for {selectedRequest.user.name}</h4>
-            <div className="field">
-              <label htmlFor="temporary-password">Temporary password</label>
-              <input id="temporary-password" type="password" minLength={8} maxLength={128} required autoComplete="new-password" value={resetForm.temporaryPassword} onChange={(event) => setResetForm({ ...resetForm, temporaryPassword: event.target.value })} />
+            <h4>Approve reset access for {selectedRequest.user.name}</h4>
+            <div className="recovery-verification-summary">
+              <span><b>Submitted ID</b>{selectedRequest.identityNumber}</span>
+              <span><b>Matched question</b>{selectedRequest.securityQuestionLabel}</span>
             </div>
             <div className="field">
               <label htmlFor="password-reset-reason">Verification note</label>
@@ -106,7 +115,7 @@ export default function Users() {
             </div>
             <div className="form-actions">
               <button type="button" className="btn btn-outline" onClick={() => setSelectedRequest(null)} disabled={resetBusy}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={resetBusy}>{resetBusy ? 'Saving…' : 'Set temporary password'}</button>
+              <button type="submit" className="btn btn-primary" disabled={resetBusy}>{resetBusy ? 'Approving…' : 'Approve reset link'}</button>
             </div>
           </form>
         )}
@@ -126,7 +135,7 @@ export default function Users() {
 
         <UserTable
           users={shown}
-          columns={[{ key: 'role', label: 'Role', render: (u) => <span className="chip" style={{ textTransform: 'capitalize' }}>{u.role}</span> },
+          columns={[{ key: 'role', label: 'Roles', render: (u) => <span className="chip" style={{ textTransform: 'capitalize' }}>{(u.roles || [u.role]).join(' / ')}</span> },
                     { key: 'joined', label: 'Joined' }]}
           onToggleStatus={toggle}
         />

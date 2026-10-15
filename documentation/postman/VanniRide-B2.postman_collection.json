@@ -25,7 +25,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sample Customer\",\n  \"email\": \"customer@example.com\",\n  \"phone\": \"0771234567\",\n  \"password\": \"password123\",\n  \"role\": \"CUSTOMER\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sample Customer\",\n  \"email\": \"customer@example.com\",\n  \"phone\": \"0771234567\",\n  \"password\": \"password123\",\n  \"role\": \"CUSTOMER\",\n  \"roles\": [\"CUSTOMER\"],\n  \"identityNumber\": \"ST-2026-001\",\n  \"securityQuestion\": \"first_school\",\n  \"securityAnswer\": \"Example School\"\n}" },
             "url": "{{baseUrl}}/api/auth/register"
           }
         },

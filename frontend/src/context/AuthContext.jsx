@@ -77,6 +77,35 @@ export function AuthProvider({ children }) {
     return { ...result, user: updated };
   }, [user]);
 
+  const switchRole = useCallback(async (role) => {
+    const switched = await authApi.switchRole(role);
+    setUser(switched);
+    return switched;
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    const message = await authApi.changePassword(currentPassword, newPassword);
+    setUser(null);
+    setAuthError(null);
+    return message;
+  }, []);
+
+  const updateRecoverySettings = useCallback(async (payload) => {
+    const updated = await authApi.updateRecoverySettings(payload);
+    setUser((current) => ({ ...current, ...updated, riderProfile: current.riderProfile }));
+    return updated;
+  }, []);
+
+  const addRole = useCallback(async (role, vehicle) => {
+    const result = await authApi.addRole(role, vehicle);
+    setUser((current) => ({
+      ...current,
+      ...result.user,
+      riderProfile: result.riderProfile || current.riderProfile,
+    }));
+    return result;
+  }, []);
+
   const value = {
     user,
     loading,
@@ -87,6 +116,10 @@ export function AuthProvider({ children }) {
     updateUser,
     setRiderAvailability,
     updateRiderVehicle,
+    switchRole,
+    changePassword,
+    updateRecoverySettings,
+    addRole,
     refresh,
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -660,6 +660,15 @@ ul{margin:0;padding:0;list-style:none}
 
 /* sidebar extras */
 .sidebar-role{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:#9bb6a4;padding:0 20px 14px}
+.sidebar-role-switch{display:flex;align-items:center;gap:10px;width:calc(100% - 24px);margin:0 12px 12px;padding:10px 12px;border:1px solid rgba(255,255,255,.16);border-radius:10px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer;font:inherit;text-align:left}
+.sidebar-role-switch:hover{background:rgba(255,255,255,.14)}
+.sidebar-role-switch:disabled{opacity:.65;cursor:wait}
+.settings-form{display:grid;gap:12px}
+.password-reset-link-result{display:grid;gap:10px;margin:14px 0}
+.password-reset-link-result span{display:block}
+.password-reset-link-result input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.recovery-verification-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.recovery-verification-summary span{display:flex;flex-direction:column;gap:4px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--mint-50)}
 .sidebar-logout{display:flex;align-items:center;gap:12px;margin:auto 14px 18px;padding:12px 14px;border:0;border-radius:var(--radius-sm);
   background:transparent;color:#cfe3d4;font:inherit;font-size:.9rem;cursor:pointer;text-align:left;width:calc(100% - 28px)}
 .sidebar-logout:hover{background:rgba(255,255,255,.08)}

@@ -292,6 +292,9 @@ test('restricts release registration to university email while preserving the te
           phone: '0700000199',
           password: 'Password123!',
           role: 'CUSTOMER',
+          identityNumber: 'STUDENT-0199',
+          securityQuestion: 'first_school',
+          securityAnswer: 'Test School',
         },
       })
     );
@@ -622,6 +625,9 @@ test('requires rider approval and resubmits changed vehicle details for review',
         phone: '0700001401',
         password: 'Password123!',
         role: 'RIDER',
+        identityNumber: 'RIDER-1401',
+        securityQuestion: 'birth_place',
+        securityAnswer: 'Vavuniya',
         vehicle: {
           type: 'Motorcycle',
           model: 'Honda Dio',
@@ -2411,6 +2417,9 @@ test('completes the customer, rider, and administrator journey through HTTP APIs
       phone: '0700001701',
       password,
       role: 'CUSTOMER',
+      identityNumber: 'JOURNEY-1701',
+      securityQuestion: 'first_school',
+      securityAnswer: 'Journey School',
     });
     const riderRegistration = await request('POST', '/api/auth/register', null, {
       name: 'Journey Rider',
@@ -2418,6 +2427,9 @@ test('completes the customer, rider, and administrator journey through HTTP APIs
       phone: '0700001702',
       password,
       role: 'RIDER',
+      identityNumber: 'JOURNEY-1702',
+      securityQuestion: 'birth_place',
+      securityAnswer: 'Vavuniya',
       vehicle: {
         type: 'Motorcycle',
         model: 'Honda Dio',

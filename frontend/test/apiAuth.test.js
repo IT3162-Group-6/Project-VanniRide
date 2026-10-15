@@ -151,6 +151,9 @@ test('sends the backend rider registration contract', async () => {
     phone: ' 0700000002 ',
     password: 'secret12',
     role: 'rider',
+    identityNumber: 'ST-2026-002',
+    securityQuestion: 'first_school',
+    securityAnswer: 'Vavuniya College',
     vehicle: {
       type: 'Motorcycle',
       model: 'Honda Dio',
@@ -160,6 +163,9 @@ test('sends the backend rider registration contract', async () => {
   });
 
   assert.equal(requestBody.role, 'RIDER');
+  assert.deepEqual(requestBody.roles, ['RIDER']);
+  assert.equal(requestBody.identityNumber, 'ST-2026-002');
+  assert.equal(requestBody.securityQuestion, 'first_school');
   assert.equal(requestBody.name, 'New Rider');
   assert.equal(requestBody.phone, '0700000002');
   assert.equal(requestBody.vehicle.registrationNumber, 'NP-5678');
@@ -267,22 +273,78 @@ test('requests and completes password recovery without storing a session token',
     return jsonResponse({
       success: true,
       message: String(url).endsWith('/forgot-password')
-        ? 'If an active account matches that email, an administrator will review the password reset request.'
+        ? 'If the account and identity details match, an administrator will review the password reset request.'
         : 'Password reset successfully. You can now log in.',
     });
   };
 
-  const forgotMessage = await authApi.forgotPassword('  person@vau.ac.lk  ');
+  const forgotMessage = await authApi.forgotPassword({
+    email: '  person@vau.ac.lk  ',
+    identityNumber: ' 2026-001 ',
+    securityQuestion: 'first_school',
+    securityAnswer: 'Example School',
+  });
   const resetMessage = await authApi.resetPassword('a'.repeat(64), 'new-password-123');
 
-  assert.match(forgotMessage, /If an active account/);
+  assert.match(forgotMessage, /identity details match/);
   assert.match(resetMessage, /reset successfully/);
-  assert.deepEqual(JSON.parse(requests[0].options.body), { email: 'person@vau.ac.lk' });
+  assert.deepEqual(JSON.parse(requests[0].options.body), {
+    email: 'person@vau.ac.lk',
+    identityNumber: '2026-001',
+    securityQuestion: 'first_school',
+    securityAnswer: 'Example School',
+  });
   assert.deepEqual(JSON.parse(requests[1].options.body), {
     token: 'a'.repeat(64),
     password: 'new-password-123',
   });
   assert.equal(getToken(), null);
+});
+
+test('switches an authorized role and manages logged-in security settings', async () => {
+  localStorage.setItem('vr_token', 'customer-token');
+  const requests = [];
+  global.fetch = async (url, options) => {
+    requests.push({ url: String(url), options });
+    const path = new URL(String(url)).pathname;
+    if (path.endsWith('/auth/switch-role')) {
+      return jsonResponse({
+        success: true,
+        token: 'rider-token',
+        data: {
+          user: { id: 'dual-1', name: 'Dual User', role: 'RIDER', roles: ['CUSTOMER', 'RIDER'] },
+          riderProfile: { approvalStatus: 'APPROVED', availabilityStatus: 'UNAVAILABLE' },
+        },
+      });
+    }
+    if (path.endsWith('/users/recovery-settings')) {
+      return jsonResponse({
+        success: true,
+        data: { user: { id: 'dual-1', name: 'Dual User', role: 'RIDER', roles: ['CUSTOMER', 'RIDER'], recoveryConfigured: true } },
+      });
+    }
+    if (path.endsWith('/auth/change-password')) {
+      return jsonResponse({ success: true, message: 'Password changed successfully. Please sign in again.' });
+    }
+    throw new Error(`Unexpected request ${url}`);
+  };
+
+  const switched = await authApi.switchRole('rider');
+  assert.equal(switched.role, 'rider');
+  assert.deepEqual(switched.roles, ['customer', 'rider']);
+  assert.equal(getToken(), 'rider-token');
+
+  const recovery = await authApi.updateRecoverySettings({
+    currentPassword: 'old-password',
+    identityNumber: 'ST-001',
+    securityQuestion: 'birth_place',
+    securityAnswer: 'Vavuniya',
+  });
+  assert.equal(recovery.recoveryConfigured, true);
+
+  await authApi.changePassword('old-password', 'new-password');
+  assert.equal(getToken(), null);
+  assert.deepEqual(JSON.parse(requests[0].options.body), { role: 'RIDER' });
 });
 
 test('uses backend map results and creates a ride without trusting client fare values', async () => {
@@ -637,13 +699,10 @@ test('connects administrator management, review, audit, and statistics APIs', as
   assert.equal((await adminApi.reviewChatAccess('a1', 'APPROVE', 'Lost item')).status, 'APPROVED');
   assert.equal((await adminApi.stats()).pendingChatRequests, 1);
   assert.equal((await adminApi.passwordResetRequests())[0].status, 'PENDING');
-  assert.equal((await adminApi.resolvePasswordResetRequest('pr1', 'temporary-pass-123', 'Identity verified')).status, 'RESOLVED');
+  assert.equal((await adminApi.resolvePasswordResetRequest('pr1', 'Identity verified')).status, 'RESOLVED');
 
   assert.deepEqual(JSON.parse(requests[2].options.body), { accountStatus: 'SUSPENDED', reason: 'Policy' });
   assert.deepEqual(JSON.parse(requests[3].options.body), { decision: 'APPROVE', reason: 'Documents valid' });
   assert.ok(requests[5].url.includes('reason=Safety+review'));
-  assert.deepEqual(JSON.parse(requests.at(-1).options.body), {
-    temporaryPassword: 'temporary-pass-123',
-    reason: 'Identity verified',
-  });
+  assert.deepEqual(JSON.parse(requests.at(-1).options.body), { reason: 'Identity verified' });
 });

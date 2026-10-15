@@ -40,11 +40,18 @@ See `.env.example` for the full configuration. The server validates critical
 production settings before opening its port. Browser origins not listed in
 `CORS_ORIGINS` are rejected for both HTTP and Socket.IO.
 
-Password recovery currently creates an account-neutral administrator request.
-An administrator verifies the requester, sets a temporary password from the
-Users page, and records a verification note. Resolving the request revokes all
-existing sessions and is written to the administrator audit log. The dormant
-email-token implementation can be enabled later after a sender is verified.
+New customer and rider accounts configure an ID number, a predefined security
+question, and an answer. A recovery request reaches administrators only when
+all submitted details match, while the public response remains account-neutral.
+After manual identity verification, an administrator approves a one-time,
+expiring reset link and records a verification note. Completing the reset
+revokes all existing sessions and invalidates other reset links.
+
+One user may hold both `CUSTOMER` and `RIDER` roles under the same unique email
+and password. The active role is carried by the JWT and may be switched without
+signing out. Existing single-role users remain compatible and can enable their
+missing customer or rider role from Settings. Rider access still requires the
+normal vehicle review and administrator approval.
 
 ## Verification
 

@@ -15,6 +15,16 @@ const {
   registrationEmailIsAllowed,
 } = require('../utils/universityEmail');
 const {
+  SECURITY_QUESTIONS,
+  hashRecoveryValue,
+  normalizeIdentityNumber,
+  normalizeSecurityAnswer,
+  recoveryValueMatches,
+  validateIdentityNumber,
+  validateSecurityAnswer,
+  validateSecurityQuestion,
+} = require('../services/accountSecurityService');
+const {
   hashResetToken,
   isResetTokenFormatValid,
   validateNewPassword,
@@ -22,24 +32,46 @@ const {
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 const PASSWORD_RESET_RESPONSE =
-  'If an active account matches that email, an administrator will review the password reset request.';
+  'If the account and identity details match, an administrator will review the password reset request.';
 
-const serializeUser = (userDocument) => {
+const getUserRoles = (user) => {
+  const roles = Array.isArray(user?.roles) && user.roles.length
+    ? user.roles
+    : [user?.role];
+  return [...new Set(roles.filter(Boolean).map((role) => String(role).toUpperCase()))];
+};
+
+const normalizeRegistrationRoles = (body) => {
+  const requested = Array.isArray(body.roles) && body.roles.length
+    ? body.roles
+    : [body.role];
+  const roles = [...new Set(requested.filter(Boolean).map((role) => String(role).toUpperCase()))];
+  if (!roles.length || roles.some((role) => !['CUSTOMER', 'RIDER'].includes(role))) {
+    throw new AppError('Choose Customer, Rider, or Both', 400);
+  }
+  return roles;
+};
+
+const serializeUser = (userDocument, activeRole = null) => {
   const user = userDocument.toObject ? userDocument.toObject() : userDocument;
+  const roles = getUserRoles(user);
+  const role = String(activeRole || user.role || '').toUpperCase();
 
   return {
     id: user._id.toString(),
     name: user.name,
     email: user.email,
     phone: user.phone,
-    role: user.role,
+    role,
+    roles,
+    recoveryConfigured: Boolean(user.security_question),
     accountStatus: user.account_status,
     createdAt: user.created_at,
     updatedAt: user.updated_at,
   };
 };
 
-const signToken = (user) => {
+const signToken = (user, activeRole = user.role) => {
   if (!env.jwtSecret) {
     throw new AppError('JWT_SECRET is not configured', 500);
   }
@@ -47,7 +79,7 @@ const signToken = (user) => {
   return jwt.sign(
     {
       id: user._id.toString(),
-      role: user.role,
+      role: activeRole,
       tokenVersion: user.token_version,
     },
     env.jwtSecret,
@@ -62,7 +94,8 @@ exports.register = async (req, res, next) => {
   try {
     const { name, phone, password } = req.body;
     const email = normalizeEmail(req.body.email);
-    const role = String(req.body.role || '').toUpperCase();
+    const roles = normalizeRegistrationRoles(req.body);
+    const role = roles.includes('CUSTOMER') ? 'CUSTOMER' : 'RIDER';
 
     if (!isValidEmail(email)) {
       return next(new AppError('Please provide a valid email address', 400));
@@ -81,22 +114,37 @@ exports.register = async (req, res, next) => {
       return next(new AppError('Email already registered', 409));
     }
 
-    if (!['CUSTOMER', 'RIDER'].includes(role)) {
-      return next(new AppError('Role must be CUSTOMER or RIDER', 400));
+    let identityNumber;
+    let securityQuestion;
+    let securityAnswer;
+    try {
+      identityNumber = validateIdentityNumber(req.body.identityNumber);
+      securityQuestion = validateSecurityQuestion(req.body.securityQuestion);
+      securityAnswer = validateSecurityAnswer(req.body.securityAnswer);
+    } catch (validationError) {
+      return next(new AppError(validationError.message, 400));
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const [passwordHash, identityNumberHash, securityAnswerHash] = await Promise.all([
+      bcrypt.hash(password, 12),
+      hashRecoveryValue(identityNumber),
+      hashRecoveryValue(securityAnswer),
+    ]);
     createdUser = await User.create({
       name: String(name).trim(),
       email,
       phone: String(phone).trim(),
       password_hash: passwordHash,
       role,
+      roles,
+      identity_number_hash: identityNumberHash,
+      security_question: securityQuestion,
+      security_answer_hash: securityAnswerHash,
       account_status: 'ACTIVE',
       token_version: 0,
     });
 
-    if (role === 'RIDER') {
+    if (roles.includes('RIDER')) {
       createdRider = await Rider.create({
         user_id: createdUser._id,
         availability_status: 'UNAVAILABLE',
@@ -108,13 +156,13 @@ exports.register = async (req, res, next) => {
       });
     }
 
-    const token = signToken(createdUser);
+    const token = signToken(createdUser, role);
 
     return res.status(201).json({
       success: true,
       token,
       data: {
-        user: serializeUser(createdUser),
+        user: serializeUser(createdUser, role),
         riderProfile: serializeRiderProfile(createdRider),
       },
     });
@@ -164,9 +212,14 @@ exports.login = async (req, res, next) => {
       return next(new AppError('This account is suspended', 403));
     }
 
-    const token = signToken(user);
+    const roles = getUserRoles(user);
+    const requestedRole = String(req.body.role || '').toUpperCase();
+    const activeRole = requestedRole && roles.includes(requestedRole)
+      ? requestedRole
+      : (roles.includes(user.role) ? user.role : roles[0]);
+    const token = signToken(user, activeRole);
     const riderProfile =
-      user.role === 'RIDER'
+      roles.includes('RIDER')
         ? await Rider.findOne({ user_id: user._id })
         : null;
 
@@ -174,7 +227,7 @@ exports.login = async (req, res, next) => {
       success: true,
       token,
       data: {
-        user: serializeUser(user),
+        user: serializeUser(user, activeRole),
         riderProfile: serializeRiderProfile(riderProfile),
       },
     });
@@ -210,9 +263,20 @@ exports.forgotPassword = async (req, res, next) => {
       const user = await User.findOne({
         email,
         account_status: 'ACTIVE',
-      }).select('_id');
+      }).select('_id security_question +identity_number_hash +security_answer_hash');
 
-      if (user) {
+      const identityNumber = normalizeIdentityNumber(req.body.identityNumber);
+      const securityQuestion = String(req.body.securityQuestion || '').trim();
+      const securityAnswer = normalizeSecurityAnswer(req.body.securityAnswer);
+      const [identityValueMatches, answerValueMatches] = await Promise.all([
+        recoveryValueMatches(identityNumber, user?.identity_number_hash),
+        recoveryValueMatches(securityAnswer, user?.security_answer_hash),
+      ]);
+      const identityMatches = Boolean(user) && identityValueMatches;
+      const answerMatches = Boolean(user) &&
+        securityQuestion === user.security_question && answerValueMatches;
+
+      if (user && identityMatches && answerMatches) {
         await PasswordResetRequest.findOneAndUpdate(
           { user_id: user._id },
           {
@@ -221,6 +285,8 @@ exports.forgotPassword = async (req, res, next) => {
               requested_at: new Date(),
               resolved_at: null,
               resolved_by: null,
+              identity_number: identityNumber,
+              security_question: securityQuestion,
             },
           },
           { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
@@ -231,6 +297,69 @@ exports.forgotPassword = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: PASSWORD_RESET_RESPONSE,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.getSecurityQuestions = (req, res) => res.status(200).json({
+  success: true,
+  data: { securityQuestions: SECURITY_QUESTIONS },
+});
+
+exports.switchRole = async (req, res, next) => {
+  try {
+    const role = String(req.body.role || '').toUpperCase();
+    const roles = getUserRoles(req.user);
+    if (!['CUSTOMER', 'RIDER'].includes(role) || !roles.includes(role)) {
+      return next(new AppError('This role is not enabled for your account', 403));
+    }
+    const riderProfile = roles.includes('RIDER')
+      ? await Rider.findOne({ user_id: req.user._id })
+      : null;
+    if (role === 'RIDER' && !riderProfile) {
+      return next(new AppError('Rider profile not found', 409));
+    }
+    return res.status(200).json({
+      success: true,
+      token: signToken(req.user, role),
+      data: {
+        user: serializeUser(req.user, role),
+        riderProfile: serializeRiderProfile(riderProfile),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.changePassword = async (req, res, next) => {
+  try {
+    const currentPassword = String(req.body.currentPassword || '');
+    let newPassword;
+    try {
+      newPassword = validateNewPassword(req.body.newPassword);
+    } catch (validationError) {
+      return next(new AppError(validationError.message, 400));
+    }
+    const user = await User.findById(req.user._id).select('+password_hash');
+    if (!user || !(await bcrypt.compare(currentPassword, user.password_hash))) {
+      return next(new AppError('Current password is incorrect', 400));
+    }
+    if (await bcrypt.compare(newPassword, user.password_hash)) {
+      return next(new AppError('New password must be different from the current password', 400));
+    }
+    user.password_hash = await bcrypt.hash(newPassword, 12);
+    user.token_version += 1;
+    await user.save();
+    await PasswordResetToken.updateMany(
+      { user_id: user._id, used_at: null },
+      { $set: { used_at: new Date() } }
+    );
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully. Please sign in again.',
     });
   } catch (error) {
     return next(error);
@@ -292,3 +421,4 @@ exports.resetPassword = async (req, res, next) => {
 };
 
 exports.serializeUser = serializeUser;
+exports.getUserRoles = getUserRoles;

@@ -19,25 +19,38 @@ The B2 controllers also enforce the role and MongoDB ObjectId requirements.
 
 ## Authentication and profile endpoints
 
-- `POST /api/auth/register` - Register a `CUSTOMER` or `RIDER` account.
+- `POST /api/auth/register` - Register a `CUSTOMER`, `RIDER`, or dual-role
+  account with recovery details.
 - `POST /api/auth/login` - Return a JWT for an active account.
-- `POST /api/auth/forgot-password` - Accept an email and always return the same
-  account-neutral response; eligible accounts create an administrator request.
+- `GET /api/auth/security-questions` - Return the approved recovery questions.
+- `POST /api/auth/forgot-password` - Accept email, ID number, question, and
+  answer and always return the same account-neutral response. A request is
+  created only when every value matches.
 - `POST /api/auth/reset-password` - Consume a single-use reset token and set a
-  new password of 8-128 characters; retained for future email recovery.
+  new password of 8-128 characters.
+- `POST /api/auth/change-password` - Change a logged-in user's password after
+  verifying the current password.
+- `POST /api/auth/switch-role` - Issue a replacement JWT for another role
+  enabled on the same account.
 - `POST /api/auth/logout` - Invalidate all tokens issued with the current token
   version.
 - `GET /api/users/profile` - Return the authenticated user profile.
 - `PUT /api/users/profile` - Update the authenticated user's name or phone.
+- `PUT /api/users/recovery-settings` - Replace the recovery ID, question, and
+  answer after verifying the current password.
+- `POST /api/users/roles` - Enable missing customer access or submit a rider
+  profile for approval.
 - `PATCH /api/users/rider/availability` - Rider-only switch between `AVAILABLE`
   and `UNAVAILABLE`; only an approved, non-busy rider may use it.
 - `PUT /api/users/rider/profile` - Rider-only vehicle update. A changed vehicle
   returns the rider to `PENDING` approval and `UNAVAILABLE`.
 - `GET /api/admin/password-reset-requests` - List pending administrator-assisted
   password reset requests.
-- `PATCH /api/admin/password-reset-requests/:requestId` - Set a temporary
-  password after identity verification, revoke sessions, and audit the action.
+- `PATCH /api/admin/password-reset-requests/:requestId` - Approve an expiring,
+  single-use reset link after manual identity verification and audit the action.
 
+Registration requires `identityNumber`, `securityQuestion`, and
+`securityAnswer`. `roles: ["CUSTOMER", "RIDER"]` creates a dual-role account.
 Rider registration requires `vehicle.type`, `vehicle.model`,
 `vehicle.registrationNumber`, and `vehicle.color`. New riders remain
 `PENDING` and cannot receive or accept ride requests until an administrator
@@ -46,7 +59,8 @@ approves them. The current registration client presents `Motorcycle` and
 
 All protected endpoints require `Authorization: Bearer <token>`. Tokens are
 rejected if the user no longer exists, the account is suspended, the embedded
-role differs from the stored role, or logout has invalidated the token version.
+role is not included in the account's authorized roles, or logout has
+invalidated the token version.
 
 Public registration accepts only addresses under the configured
 `UNIVERSITY_EMAIL_DOMAIN` (`vau.ac.lk` by default). Local development and tests
@@ -57,7 +71,8 @@ Password reset tokens contain 32 random bytes. Only their SHA-256 hashes are
 stored in the `password_reset_tokens` collection, whose expiry index removes
 elapsed records. Successful reset increments the user's token version and
 therefore invalidates previously issued JWTs. Requests are subject to a
-per-account cooldown and never reveal whether an email is registered.
+per-account cooldown and never reveal whether an email or recovery detail
+matched.
 
 ## Ride workflow
 

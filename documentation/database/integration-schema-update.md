@@ -2,7 +2,7 @@
 
 Status: Approved for implementation
 Schema update: 2 October 2026
-Applies to: `frontend-backend-integration`
+Applies to: `main` (the former integration branch is retired)
 
 ## Purpose
 

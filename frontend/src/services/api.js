@@ -31,6 +31,14 @@ export const RIDE_STATUS = {
   CANCELLED: 'cancelled',
 };
 
+const SECURITY_QUESTIONS = [
+  { id: 'birth_place', label: 'In which city or town were you born?' },
+  { id: 'first_school', label: 'What was the name of your first school?' },
+  { id: 'childhood_friend', label: 'What is the first name of a childhood friend?' },
+  { id: 'favorite_teacher', label: 'What was the surname of your favorite teacher?' },
+  { id: 'memorable_place', label: 'What place did you visit on a memorable trip?' },
+];
+
 /* ---------------- token helpers ---------------- */
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
@@ -105,6 +113,9 @@ const normalizeApiUser = (user, riderProfile = null) => {
   return {
     ...user,
     role: String(user.role || '').toLowerCase(),
+    roles: (Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role])
+      .filter(Boolean)
+      .map((role) => String(role).toLowerCase()),
     status: String(user.accountStatus || user.status || '').toLowerCase(),
     joined: user.createdAt || user.joined || null,
     riderProfile: normalizedRider,
@@ -249,14 +260,25 @@ export const mapApi = {
    AUTH
    ============================================================ */
 export const authApi = {
-  async forgotPassword(email) {
+  async securityQuestions() {
+    if (USE_MOCK_AUTH) return SECURITY_QUESTIONS;
+    const response = await http('/auth/security-questions');
+    return response.data?.securityQuestions || [];
+  },
+
+  async forgotPassword({ email, identityNumber, securityQuestion, securityAnswer }) {
     if (USE_MOCK_AUTH) {
       await delay(200);
-      return 'If an active account matches that email, an administrator will review the password reset request.';
+      return 'If the account and identity details match, an administrator will review the password reset request.';
     }
     const response = await http('/auth/forgot-password', {
       method: 'POST',
-      body: { email: String(email).trim() },
+      body: {
+        email: String(email).trim(),
+        identityNumber: String(identityNumber).trim(),
+        securityQuestion,
+        securityAnswer,
+      },
     });
     return response.message;
   },
@@ -292,8 +314,9 @@ export const authApi = {
     return { user: publicUser(user), token: getToken() };
   },
 
-  async register({ name, email, password, role = 'customer', phone = '', vehicle }) {
+  async register({ name, email, password, role = 'customer', phone = '', vehicle, identityNumber, securityQuestion, securityAnswer }) {
     if (!USE_MOCK_AUTH) {
+      const roles = role === 'both' ? ['CUSTOMER', 'RIDER'] : [String(role).toUpperCase()];
       const response = await http('/auth/register', {
         method: 'POST',
         body: {
@@ -301,8 +324,12 @@ export const authApi = {
           email: String(email).trim(),
           phone: String(phone).trim(),
           password,
-          role: String(role).toUpperCase(),
-          ...(String(role).toLowerCase() === 'rider' ? { vehicle } : {}),
+          role: roles[0],
+          roles,
+          identityNumber: String(identityNumber).trim(),
+          securityQuestion,
+          securityAnswer,
+          ...(roles.includes('RIDER') ? { vehicle } : {}),
         },
       });
       setToken(response.token);
@@ -318,14 +345,16 @@ export const authApi = {
     if (d.users.some((u) => u.email.toLowerCase() === String(email).toLowerCase())) {
       throw new Error('An account with that email already exists');
     }
+    const accountRoles = role === 'both' ? ['customer', 'rider'] : [role];
+    const primaryRole = accountRoles.includes('customer') ? 'customer' : 'rider';
     const user = {
-      id: uid('u'), name, email, password, role, phone,
-      wallet: role === 'customer' ? 0 : undefined,
-      earnings: role === 'rider' ? 0 : undefined,
-      rating: role === 'rider' ? 5 : undefined,
-      online: role === 'rider' ? false : undefined,
+      id: uid('u'), name, email, password, role: primaryRole, roles: accountRoles, phone,
+      wallet: accountRoles.includes('customer') ? 0 : undefined,
+      earnings: accountRoles.includes('rider') ? 0 : undefined,
+      rating: accountRoles.includes('rider') ? 5 : undefined,
+      online: accountRoles.includes('rider') ? false : undefined,
       joined: new Date().toISOString().slice(0, 10),
-      status: role === 'rider' ? 'pending' : 'active',
+      status: accountRoles.includes('rider') ? 'pending' : 'active',
     };
     d.users.push(user);
     save(d);
@@ -373,6 +402,83 @@ export const authApi = {
     Object.assign(u, patch);
     save(d);
     return publicUser(u);
+  },
+
+  async switchRole(role) {
+    if (USE_MOCK_AUTH) {
+      const d = db();
+      const user = d.users.find((item) => item.id === getToken()?.replace('mock.', ''));
+      const normalizedRole = String(role).toLowerCase();
+      if (!user || !(user.roles || [user.role]).includes(normalizedRole)) {
+        throw new ApiError('This role is not enabled for your account', 403);
+      }
+      user.role = normalizedRole;
+      save(d);
+      return publicUser(user);
+    }
+    const response = await http('/auth/switch-role', {
+      method: 'POST',
+      body: { role: String(role).toUpperCase() },
+    });
+    setToken(response.token);
+    const riderProfile = normalizeRiderProfile(response.data?.riderProfile);
+    return normalizeApiUser(response.data?.user, riderProfile);
+  },
+
+  async changePassword(currentPassword, newPassword) {
+    if (USE_MOCK_AUTH) {
+      const d = db();
+      const user = d.users.find((item) => item.id === getToken()?.replace('mock.', ''));
+      if (!user || user.password !== currentPassword) throw new ApiError('Current password is incorrect', 400);
+      user.password = newPassword;
+      save(d);
+      setToken(null);
+      return 'Password changed successfully. Please sign in again.';
+    }
+    const response = await http('/auth/change-password', {
+      method: 'POST',
+      body: { currentPassword, newPassword },
+    });
+    setToken(null);
+    return response.message;
+  },
+
+  async updateRecoverySettings(payload) {
+    if (USE_MOCK_AUTH) {
+      const d = db();
+      const user = d.users.find((item) => item.id === getToken()?.replace('mock.', ''));
+      if (!user || user.password !== payload.currentPassword) throw new ApiError('Current password is incorrect', 400);
+      user.recoveryConfigured = true;
+      save(d);
+      return publicUser(user);
+    }
+    const response = await http('/users/recovery-settings', {
+      method: 'PUT',
+      body: payload,
+    });
+    return normalizeApiUser(response.data?.user);
+  },
+
+  async addRole(role, vehicle) {
+    if (USE_MOCK_AUTH) {
+      const d = db();
+      const user = d.users.find((item) => item.id === getToken()?.replace('mock.', ''));
+      const normalizedRole = String(role).toLowerCase();
+      if (!user) throw new ApiError('Authentication is required', 401);
+      user.roles = [...new Set([...(user.roles || [user.role]), normalizedRole])];
+      if (vehicle) user.vehicle = `${vehicle.model} · ${vehicle.registrationNumber}`;
+      save(d);
+      return { user: publicUser(user), riderProfile: null, message: `${normalizedRole} access enabled` };
+    }
+    const response = await http('/users/roles', {
+      method: 'POST',
+      body: { role: String(role).toUpperCase(), ...(vehicle ? { vehicle } : {}) },
+    });
+    return {
+      user: normalizeApiUser(response.data?.user, response.data?.riderProfile),
+      riderProfile: normalizeRiderProfile(response.data?.riderProfile),
+      message: response.message,
+    };
   },
 
   async logout() {
@@ -763,7 +869,7 @@ export const adminApi = {
     if (!USE_MOCK_AUTH) {
       const response = await http('/admin/users');
       const users = (response.data?.users || []).map((user) => normalizeApiUser(user));
-      return role ? users.filter((user) => user.role === role) : users;
+      return role ? users.filter((user) => (user.roles || [user.role]).includes(role)) : users;
     }
     if (!USE_MOCK_DATA) return http('/admin/users', { params: { role } });
     await delay(180);
@@ -789,11 +895,15 @@ export const adminApi = {
     const response = await http('/admin/password-reset-requests');
     return response.data?.passwordResetRequests || [];
   },
-  async resolvePasswordResetRequest(requestId, temporaryPassword, reason) {
+  async resolvePasswordResetRequest(requestId, reason) {
     const response = await http(`/admin/password-reset-requests/${requestId}`, {
-      method: 'PATCH', body: { temporaryPassword, reason },
+      method: 'PATCH', body: { reason },
     });
-    return response.data?.passwordResetRequest;
+    return {
+      ...response.data?.passwordResetRequest,
+      resetUrl: response.data?.resetUrl,
+      expiresAt: response.data?.expiresAt,
+    };
   },
   async riders(approvalStatus) {
     const response = await http('/admin/riders', { params: { approvalStatus } });

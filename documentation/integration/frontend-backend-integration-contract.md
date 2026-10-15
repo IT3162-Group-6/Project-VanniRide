@@ -3,7 +3,7 @@
 Status: Approved for implementation
 Contract version: 1.0
 Approved: 2 October 2026
-Applies to branch: `frontend-backend-integration`
+Applies to branch: `main` (the former integration branch is retired)
 
 ## 1. Purpose and authority
 
@@ -450,6 +450,11 @@ PATCH /api/notifications/read-all
 POST  /api/admin/notifications/broadcast
 POST  /api/auth/forgot-password
 POST  /api/auth/reset-password
+GET   /api/auth/security-questions
+POST  /api/auth/change-password
+POST  /api/auth/switch-role
+PUT   /api/users/recovery-settings
+POST  /api/users/roles
 GET   /api/admin/password-reset-requests
 PATCH /api/admin/password-reset-requests/:requestId
 ```
@@ -459,12 +464,13 @@ All existing version-one endpoints remain in force.
 ### Password-recovery behavior
 
 The login page links to a public forgot-password form. Its response remains the
-same for known and unknown addresses. Eligible accounts create a pending item
-on the administrator Users page. After verifying the requester through an
-established university channel, an administrator assigns a temporary password
-and records a verification note. Resolving the request revokes existing
-sessions and creates an audit entry. Email token recovery remains dormant for a
-future phase.
+same for every submission. A pending administrator item is created only when
+the email, ID number, selected security question, and normalized answer match.
+After manual verification through an established university channel, an
+administrator approves an expiring, single-use reset link and records a
+verification note. Completing the reset revokes existing sessions and creates
+an audit entry. Logged-in users can change their password using the current
+password and can replace their recovery details in Settings.
 
 ### Notification-centre behavior
 
@@ -562,9 +568,9 @@ contract rather than embedding a secret in browser code.
 - Route preview and ride creation have bounded network timeouts.
 - Browser geolocation is used only after consent and is not continuously
   tracked.
-- Password recovery uses neutral account lookup responses, requires an
-  administrator verification note, audits each resolution, and revokes existing
-  sessions when a temporary password is assigned.
+- Password recovery uses neutral account lookup responses, requires matching
+  recovery details plus an administrator verification note, audits each
+  approval, and revokes existing sessions when the approved link is consumed.
 
 ## 13. Phase acceptance criteria
 

@@ -85,7 +85,10 @@ exports.broadcastSystemNotification = catchAsync(async (req, res) => {
     throw new AppError('Notification link must be an internal application path', 400);
   }
 
-  const recipients = await User.find({ role: { $in: roles }, account_status: 'ACTIVE' })
+  const recipients = await User.find({
+    $or: [{ roles: { $in: roles } }, { role: { $in: roles } }],
+    account_status: 'ACTIVE',
+  })
     .select('_id')
     .lean();
   const notifications = await createNotifications({

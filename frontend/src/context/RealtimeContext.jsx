@@ -13,13 +13,14 @@ import {
 export function RealtimeProvider({ children }) {
   const { user } = useAuth();
   const userId = user?.id;
-  const socket = useMemo(() => userId && !isMockAuth()
+  const activeRole = user?.role;
+  const socket = useMemo(() => userId && activeRole && !isMockAuth()
     ? io(API_ORIGIN, {
         auth: { token: getToken() },
         transports: ['websocket', 'polling'],
         autoConnect: false,
       })
-    : null, [userId]);
+    : null, [userId, activeRole]);
 
   useEffect(() => {
     if (!socket) return undefined;

@@ -244,6 +244,13 @@ exports.requestRide = catchAsync(async (req, res) => {
       409
     );
   }
+  const activeRiderJobExists = await Ride.exists({
+    rider_id: userId,
+    status: { $in: ACTIVE_RIDE_STATUSES },
+  });
+  if (activeRiderJobExists) {
+    throw new AppError('Complete your active rider job before creating a customer request', 409);
+  }
 
   const pickupLocation = normalizeLocation(req.body.pickupLocation, 'Pickup');
   const destination = normalizeLocation(req.body.destination, 'Destination');
@@ -305,6 +312,7 @@ exports.requestRide = catchAsync(async (req, res) => {
 
   emitNewRideRequest(req, ride);
   const availableRiders = await Rider.find({
+    user_id: { $ne: userId },
     approval_status: 'APPROVED',
     availability_status: 'AVAILABLE',
   }).select('user_id').lean();
@@ -327,6 +335,13 @@ exports.requestRide = catchAsync(async (req, res) => {
 
 exports.getAvailableRides = catchAsync(async (req, res) => {
   const { userId } = getAuthenticatedUser(req, ['RIDER']);
+  const activeCustomerRequest = await Ride.exists({
+    customer_id: userId,
+    status: { $in: ACTIVE_RIDE_STATUSES },
+  });
+  if (activeCustomerRequest) {
+    throw new AppError('Complete your customer request before viewing rider jobs', 409);
+  }
   const rider = await Rider.findOne({ user_id: userId }).lean();
 
   if (!rider) {
@@ -344,7 +359,11 @@ exports.getAvailableRides = catchAsync(async (req, res) => {
     throw new AppError('Only available riders can view ride requests', 403);
   }
 
-  const rides = await Ride.find({ status: 'REQUESTED', rider_id: null })
+  const rides = await Ride.find({
+    status: 'REQUESTED',
+    rider_id: null,
+    customer_id: { $ne: userId },
+  })
     .sort({ requested_at: 1 })
     .lean();
 
@@ -490,6 +509,14 @@ exports.acceptRide = catchAsync(async (req, res) => {
   const { userId } = getAuthenticatedUser(req, ['RIDER']);
   validateRideId(req.params.rideId);
 
+  const activeCustomerRequest = await Ride.exists({
+    customer_id: userId,
+    status: { $in: ACTIVE_RIDE_STATUSES },
+  });
+  if (activeCustomerRequest) {
+    throw new AppError('Complete your customer request before accepting a rider job', 409);
+  }
+
   const rider = await Rider.findOneAndUpdate(
     {
       user_id: userId,
@@ -518,7 +545,12 @@ exports.acceptRide = catchAsync(async (req, res) => {
   let ride;
   try {
     ride = await Ride.findOneAndUpdate(
-      { _id: req.params.rideId, status: 'REQUESTED', rider_id: null },
+      {
+        _id: req.params.rideId,
+        status: 'REQUESTED',
+        rider_id: null,
+        customer_id: { $ne: userId },
+      },
       {
         $set: {
           rider_id: userId,

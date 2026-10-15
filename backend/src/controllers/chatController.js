@@ -178,7 +178,10 @@ exports.requestPostCompletionAccess = catchAsync(async (req, res) => {
   }
 
   emitChatAccessUpdated(req, ride, chatAccessRequest);
-  const admins = await User.find({ role: 'ADMIN', account_status: 'ACTIVE' })
+  const admins = await User.find({
+    $or: [{ roles: 'ADMIN' }, { role: 'ADMIN' }],
+    account_status: 'ACTIVE',
+  })
     .select('_id')
     .lean();
   await notifyManySafely({
