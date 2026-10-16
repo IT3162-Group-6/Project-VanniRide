@@ -99,6 +99,7 @@ const releaseRiderAfterRide = async (riderUserId) => {
       ? 'AVAILABLE'
       : 'UNAVAILABLE';
   rider.availability_status = availabilityStatus;
+  rider.last_seen_at = availabilityStatus === 'AVAILABLE' ? new Date() : null;
   await rider.save();
   return availabilityStatus;
 };

@@ -42,9 +42,12 @@ The B2 controllers also enforce the role and MongoDB ObjectId requirements.
   profile for approval.
 - `PATCH /api/users/rider/availability` - Rider-only switch between `AVAILABLE`
   and `UNAVAILABLE`; only an approved, non-busy rider may use it.
+- `POST /api/users/rider/heartbeat` - Refresh an approved available rider's
+  presence. Available counts expire after 90 seconds without a heartbeat.
 - `GET /api/users/rider-availability-summary` - Return aggregate counts of
-  approved riders by `AVAILABLE`, `BUSY`, and `UNAVAILABLE` status. No rider
-  identity or location data is exposed.
+  approved riders by live availability, `BUSY`, and offline status. Stale
+  `AVAILABLE` records are reported as offline; no identity or location data is
+  exposed.
 - `PUT /api/users/rider/profile` - Rider-only vehicle update. A changed vehicle
   returns the rider to `PENDING` approval and `UNAVAILABLE`.
 - `GET /api/admin/password-reset-requests` - List pending administrator-assisted

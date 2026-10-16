@@ -34,6 +34,9 @@ const {
   releaseRiderAfterRide,
   serializeRiderProfile,
 } = require('../services/riderService');
+const {
+  getRiderAvailabilitySummary,
+} = require('../services/riderPresenceService');
 const { serializeDeliveryDetails } = require('../utils/deliveryDetails');
 const { questionLabel } = require('../services/accountSecurityService');
 const {
@@ -1089,7 +1092,7 @@ exports.getAdminStatistics = catchAsync(async (req, res) => {
     paymentStatsRows,
     ratingStatsRows,
     riderApprovalRows,
-    riderAvailabilityRows,
+    riderAvailability,
   ] =
     await Promise.all([
       User.aggregate([
@@ -1163,10 +1166,7 @@ exports.getAdminStatistics = catchAsync(async (req, res) => {
       Rider.aggregate([
         { $group: { _id: '$approval_status', count: { $sum: 1 } } },
       ]),
-      Rider.aggregate([
-        { $match: { approval_status: 'APPROVED' } },
-        { $group: { _id: '$availability_status', count: { $sum: 1 } } },
-      ]),
+      getRiderAvailabilitySummary(),
     ]);
 
   const [totalCancellations, pendingChatAccessRequests] = await Promise.all([
@@ -1206,10 +1206,6 @@ exports.getAdminStatistics = catchAsync(async (req, res) => {
   const riderApprovals = Object.fromEntries(
     riderApprovalRows.map((item) => [item._id, item.count])
   );
-  const riderAvailability = Object.fromEntries(
-    riderAvailabilityRows.map((item) => [item._id, item.count])
-  );
-
   return res.status(200).json({
     success: true,
     data: {
@@ -1250,9 +1246,9 @@ exports.getAdminStatistics = catchAsync(async (req, res) => {
           rejected: riderApprovals.REJECTED || 0,
         },
         riderAvailability: {
-          available: riderAvailability.AVAILABLE || 0,
-          busy: riderAvailability.BUSY || 0,
-          offline: riderAvailability.UNAVAILABLE || 0,
+          available: riderAvailability.available,
+          busy: riderAvailability.busy,
+          offline: riderAvailability.offline,
         },
       },
     },

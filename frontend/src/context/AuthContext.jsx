@@ -65,6 +65,32 @@ export function AuthProvider({ children }) {
     return updated;
   }, [user]);
 
+  useEffect(() => {
+    if (user?.role !== 'rider' || !user.online) return undefined;
+
+    const heartbeat = () => {
+      void riderApi.heartbeat().then(({ online }) => {
+        if (!online) {
+          setUser((current) => current ? { ...current, online: false } : current);
+        }
+      }).catch(() => {
+        // A temporary network failure is handled by the global network banner;
+        // the backend will expire this presence automatically.
+      });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') heartbeat();
+    };
+
+    heartbeat();
+    const timer = window.setInterval(heartbeat, 30000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user?.role, user?.online]);
+
   const updateRiderVehicle = useCallback(async (vehicle) => {
     const result = await riderApi.updateVehicle(vehicle);
     const updated = {

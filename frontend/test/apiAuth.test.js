@@ -550,6 +550,7 @@ test('connects rider availability, requests, lifecycle, earnings, vehicle, and c
     const request = { url: String(url), options }; requests.push(request);
     if (request.url.endsWith('/users/rider-availability-summary')) return jsonResponse({success:true,data:{riderAvailability:{available:3,busy:1,offline:2,approved:6}}});
     if (request.url.endsWith('/users/rider/availability')) return jsonResponse({success:true,data:{riderProfile:{approvalStatus:'APPROVED',availabilityStatus:'AVAILABLE'}}});
+    if (request.url.endsWith('/users/rider/heartbeat')) return jsonResponse({success:true,data:{online:true}});
     if (request.url.endsWith('/users/rider/profile')) return jsonResponse({success:true,data:{riderProfile:{approvalStatus:'PENDING',availabilityStatus:'UNAVAILABLE',vehicle:{model:'Dio',registrationNumber:'NP-9'}},reapprovalTriggered:true}});
     if (request.url.endsWith('/users/rider/earnings')) return jsonResponse({success:true,data:{summary:{totalEarnings:500,pendingReceiptAmount:200},earnings:[]}});
     if (request.url.endsWith('/rides/available')) return jsonResponse({success:true,data:{rides:[{id:'r1',rideType:'TRANSPORT',pickupLocation:{address:'A'},destination:{address:'B'},status:'REQUESTED',estimatedFare:200}]}});
@@ -562,6 +563,7 @@ test('connects rider availability, requests, lifecycle, earnings, vehicle, and c
   };
   assert.deepEqual(await riderApi.availabilitySummary(), { available: 3, busy: 1, offline: 2, approved: 6 });
   assert.equal((await riderApi.setAvailability(true)).availabilityStatus, 'available');
+  assert.deepEqual(await riderApi.heartbeat(), { online: true });
   assert.equal((await riderApi.updateVehicle({type:'Motorcycle',model:'Dio',registrationNumber:'NP-9',color:'Black'})).reapprovalTriggered, true);
   assert.equal((await riderApi.earnings()).summary.totalEarnings, 500);
   assert.equal((await ridesApi.list({available:true}))[0].status, 'pending');
@@ -572,6 +574,8 @@ test('connects rider availability, requests, lifecycle, earnings, vehicle, and c
   assert.equal((await ridesApi.confirmCashPayment('r1')).status, 'paid');
   const statusRequest = requests.find((request) => request.url.endsWith('/rides/r1/status'));
   assert.equal(JSON.parse(statusRequest.options.body).status, 'ARRIVED');
+  const heartbeatRequest = requests.find((request) => request.url.endsWith('/users/rider/heartbeat'));
+  assert.equal(heartbeatRequest.options.method, 'POST');
 });
 
 test('connects ride chat, access requests, and rider ratings', async () => {

@@ -240,10 +240,16 @@ exports.login = async (req, res, next) => {
 
 exports.logout = async (req, res, next) => {
   try {
-    await User.updateOne(
-      { _id: req.user._id },
-      { $inc: { token_version: 1 } }
-    );
+    await Promise.all([
+      User.updateOne(
+        { _id: req.user._id },
+        { $inc: { token_version: 1 } }
+      ),
+      Rider.updateOne(
+        { user_id: req.user._id, availability_status: { $ne: 'BUSY' } },
+        { $set: { availability_status: 'UNAVAILABLE', last_seen_at: null } }
+      ),
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -339,6 +345,11 @@ exports.switchRole = async (req, res, next) => {
       : null;
     if (role === 'RIDER' && !riderProfile) {
       return next(new AppError('Rider profile not found', 409));
+    }
+    if (role !== 'RIDER' && riderProfile?.availability_status !== 'BUSY') {
+      riderProfile.availability_status = 'UNAVAILABLE';
+      riderProfile.last_seen_at = null;
+      await riderProfile.save();
     }
     return res.status(200).json({
       success: true,

@@ -54,6 +54,10 @@ const riderSchema = new mongoose.Schema(
       enum: RIDER_AVAILABILITY,
       default: 'UNAVAILABLE',
     },
+    last_seen_at: {
+      type: Date,
+      default: null,
+    },
     vehicle: {
       type: vehicleSchema,
       required: true,
@@ -89,6 +93,7 @@ const riderSchema = new mongoose.Schema(
 );
 
 riderSchema.index({ availability_status: 1 });
+riderSchema.index({ approval_status: 1, availability_status: 1, last_seen_at: 1 });
 riderSchema.index({ approval_status: 1 });
 riderSchema.index(
   { 'vehicle.registration_number': 1 },

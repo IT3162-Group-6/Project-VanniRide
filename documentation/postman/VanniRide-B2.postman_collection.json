@@ -130,6 +130,7 @@
             "url": "{{baseUrl}}/api/users/rider/availability"
           }
         },
+        { "name": "Record Rider Heartbeat", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }], "url": "{{baseUrl}}/api/users/rider/heartbeat" } },
         {
           "name": "Update Rider Vehicle Profile",
           "request": {

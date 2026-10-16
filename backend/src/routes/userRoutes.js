@@ -27,6 +27,12 @@ router.patch(
   userController.updateRiderAvailability
 );
 
+router.post(
+  '/rider/heartbeat',
+  restrictTo('RIDER'),
+  userController.recordRiderHeartbeat
+);
+
 router.put(
   '/rider/profile',
   restrictTo('RIDER'),

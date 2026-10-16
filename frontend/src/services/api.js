@@ -534,6 +534,12 @@ export const riderApi = {
     return normalizeRiderProfile(response.data?.riderProfile);
   },
 
+  async heartbeat() {
+    if (USE_MOCK_AUTH) return { online: true };
+    const response = await http('/users/rider/heartbeat', { method: 'POST' });
+    return { online: Boolean(response.data?.online) };
+  },
+
   async updateVehicle(vehicle) {
     const response = await http('/users/rider/profile', {
       method: 'PUT',

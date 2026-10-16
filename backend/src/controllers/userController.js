@@ -17,6 +17,9 @@ const {
   serializeRiderProfile,
 } = require('../services/riderService');
 const { emitRiderAvailabilityChanged } = require('../utils/socketEvents');
+const {
+  getRiderAvailabilitySummary,
+} = require('../services/riderPresenceService');
 
 exports.getProfile = async (req, res, next) => {
   try {
@@ -81,22 +84,11 @@ exports.updateRecoverySettings = async (req, res, next) => {
 
 exports.getRiderAvailabilitySummary = async (req, res, next) => {
   try {
-    const rows = await Rider.aggregate([
-      { $match: { approval_status: 'APPROVED' } },
-      { $group: { _id: '$availability_status', count: { $sum: 1 } } },
-    ]);
-    const byStatus = Object.fromEntries(rows.map((row) => [row._id, row.count]));
+    const riderAvailability = await getRiderAvailabilitySummary();
 
     return res.status(200).json({
       success: true,
-      data: {
-        riderAvailability: {
-          available: byStatus.AVAILABLE || 0,
-          busy: byStatus.BUSY || 0,
-          offline: byStatus.UNAVAILABLE || 0,
-          approved: rows.reduce((total, row) => total + row.count, 0),
-        },
-      },
+      data: { riderAvailability },
     });
   } catch (error) {
     return next(error);
@@ -202,7 +194,12 @@ exports.updateRiderAvailability = async (req, res, next) => {
         availability_status: { $ne: 'BUSY' },
         approval_status: 'APPROVED',
       },
-      { $set: { availability_status: availabilityStatus } },
+      {
+        $set: {
+          availability_status: availabilityStatus,
+          last_seen_at: availabilityStatus === 'AVAILABLE' ? new Date() : null,
+        },
+      },
       { returnDocument: 'after', runValidators: true }
     );
 
@@ -234,6 +231,27 @@ exports.updateRiderAvailability = async (req, res, next) => {
       success: true,
       message: `Rider availability updated to ${availabilityStatus}`,
       data: { riderProfile: serializeRiderProfile(rider) },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.recordRiderHeartbeat = async (req, res, next) => {
+  try {
+    const rider = await Rider.findOneAndUpdate(
+      {
+        user_id: req.user._id,
+        approval_status: 'APPROVED',
+        availability_status: 'AVAILABLE',
+      },
+      { $set: { last_seen_at: new Date() } },
+      { returnDocument: 'after' }
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: { online: Boolean(rider) },
     });
   } catch (error) {
     return next(error);

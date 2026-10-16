@@ -447,6 +447,7 @@ created through protected setup tooling.
 - `PUT /api/users/profile`
 - `PUT /api/users/rider/profile`
 - `PATCH /api/users/rider/availability`
+- `POST /api/users/rider/heartbeat`
 - `GET /api/users/rider-availability-summary`
 - `GET /api/users/cancellation-allowance`
 

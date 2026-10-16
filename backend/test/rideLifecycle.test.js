@@ -90,6 +90,7 @@ let riderFixtureSequence = 0;
 const approvedRider = (userId, availabilityStatus = 'AVAILABLE') => ({
   user_id: userId,
   availability_status: availabilityStatus,
+  last_seen_at: availabilityStatus === 'AVAILABLE' ? new Date() : null,
   vehicle: {
     type: 'Motorcycle',
     model: 'Test Model',
@@ -686,6 +687,13 @@ test('requires rider approval and resubmits changed vehicle details for review',
     })
   );
   assert.equal(availability.body.data.riderProfile.availabilityStatus, 'AVAILABLE');
+  assert.ok((await Rider.findOne({ user_id: riderUserId }).lean()).last_seen_at);
+
+  const heartbeat = await invokeController(
+    userController.recordRiderHeartbeat,
+    makeRequest({ user: { _id: riderUserId, role: 'RIDER' } })
+  );
+  assert.equal(heartbeat.body.data.online, true);
 
   const changedVehicle = await invokeController(
     userController.updateRiderProfile,
@@ -704,6 +712,81 @@ test('requires rider approval and resubmits changed vehicle details for review',
   assert.equal(changedVehicle.body.data.reapprovalTriggered, true);
   assert.equal(changedVehicle.body.data.riderProfile.approvalStatus, 'PENDING');
   assert.equal(changedVehicle.body.data.riderProfile.availabilityStatus, 'UNAVAILABLE');
+});
+
+test('counts only recently active available riders and clears presence on logout', async () => {
+  const freshRiderId = new mongoose.Types.ObjectId();
+  const staleRiderId = new mongoose.Types.ObjectId();
+  const offlineRiderId = new mongoose.Types.ObjectId();
+  await User.create([
+    {
+      _id: freshRiderId,
+      name: 'Fresh Rider',
+      email: 'fresh-rider@example.com',
+      phone: '0700001411',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      roles: ['RIDER'],
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: staleRiderId,
+      name: 'Stale Rider',
+      email: 'stale-rider@example.com',
+      phone: '0700001412',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      roles: ['RIDER'],
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+    {
+      _id: offlineRiderId,
+      name: 'Offline Rider',
+      email: 'offline-rider@example.com',
+      phone: '0700001413',
+      password_hash: 'test-password-hash',
+      role: 'RIDER',
+      roles: ['RIDER'],
+      account_status: 'ACTIVE',
+      token_version: 0,
+    },
+  ]);
+  await Rider.create([
+    approvedRider(freshRiderId),
+    {
+      ...approvedRider(staleRiderId),
+      last_seen_at: new Date(Date.now() - 2 * 60 * 1000),
+    },
+    approvedRider(offlineRiderId, 'UNAVAILABLE'),
+  ]);
+
+  const beforeLogout = await invokeController(
+    userController.getRiderAvailabilitySummary,
+    makeRequest({ user: { _id: offlineRiderId, role: 'CUSTOMER' } })
+  );
+  assert.deepEqual(beforeLogout.body.data.riderAvailability, {
+    available: 1,
+    busy: 0,
+    offline: 2,
+    approved: 3,
+  });
+
+  await invokeController(
+    authController.logout,
+    makeRequest({ user: { _id: freshRiderId, role: 'RIDER' } })
+  );
+  const loggedOutRider = await Rider.findOne({ user_id: freshRiderId }).lean();
+  assert.equal(loggedOutRider.availability_status, 'UNAVAILABLE');
+  assert.equal(loggedOutRider.last_seen_at, null);
+
+  const afterLogout = await invokeController(
+    userController.getRiderAvailabilitySummary,
+    makeRequest({ user: { _id: offlineRiderId, role: 'CUSTOMER' } })
+  );
+  assert.equal(afterLogout.body.data.riderAvailability.available, 0);
+  assert.equal(afterLogout.body.data.riderAvailability.offline, 3);
 });
 
 test('audits admin conversation access and force cancellation without using participant allowances', async () => {
@@ -2224,7 +2307,7 @@ test('keeps the Postman collection synchronized with every implemented API route
   );
 
   assert.equal(new Set(collectedRoutes).size, collectedRoutes.length);
-  assert.equal(implementedRoutes.length, 59);
+  assert.equal(implementedRoutes.length, 60);
   assert.deepEqual(collectedRoutes.sort(), implementedRoutes.sort());
 });
 
