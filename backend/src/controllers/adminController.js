@@ -38,6 +38,7 @@ const { serializeDeliveryDetails } = require('../utils/deliveryDetails');
 const { questionLabel } = require('../services/accountSecurityService');
 const {
   createResetToken,
+  sendPasswordResetEmail,
 } = require('../services/passwordResetService');
 const {
   notifyManySafely,
@@ -292,21 +293,41 @@ exports.resolvePasswordResetRequest = catchAsync(async (req, res) => {
     throw error;
   }
 
+  let deliveryMethod = 'MANUAL';
+  if (env.passwordResetEmailConfigured) {
+    try {
+      await sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        token,
+        idempotencyKey: claimedRequest._id.toString(),
+      });
+      deliveryMethod = 'EMAIL';
+    } catch (error) {
+      console.error(`Password reset email delivery failed; using manual fallback: ${error.message}`);
+    }
+  }
+
   await notifySafely({
     userId: user._id,
     type: 'SYSTEM',
     title: 'Password reset approved',
-    message: 'An administrator approved your password reset request. Obtain the one-time reset link through the verified university channel.',
+    message: deliveryMethod === 'EMAIL'
+      ? 'Your one-time password reset link was sent to your registered university email.'
+      : 'Contact an administrator through your verified university channel to receive your one-time reset link.',
     link: '/login',
     io: req.app?.get('io'),
   });
 
   return res.status(200).json({
     success: true,
-    message: 'Password reset access approved',
+    message: deliveryMethod === 'EMAIL'
+      ? 'Password reset access approved and emailed'
+      : 'Password reset access approved; share the link through a verified channel',
     data: {
       resetUrl: `${env.frontendUrl}/reset-password?token=${encodeURIComponent(token)}`,
       expiresAt,
+      deliveryMethod,
       passwordResetRequest: {
         id: claimedRequest._id.toString(),
         status: 'RESOLVED',

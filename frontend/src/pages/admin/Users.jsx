@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import UserTable from '../../components/UserTable';
 import { adminApi } from '../../services/api';
 import { useAppState } from '../../context/appStateStore';
@@ -18,18 +18,33 @@ export default function Users() {
   const [resetForm, setResetForm] = useState({ reason: '' });
   const [approvedReset, setApprovedReset] = useState(null);
   const [resetBusy, setResetBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [tab, setTab] = useState('all');
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    Promise.all([adminApi.users(), adminApi.passwordResetRequests()])
+  const loadData = useCallback((showProgress = false) => {
+    if (showProgress) setRefreshing(true);
+    return Promise.all([adminApi.users(), adminApi.passwordResetRequests()])
       .then(([userList, requestList]) => {
         setUsers(userList);
         setResetRequests(requestList);
+        setLastUpdated(new Date());
+        setError('');
       })
-      .catch((requestError) => setError(requestError.message));
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setRefreshing(false));
   }, []);
+
+  useEffect(() => {
+    const initialRefresh = window.setTimeout(() => loadData(), 0);
+    const refreshTimer = window.setInterval(() => loadData(), 30_000);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      window.clearInterval(refreshTimer);
+    };
+  }, [loadData]);
 
   const shown = useMemo(() => users
     .filter((u) => (tab === 'all' ? true : (u.roles || [u.role]).includes(tab)))
@@ -71,15 +86,32 @@ export default function Users() {
   return (
     <>
       <div className="card" style={{ marginBottom: 18 }}>
-        <div className="card-head"><h3>Password reset requests ({resetRequests.length})</h3></div>
+        <div className="card-head">
+          <div>
+            <h3>Password reset requests ({resetRequests.length})</h3>
+            {lastUpdated && <small className="muted">Updated {lastUpdated.toLocaleTimeString()}</small>}
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => loadData(true)} disabled={refreshing}>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
         {error && <div className="alert alert-error">{error}</div>}
         <p className="muted">The national ID number and security answer matched before the request was created. Verify the person through an established university channel before granting a one-time reset link.</p>
         {approvedReset && (
           <div className="alert alert-ok password-reset-link-result">
             <b>Reset access approved for {approvedReset.userName}</b>
-            <span>Share this link only through the verified channel. It expires {new Date(approvedReset.expiresAt).toLocaleString()}.</span>
-            <input aria-label="Approved reset link" readOnly value={approvedReset.resetUrl || ''} onFocus={(event) => event.target.select()} />
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => navigator.clipboard?.writeText(approvedReset.resetUrl).then(() => showToast('Reset link copied')).catch(() => showToast('Select and copy the link manually'))}>Copy reset link</button>
+            <span>
+              {approvedReset.deliveryMethod === 'EMAIL'
+                ? 'The reset link was sent to the registered university email.'
+                : 'Share this link only through the verified university channel.'}
+              {' '}It expires {new Date(approvedReset.expiresAt).toLocaleString()}.
+            </span>
+            {approvedReset.deliveryMethod !== 'EMAIL' && (
+              <>
+                <input aria-label="Approved reset link" readOnly value={approvedReset.resetUrl || ''} onFocus={(event) => event.target.select()} />
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => navigator.clipboard?.writeText(approvedReset.resetUrl).then(() => showToast('Reset link copied')).catch(() => showToast('Select and copy the link manually'))}>Copy reset link</button>
+              </>
+            )}
           </div>
         )}
         {!resetRequests.length ? (

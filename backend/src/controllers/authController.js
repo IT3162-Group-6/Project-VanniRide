@@ -29,10 +29,12 @@ const {
   isResetTokenFormatValid,
   validateNewPassword,
 } = require('../services/passwordResetService');
+const { notifyManySafely } = require('../services/notificationService');
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 const PASSWORD_RESET_RESPONSE =
-  'If the account and identity details match, an administrator will review the password reset request.';
+  'If an active account and all recovery details match, the request will be sent for administrator review.';
+const PASSWORD_RESET_DELIVERY = env.passwordResetEmailConfigured ? 'EMAIL' : 'MANUAL';
 
 const getUserRoles = (user) => {
   const roles = Array.isArray(user?.roles) && user.roles.length
@@ -291,12 +293,26 @@ exports.forgotPassword = async (req, res, next) => {
           },
           { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
         );
+        const administrators = await User.find({
+          _id: { $ne: user._id },
+          $or: [{ role: 'ADMIN' }, { roles: 'ADMIN' }],
+          account_status: 'ACTIVE',
+        }).select('_id');
+        await notifyManySafely({
+          userIds: administrators.map((administrator) => administrator._id),
+          type: 'SYSTEM',
+          title: 'Password reset request',
+          message: `${email} submitted matching recovery details for administrator review.`,
+          link: '/admin/users',
+          io: req.app?.get('io'),
+        });
       }
     }
 
     return res.status(200).json({
       success: true,
       message: PASSWORD_RESET_RESPONSE,
+      data: { deliveryMethod: PASSWORD_RESET_DELIVERY },
     });
   } catch (error) {
     return next(error);
@@ -305,7 +321,10 @@ exports.forgotPassword = async (req, res, next) => {
 
 exports.getSecurityQuestions = (req, res) => res.status(200).json({
   success: true,
-  data: { securityQuestions: SECURITY_QUESTIONS },
+  data: {
+    securityQuestions: SECURITY_QUESTIONS,
+    passwordResetDelivery: PASSWORD_RESET_DELIVERY,
+  },
 });
 
 exports.switchRole = async (req, res, next) => {

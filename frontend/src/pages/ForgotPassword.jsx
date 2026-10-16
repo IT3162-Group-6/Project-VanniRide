@@ -11,14 +11,16 @@ export default function ForgotPassword() {
     securityAnswer: '',
   });
   const [questions, setQuestions] = useState([]);
+  const [deliveryMethod, setDeliveryMethod] = useState('MANUAL');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    authApi.securityQuestions()
-      .then((items) => {
+    authApi.passwordResetConfiguration()
+      .then(({ questions: items, deliveryMethod: method }) => {
         setQuestions(items);
+        setDeliveryMethod(method);
         setForm((current) => ({
           ...current,
           securityQuestion: current.securityQuestion || items[0]?.id || '',
@@ -48,7 +50,12 @@ export default function ForgotPassword() {
         {message ? (
           <>
             <div className="alert alert-ok">{message}</div>
-            <p className="muted auth-help">Contact an administrator through your usual university channel. After verification, they can provide an expiring one-time reset link. For privacy, this page does not confirm which detail matched.</p>
+            <p className="muted auth-help">
+              {deliveryMethod === 'EMAIL'
+                ? 'After administrator approval, the reset link will be sent to your registered university email.'
+                : 'After administrator approval, contact an administrator through your usual university channel to receive the expiring one-time reset link.'}
+              {' '}For privacy, this page does not confirm whether an account or recovery detail matched.
+            </p>
           </>
         ) : (
           <form onSubmit={submit}>

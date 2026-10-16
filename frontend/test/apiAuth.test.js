@@ -273,7 +273,7 @@ test('requests and completes password recovery without storing a session token',
     return jsonResponse({
       success: true,
       message: String(url).endsWith('/forgot-password')
-        ? 'If the account and identity details match, an administrator will review the password reset request.'
+        ? 'If an active account and all recovery details match, the request will be sent for administrator review.'
         : 'Password reset successfully. You can now log in.',
     });
   };
@@ -286,7 +286,7 @@ test('requests and completes password recovery without storing a session token',
   });
   const resetMessage = await authApi.resetPassword('a'.repeat(64), 'new-password-123');
 
-  assert.match(forgotMessage, /identity details match/);
+  assert.match(forgotMessage, /recovery details match/);
   assert.match(resetMessage, /reset successfully/);
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     email: 'person@vau.ac.lk',

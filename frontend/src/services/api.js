@@ -266,10 +266,21 @@ export const authApi = {
     return response.data?.securityQuestions || [];
   },
 
+  async passwordResetConfiguration() {
+    if (USE_MOCK_AUTH) {
+      return { questions: SECURITY_QUESTIONS, deliveryMethod: 'MANUAL' };
+    }
+    const response = await http('/auth/security-questions');
+    return {
+      questions: response.data?.securityQuestions || [],
+      deliveryMethod: response.data?.passwordResetDelivery || 'MANUAL',
+    };
+  },
+
   async forgotPassword({ email, identityNumber, securityQuestion, securityAnswer }) {
     if (USE_MOCK_AUTH) {
       await delay(200);
-      return 'If the account and identity details match, an administrator will review the password reset request.';
+      return 'If an active account and all recovery details match, the request will be sent for administrator review.';
     }
     const response = await http('/auth/forgot-password', {
       method: 'POST',
@@ -923,6 +934,7 @@ export const adminApi = {
       ...response.data?.passwordResetRequest,
       resetUrl: response.data?.resetUrl,
       expiresAt: response.data?.expiresAt,
+      deliveryMethod: response.data?.deliveryMethod || 'MANUAL',
     };
   },
   async riders(approvalStatus) {
