@@ -6,6 +6,9 @@ const config = require('./src/config/env');
 const connectDatabase = require('./src/config/database');
 const initializeSocketHandler = require('./src/sockets/socketHandler');
 const {
+  resetNonAdminProductionDataOnce,
+} = require('./src/services/productionDataReset');
+const {
   startCancellationWorker,
 } = require('./src/workers/cancellationWorker');
 
@@ -37,6 +40,10 @@ const shutdown = async (signal, exitCode = 0) => {
 const startServer = async () => {
   config.validateRuntimeConfig();
   await connectDatabase(config.mongoUri);
+  if (config.nodeEnv === 'production') {
+    const dataResetReport = await resetNonAdminProductionDataOnce();
+    app.set('dataResetReport', dataResetReport);
+  }
 
   server = http.createServer(app);
   io = new SocketServer(server, {
