@@ -23,6 +23,14 @@ const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
 const passwordResetFromEmail = String(
   process.env.PASSWORD_RESET_FROM_EMAIL || ''
 ).trim();
+const configuredUniversityEmailDomain = String(
+  process.env.UNIVERSITY_EMAIL_DOMAIN || 'stu.vau.ac.lk'
+).trim().toLowerCase().replace(/^@+/, '');
+// Migrate the previous production value without requiring a perfectly timed
+// hosting-dashboard change during deployment.
+const universityEmailDomain = configuredUniversityEmailDomain === 'vau.ac.lk'
+  ? 'stu.vau.ac.lk'
+  : configuredUniversityEmailDomain;
 const frontendUrl = String(
   process.env.FRONTEND_URL || corsOrigins[0] || 'http://localhost:5173'
 ).trim().replace(/\/$/, '');
@@ -33,9 +41,7 @@ const config = {
   mongoUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  universityEmailDomain: String(
-    process.env.UNIVERSITY_EMAIL_DOMAIN || 'vau.ac.lk'
-  ).trim().toLowerCase().replace(/^@+/, ''),
+  universityEmailDomain,
   allowNonUniversityEmails: parseBoolean(
     process.env.ALLOW_NON_UNIVERSITY_EMAILS,
     nodeEnv !== 'production'

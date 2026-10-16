@@ -73,7 +73,7 @@ export default function Users() {
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="card-head"><h3>Password reset requests ({resetRequests.length})</h3></div>
         {error && <div className="alert alert-error">{error}</div>}
-        <p className="muted">The ID and security answer matched before the request was created. Verify the person through an established university channel before granting a one-time reset link.</p>
+        <p className="muted">The national ID number and security answer matched before the request was created. Verify the person through an established university channel before granting a one-time reset link.</p>
         {approvedReset && (
           <div className="alert alert-ok password-reset-link-result">
             <b>Reset access approved for {approvedReset.userName}</b>
@@ -106,7 +106,7 @@ export default function Users() {
           <form onSubmit={resolvePasswordReset} className="password-reset-admin-form">
             <h4>Approve reset access for {selectedRequest.user.name}</h4>
             <div className="recovery-verification-summary">
-              <span><b>Submitted ID</b>{selectedRequest.identityNumber}</span>
+              <span><b>Submitted national ID</b>{selectedRequest.identityNumber}</span>
               <span><b>Matched question</b>{selectedRequest.securityQuestionLabel}</span>
             </div>
             <div className="field">

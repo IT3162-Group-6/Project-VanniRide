@@ -158,15 +158,15 @@ export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMen
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <Link to="/" className="brand" onClick={() => setOpen(false)}>
+        <Link to={user ? HOME_BY_ROLE[user.role] : '/'} className="brand" onClick={() => setOpen(false)}>
           <span className="brand-mark"><Icon name="pin" size={20} /></span> Vanni <b>Ride</b>
         </Link>
         <nav className="topnav">
           <Link to="/">Home</Link>
-          <a href="#how">How It Works</a>
           <a href="#services">Services</a>
+          <a href="#how">How It Works</a>
           <a href="#safety">Safety</a>
-          <a href="#about">About Us</a>
+          <a href="#riders">For Riders</a>
         </nav>
         <div className="topbar-actions">
           {user ? (
@@ -184,10 +184,10 @@ export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMen
       </div>
       <div className={`mobile-menu ${open ? 'open' : ''}`}>
         <Link className="mm-link" to="/" onClick={() => setOpen(false)}>Home</Link>
-        <a className="mm-link" href="#how" onClick={() => setOpen(false)}>How It Works</a>
         <a className="mm-link" href="#services" onClick={() => setOpen(false)}>Services</a>
+        <a className="mm-link" href="#how" onClick={() => setOpen(false)}>How It Works</a>
         <a className="mm-link" href="#safety" onClick={() => setOpen(false)}>Safety</a>
-        <a className="mm-link" href="#about" onClick={() => setOpen(false)}>About Us</a>
+        <a className="mm-link" href="#riders" onClick={() => setOpen(false)}>For Riders</a>
         {user ? (
           <Link to={HOME_BY_ROLE[user.role]} className="btn btn-primary btn-block" onClick={() => setOpen(false)}>Dashboard</Link>
         ) : (

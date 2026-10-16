@@ -6,8 +6,8 @@ import { isMockAuth } from '../services/api';
 import AuthShell from '../components/AuthShell';
 
 const DEMO = [
-  { role: 'Customer', email: 'customer@vau.ac.lk' },
-  { role: 'Rider', email: 'rider@vau.ac.lk' },
+  { role: 'Customer', email: 'customer@stu.vau.ac.lk' },
+  { role: 'Rider', email: 'rider@stu.vau.ac.lk' },
   { role: 'Admin', email: 'admin@vau.ac.lk' },
 ];
 
@@ -47,7 +47,7 @@ export default function Login() {
           <div className="field">
             <label>University email</label>
             <input
-              type="email" placeholder="you@vau.ac.lk" required
+              type="email" placeholder="you@stu.vau.ac.lk" required
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />

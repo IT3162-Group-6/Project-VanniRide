@@ -465,7 +465,7 @@ All existing version-one endpoints remain in force.
 
 The login page links to a public forgot-password form. Its response remains the
 same for every submission. A pending administrator item is created only when
-the email, ID number, selected security question, and normalized answer match.
+the email, national ID number, selected security question, and normalized answer match.
 After manual verification through an established university channel, an
 administrator approves an expiring, single-use reset link and records a
 verification note. Completing the reset revokes existing sessions and creates

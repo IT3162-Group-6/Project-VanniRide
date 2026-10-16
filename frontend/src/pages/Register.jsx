@@ -74,7 +74,7 @@ export default function Register() {
           </div>
           <div className="field">
             <label>University email</label>
-            <input type="email" placeholder="you@vau.ac.lk" required value={form.email} onChange={set('email')} />
+            <input type="email" placeholder="you@stu.vau.ac.lk" required value={form.email} onChange={set('email')} />
             {import.meta.env.DEV && (
               <small className="muted">Testing mode also accepts other valid email addresses.</small>
             )}
@@ -89,8 +89,8 @@ export default function Register() {
           </div>
 
           <div className="field">
-            <label>University, student, or staff ID number</label>
-            <input type="text" maxLength={32} required value={form.identityNumber} onChange={set('identityNumber')} />
+            <label>National ID number</label>
+            <input type="text" inputMode="text" maxLength={12} placeholder="12 digits or 9 digits + V/X" required value={form.identityNumber} onChange={set('identityNumber')} />
             <small className="muted">Used with your security answer when requesting password recovery.</small>
           </div>
           <div className="field">

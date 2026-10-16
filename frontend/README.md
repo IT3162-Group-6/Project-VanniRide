@@ -10,7 +10,7 @@ expired sessions. API roles are normalized to the lowercase role names already
 used by the existing frontend routes.
 
 The login page includes password recovery. A request is created only when the
-email, ID number, selected security question, and answer match, while the page
+email, national ID number, selected security question, and answer match, while the page
 always shows the same account-neutral response. After manual verification, an
 administrator grants an expiring one-time reset link from the Users page.
 Completing the reset revokes existing sessions. Logged-in users can also change

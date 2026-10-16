@@ -23,7 +23,7 @@ The B2 controllers also enforce the role and MongoDB ObjectId requirements.
   account with recovery details.
 - `POST /api/auth/login` - Return a JWT for an active account.
 - `GET /api/auth/security-questions` - Return the approved recovery questions.
-- `POST /api/auth/forgot-password` - Accept email, ID number, question, and
+- `POST /api/auth/forgot-password` - Accept email, national ID number, question, and
   answer and always return the same account-neutral response. A request is
   created only when every value matches.
 - `POST /api/auth/reset-password` - Consume a single-use reset token and set a
@@ -36,7 +36,7 @@ The B2 controllers also enforce the role and MongoDB ObjectId requirements.
   version.
 - `GET /api/users/profile` - Return the authenticated user profile.
 - `PUT /api/users/profile` - Update the authenticated user's name or phone.
-- `PUT /api/users/recovery-settings` - Replace the recovery ID, question, and
+- `PUT /api/users/recovery-settings` - Replace the recovery national ID, question, and
   answer after verifying the current password.
 - `POST /api/users/roles` - Enable missing customer access or submit a rider
   profile for approval.
@@ -52,7 +52,7 @@ The B2 controllers also enforce the role and MongoDB ObjectId requirements.
 - `PATCH /api/admin/password-reset-requests/:requestId` - Approve an expiring,
   single-use reset link after manual identity verification and audit the action.
 
-Registration requires `identityNumber`, `securityQuestion`, and
+Registration requires a Sri Lankan NIC in `identityNumber`, plus `securityQuestion` and
 `securityAnswer`. `roles: ["CUSTOMER", "RIDER"]` creates a dual-role account.
 Rider registration requires `vehicle.type`, `vehicle.model`,
 `vehicle.registrationNumber`, and `vehicle.color`. New riders remain
@@ -66,7 +66,7 @@ role is not included in the account's authorized roles, or logout has
 invalidated the token version.
 
 Public registration accepts only addresses under the configured
-`UNIVERSITY_EMAIL_DOMAIN` (`vau.ac.lk` by default). Local development and tests
+`UNIVERSITY_EMAIL_DOMAIN` (`stu.vau.ac.lk` by default). Local development and tests
 may set `ALLOW_NON_UNIVERSITY_EMAILS=true` so team members can create temporary
 accounts. This bypass is disabled and rejected when `NODE_ENV=production`.
 

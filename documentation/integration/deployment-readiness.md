@@ -33,7 +33,7 @@ PORT=<platform port>
 MONGODB_URI=<private production MongoDB URI>
 JWT_SECRET=<random value of at least 32 characters>
 JWT_EXPIRES_IN=7d
-UNIVERSITY_EMAIL_DOMAIN=vau.ac.lk
+UNIVERSITY_EMAIL_DOMAIN=stu.vau.ac.lk
 ALLOW_NON_UNIVERSITY_EMAILS=false
 CORS_ORIGINS=https://<frontend-domain>
 MAP_PROVIDER=openrouteservice
@@ -111,7 +111,7 @@ npm run build
 1. `GET /health` returns HTTP 200 and `database: connected`.
 2. An unlisted browser origin is rejected.
 3. Customer and rider registration/login work over HTTPS, and registration
-   rejects addresses outside `@vau.ac.lk`.
+   rejects addresses outside `@stu.vau.ac.lk`.
 4. A newly registered rider is pending and cannot go online.
 5. Admin approval enables rider availability.
 6. Customer request, rider acceptance, chat, status progression, completion,

@@ -145,7 +145,7 @@ Required fields:
 - `password_hash`: bcrypt password hash
 - `role`: `CUSTOMER`, `RIDER`, or `ADMIN`
 - `roles`: authorized role array; legacy records fall back to `role`
-- `identity_number_hash`: bcrypt recovery ID hash when recovery is configured
+- `identity_number_hash`: bcrypt national ID hash when recovery is configured
 - `security_question`: approved recovery question identifier
 - `security_answer_hash`: bcrypt normalized recovery answer hash
 - `account_status`: `ACTIVE` or `SUSPENDED`

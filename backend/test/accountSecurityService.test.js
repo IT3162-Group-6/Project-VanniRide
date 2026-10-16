@@ -8,13 +8,17 @@ const {
   normalizeIdentityNumber,
   normalizeSecurityAnswer,
   recoveryValueMatches,
+  validateIdentityNumber,
   validateSecurityQuestion,
 } = require('../src/services/accountSecurityService');
 
-test('normalizes recovery identity values without weakening exact matching', async () => {
-  assert.equal(normalizeIdentityNumber(' st-2026 / 001 '), 'ST2026001');
+test('normalizes national identity values without weakening exact matching', async () => {
+  assert.equal(normalizeIdentityNumber(' 2001 2345 6789 '), '200123456789');
   assert.equal(normalizeSecurityAnswer('  Vavuniya   College  '), 'vavuniya college');
-  assert.equal(maskIdentityNumber('ST2026001'), '*****6001');
+  assert.equal(maskIdentityNumber('200123456789'), '********6789');
+  assert.equal(validateIdentityNumber('200123456789'), '200123456789');
+  assert.equal(validateIdentityNumber('901234567V'), '901234567V');
+  assert.throws(() => validateIdentityNumber('ST-2026-001'), /National ID number/);
 
   const hash = await hashRecoveryValue(normalizeSecurityAnswer('My First School'));
   assert.equal(await recoveryValueMatches('my first school', hash), true);

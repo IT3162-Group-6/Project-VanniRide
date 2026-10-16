@@ -21,7 +21,7 @@ services:
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: UNIVERSITY_EMAIL_DOMAIN
-        value: vau.ac.lk
+        value: stu.vau.ac.lk
       - key: ALLOW_NON_UNIVERSITY_EMAILS
         value: "false"
       - key: CORS_ORIGINS

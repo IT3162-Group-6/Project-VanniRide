@@ -90,7 +90,7 @@ MongoDB JSON Schema validation checks:
 - password_hash must be a non-empty string
 - role must be `CUSTOMER`, `RIDER`, or `ADMIN`
 - roles, when present, must contain only `CUSTOMER`, `RIDER`, or `ADMIN`
-- recovery ID numbers and security answers are stored only as password hashes
+- recovery national ID numbers and security answers are stored only as password hashes
 - account_status must be `ACTIVE` or `SUSPENDED`
 - created_at must be a date
 

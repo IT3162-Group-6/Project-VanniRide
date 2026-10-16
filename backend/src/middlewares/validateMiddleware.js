@@ -5,7 +5,7 @@ exports.validateRegister = (req, res, next) => {
   const { name, email, phone, password, role, roles, identityNumber, securityQuestion, securityAnswer } = req.body;
 
   if (!name || !email || !phone || !password || (!role && !roles) || !identityNumber || !securityQuestion || !securityAnswer) {
-    return next(new AppError('Name, email, phone, password, account type, ID number, security question, and security answer are required', 400));
+    return next(new AppError('Name, email, phone, password, account type, national ID number, security question, and security answer are required', 400));
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

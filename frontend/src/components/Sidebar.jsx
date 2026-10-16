@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon';
 import { HOME_BY_ROLE, useAuth } from '../context/authStore';
 import { useAppState } from '../context/appStateStore';
@@ -35,10 +35,10 @@ export default function Sidebar({ open, collapsed, onNavigate }) {
 
   return (
     <aside className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-      <div className="sidebar-brand">
+      <Link className="sidebar-brand" to={HOME_BY_ROLE[user?.role] || '/'} onClick={onNavigate} aria-label="Go to dashboard">
         <span className="brand-mark brand-mark-dark"><Icon name="pin" size={20} /></span>
         <span className="sidebar-brand-text">Vanni <b>Ride</b></span>
-      </div>
+      </Link>
       <div className="sidebar-role">{ROLE_LABEL[user?.role] || 'Guest'} panel</div>
       {canSwitchPanels && (
         <button type="button" className="sidebar-role-switch" onClick={handleRoleSwitch} disabled={switching}>

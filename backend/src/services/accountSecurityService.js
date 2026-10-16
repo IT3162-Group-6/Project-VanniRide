@@ -19,8 +19,8 @@ const normalizeSecurityAnswer = (value) =>
 
 const validateIdentityNumber = (value) => {
   const normalized = normalizeIdentityNumber(value);
-  if (normalized.length < 4 || normalized.length > 32) {
-    throw new Error('ID number must contain from 4 through 32 letters or numbers');
+  if (!/^(?:\d{12}|\d{9}[VX])$/.test(normalized)) {
+    throw new Error('National ID number must use the 12-digit or 9-digit plus V/X Sri Lankan NIC format');
   }
   return normalized;
 };

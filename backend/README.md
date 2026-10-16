@@ -25,7 +25,7 @@ readiness response requires an active MongoDB connection.
 - `JWT_SECRET` - signing key; production requires a non-placeholder value of
   at least 32 characters
 - `UNIVERSITY_EMAIL_DOMAIN` - domain allowed for public customer and rider
-  registration; defaults to `vau.ac.lk`
+  registration; defaults to `stu.vau.ac.lk`
 - `ALLOW_NON_UNIVERSITY_EMAILS` - local testing bypass; it cannot be enabled
   in production
 - `CORS_ORIGINS` - comma-separated exact frontend origins; explicitly required
@@ -40,7 +40,7 @@ See `.env.example` for the full configuration. The server validates critical
 production settings before opening its port. Browser origins not listed in
 `CORS_ORIGINS` are rejected for both HTTP and Socket.IO.
 
-New customer and rider accounts configure an ID number, a predefined security
+New customer and rider accounts configure a Sri Lankan national ID number, a predefined security
 question, and an answer. A recovery request reaches administrators only when
 all submitted details match, while the public response remains account-neutral.
 After manual identity verification, an administrator approves a one-time,

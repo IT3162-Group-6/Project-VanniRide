@@ -14,7 +14,9 @@
     { "key": "riderUserId", "value": "" },
     { "key": "userId", "value": "" },
     { "key": "paymentId", "value": "" },
-    { "key": "chatAccessRequestId", "value": "" }
+    { "key": "chatAccessRequestId", "value": "" },
+    { "key": "passwordResetRequestId", "value": "" },
+    { "key": "resetToken", "value": "" }
   ],
   "item": [
     {
@@ -25,7 +27,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sample Customer\",\n  \"email\": \"customer@example.com\",\n  \"phone\": \"0771234567\",\n  \"password\": \"password123\",\n  \"role\": \"CUSTOMER\",\n  \"roles\": [\"CUSTOMER\"],\n  \"identityNumber\": \"ST-2026-001\",\n  \"securityQuestion\": \"first_school\",\n  \"securityAnswer\": \"Example School\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sample Customer\",\n  \"email\": \"customer@stu.vau.ac.lk\",\n  \"phone\": \"0771234567\",\n  \"password\": \"password123\",\n  \"role\": \"CUSTOMER\",\n  \"roles\": [\"CUSTOMER\"],\n  \"identityNumber\": \"200012345678\",\n  \"securityQuestion\": \"first_school\",\n  \"securityAnswer\": \"Example School\"\n}" },
             "url": "{{baseUrl}}/api/auth/register"
           }
         },
@@ -34,7 +36,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"password123\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"customer@stu.vau.ac.lk\",\n  \"password\": \"password123\"\n}" },
             "url": "{{baseUrl}}/api/auth/login"
           }
         },
@@ -44,6 +46,43 @@
             "method": "POST",
             "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
             "url": "{{baseUrl}}/api/auth/logout"
+          }
+        },
+        { "name": "Get Security Questions", "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/security-questions" } },
+        {
+          "name": "Request Password Reset Review",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"customer@stu.vau.ac.lk\",\n  \"identityNumber\": \"200012345678\",\n  \"securityQuestion\": \"first_school\",\n  \"securityAnswer\": \"Example School\"\n}" },
+            "url": "{{baseUrl}}/api/auth/forgot-password"
+          }
+        },
+        {
+          "name": "Reset Password with Approved Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"password\": \"new-password123\"\n}" },
+            "url": "{{baseUrl}}/api/auth/reset-password"
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"password123\",\n  \"newPassword\": \"new-password123\"\n}" },
+            "url": "{{baseUrl}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Switch Active Role",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"RIDER\"\n}" },
+            "url": "{{baseUrl}}/api/auth/switch-role"
           }
         }
       ]
@@ -61,6 +100,25 @@
             "url": "{{baseUrl}}/api/users/profile"
           }
         },
+        {
+          "name": "Update Recovery Settings",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"password123\",\n  \"identityNumber\": \"200012345678\",\n  \"securityQuestion\": \"first_school\",\n  \"securityAnswer\": \"Example School\"\n}" },
+            "url": "{{baseUrl}}/api/users/recovery-settings"
+          }
+        },
+        {
+          "name": "Add Rider Role",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"RIDER\",\n  \"vehicle\": {\n    \"type\": \"Motorcycle\",\n    \"model\": \"Honda Dio\",\n    \"registrationNumber\": \"NP-7788\",\n    \"color\": \"Black\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/users/roles"
+          }
+        },
+        { "name": "Get Rider Availability Summary", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/users/rider-availability-summary" } },
         { "name": "Get My History", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/users/history" } },
         { "name": "Get Cancellation Allowance", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/users/cancellation-allowance" } },
         {
@@ -206,6 +264,16 @@
       "name": "Administration",
       "item": [
         { "name": "List Users", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/users" } },
+        { "name": "List Password Reset Requests", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/admin/password-reset-requests" } },
+        {
+          "name": "Approve Password Reset Request",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Identity details verified through the university channel\"\n}" },
+            "url": "{{baseUrl}}/api/admin/password-reset-requests/{{passwordResetRequestId}}"
+          }
+        },
         {
           "name": "Update User Status",
           "request": {

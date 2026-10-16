@@ -58,7 +58,7 @@ export default function ForgotPassword() {
               <input
                 id="forgot-email"
                 type="email"
-                placeholder="you@vau.ac.lk"
+                placeholder="you@stu.vau.ac.lk"
                 required
                 autoComplete="email"
                 value={form.email}
@@ -66,12 +66,13 @@ export default function ForgotPassword() {
               />
             </div>
             <div className="field">
-              <label htmlFor="forgot-identity">University, student, or staff ID number</label>
+              <label htmlFor="forgot-identity">National ID number</label>
               <input
                 id="forgot-identity"
                 type="text"
                 required
-                maxLength={32}
+                maxLength={12}
+                placeholder="12 digits or 9 digits + V/X"
                 autoComplete="off"
                 value={form.identityNumber}
                 onChange={(event) => setForm({ ...form, identityNumber: event.target.value })}

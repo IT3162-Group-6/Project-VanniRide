@@ -175,11 +175,11 @@ const uid = (p) => p + Math.random().toString(36).slice(2, 8);
 
 const seed = () => ({
   users: [
-    { id: 'u1', name: 'Dulani Perera', email: 'customer@vau.ac.lk', password: '123456', role: 'customer', phone: '077 123 4567', faculty: 'Science Faculty', wallet: 1250, joined: '2026-01-12', status: 'active' },
-    { id: 'u2', name: 'Nimesh Kavinda', email: 'rider@vau.ac.lk', password: '123456', role: 'rider', phone: '071 998 2210', vehicle: 'Yamaha Ray · WP-1234', rating: 4.9, earnings: 18450, online: true, joined: '2025-11-02', status: 'active' },
+    { id: 'u1', name: 'Dulani Perera', email: 'customer@stu.vau.ac.lk', password: '123456', role: 'customer', phone: '077 123 4567', faculty: 'Science Faculty', wallet: 1250, joined: '2026-01-12', status: 'active' },
+    { id: 'u2', name: 'Nimesh Kavinda', email: 'rider@stu.vau.ac.lk', password: '123456', role: 'rider', phone: '071 998 2210', vehicle: 'Yamaha Ray · WP-1234', rating: 4.9, earnings: 18450, online: true, joined: '2025-11-02', status: 'active' },
     { id: 'u3', name: 'System Admin', email: 'admin@vau.ac.lk', password: '123456', role: 'admin', phone: '070 000 0000', joined: '2025-09-01', status: 'active' },
-    { id: 'u4', name: 'Kavith Silva', email: 'kavith@vau.ac.lk', password: '123456', role: 'customer', phone: '076 441 2098', faculty: 'Business Studies', wallet: 430, joined: '2026-02-20', status: 'active' },
-    { id: 'u5', name: 'Tharushi Fernando', email: 'tharushi@vau.ac.lk', password: '123456', role: 'rider', phone: '075 220 3311', vehicle: 'Honda Dio · NP-7788', rating: 4.7, earnings: 9120, online: false, joined: '2026-03-05', status: 'pending' },
+    { id: 'u4', name: 'Kavith Silva', email: 'kavith@stu.vau.ac.lk', password: '123456', role: 'customer', phone: '076 441 2098', faculty: 'Business Studies', wallet: 430, joined: '2026-02-20', status: 'active' },
+    { id: 'u5', name: 'Tharushi Fernando', email: 'tharushi@stu.vau.ac.lk', password: '123456', role: 'rider', phone: '075 220 3311', vehicle: 'Honda Dio · NP-7788', rating: 4.7, earnings: 9120, online: false, joined: '2026-03-05', status: 'pending' },
   ],
   rides: [
     { id: 'r1', code: 'VR-1041', customerId: 'u1', riderId: 'u2', type: 'ride', pickup: 'Science Faculty', dropoff: 'Vavuniya Town', via: '', status: 'ontheway', fare: 324, distanceKm: 10.2, etaMin: 21, payment: 'wallet', createdAt: '2026-09-15T10:15:00', note: '' },

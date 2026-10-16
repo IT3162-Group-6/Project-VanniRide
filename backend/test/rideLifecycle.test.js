@@ -248,11 +248,11 @@ test('lists, reads, and broadcasts persistent notifications', async () => {
 test('restricts release registration to university email while preserving the test bypass', async () => {
   assert.equal(isValidEmail('student@vau.ac.lk'), true);
   assert.equal(isValidEmail('student@@vau.ac.lk'), false);
-  assert.equal(isUniversityEmail(' Student@VAU.AC.LK ', 'vau.ac.lk'), true);
-  assert.equal(isUniversityEmail('student@notvau.ac.lk', 'vau.ac.lk'), false);
+  assert.equal(isUniversityEmail(' Student@STU.VAU.AC.LK ', 'stu.vau.ac.lk'), true);
+  assert.equal(isUniversityEmail('student@vau.ac.lk', 'stu.vau.ac.lk'), false);
   assert.equal(
     registrationEmailIsAllowed('temporary@example.com', {
-      universityEmailDomain: 'vau.ac.lk',
+      universityEmailDomain: 'stu.vau.ac.lk',
       allowNonUniversityEmails: true,
     }),
     true
@@ -276,7 +276,7 @@ test('restricts release registration to university email while preserving the te
       ),
       (error) =>
         error.statusCode === 400 &&
-        /@vau\.ac\.lk/.test(error.message)
+        /@stu\.vau\.ac\.lk/.test(error.message)
     );
     assert.equal(
       await User.countDocuments({ email: 'external@example.com' }),
@@ -288,18 +288,18 @@ test('restricts release registration to university email while preserving the te
       makeRequest({
         body: {
           name: 'University Tester',
-          email: 'student@vau.ac.lk',
+          email: 'student@stu.vau.ac.lk',
           phone: '0700000199',
           password: 'Password123!',
           role: 'CUSTOMER',
-          identityNumber: 'STUDENT-0199',
+          identityNumber: '200123456789',
           securityQuestion: 'first_school',
           securityAnswer: 'Test School',
         },
       })
     );
     assert.equal(accepted.statusCode, 201);
-    assert.equal(accepted.body.data.user.email, 'student@vau.ac.lk');
+    assert.equal(accepted.body.data.user.email, 'student@stu.vau.ac.lk');
   } finally {
     env.allowNonUniversityEmails = originalBypass;
   }
@@ -625,7 +625,7 @@ test('requires rider approval and resubmits changed vehicle details for review',
         phone: '0700001401',
         password: 'Password123!',
         role: 'RIDER',
-        identityNumber: 'RIDER-1401',
+        identityNumber: '199012345678',
         securityQuestion: 'birth_place',
         securityAnswer: 'Vavuniya',
         vehicle: {
@@ -1399,7 +1399,7 @@ test('enforces five cancellations in the rolling one-hour window', async () => {
   assert.equal((await Ride.findById(ride._id).lean()).status, 'REQUESTED');
 });
 
-test('gates post-completion chat behind a customer request and active approval', async () => {
+test('gates post-completion chat behind a participant request and active approval', async () => {
   const customerId = new mongoose.Types.ObjectId();
   const riderUserId = new mongoose.Types.ObjectId();
   const adminId = new mongoose.Types.ObjectId();
@@ -1425,18 +1425,6 @@ test('gates post-completion chat behind a customer request and active approval',
     started_at: new Date(),
     completed_at: new Date(),
   });
-
-  await assert.rejects(
-    invokeController(
-      chatController.requestPostCompletionAccess,
-      makeRequest({
-        user: { id: riderUserId.toString(), role: 'RIDER' },
-        params: { rideId: ride._id.toString() },
-        body: { reason: 'I need to contact the customer' },
-      })
-    ),
-    (error) => error.statusCode === 403
-  );
 
   const requestResult = await invokeController(
     chatController.requestPostCompletionAccess,
@@ -2196,6 +2184,7 @@ test('keeps the Postman collection synchronized with every implemented API route
           .replaceAll('{{userId}}', ':userId')
           .replaceAll('{{paymentId}}', ':paymentId')
           .replaceAll('{{chatAccessRequestId}}', ':requestId')
+          .replaceAll('{{passwordResetRequestId}}', ':requestId')
           .replaceAll('{{notificationId}}', ':notificationId');
         collectedRoutes.push(`${item.request.method} ${normalizedPath}`);
       }
@@ -2235,7 +2224,7 @@ test('keeps the Postman collection synchronized with every implemented API route
   );
 
   assert.equal(new Set(collectedRoutes).size, collectedRoutes.length);
-  assert.equal(implementedRoutes.length, 49);
+  assert.equal(implementedRoutes.length, 59);
   assert.deepEqual(collectedRoutes.sort(), implementedRoutes.sort());
 });
 
@@ -2418,7 +2407,7 @@ test('completes the customer, rider, and administrator journey through HTTP APIs
       phone: '0700001701',
       password,
       role: 'CUSTOMER',
-      identityNumber: 'JOURNEY-1701',
+      identityNumber: '198765432109',
       securityQuestion: 'first_school',
       securityAnswer: 'Journey School',
     });
@@ -2428,7 +2417,7 @@ test('completes the customer, rider, and administrator journey through HTTP APIs
       phone: '0700001702',
       password,
       role: 'RIDER',
-      identityNumber: 'JOURNEY-1702',
+      identityNumber: '197654321098',
       securityQuestion: 'birth_place',
       securityAnswer: 'Vavuniya',
       vehicle: {
