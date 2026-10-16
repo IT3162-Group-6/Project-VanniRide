@@ -167,16 +167,16 @@ test('uses the shortest returned road route to estimate the fare', async () => {
   );
 
   assert.equal(distanceKm, 0.75);
-  assert.equal(calculateFare('TRANSPORT', distanceKm), 260);
+  assert.equal(calculateFare('TRANSPORT', distanceKm), 145);
   assert.deepEqual(
     calculateFareBreakdown('DELIVERY', distanceKm, 'FOOD', {
       food_order: { items: [{ quantity: 2 }, { quantity: 1 }] },
     }),
     {
-      baseFare: 150,
-      distanceCharge: 45,
-      handlingCharge: 75,
-      total: 270,
+      baseFare: 100,
+      distanceCharge: 34,
+      handlingCharge: 30,
+      total: 164,
     }
   );
 });
@@ -363,7 +363,7 @@ test('validates and preserves structured delivery order details', async () => {
   );
 
   assert.equal(result.statusCode, 201);
-  assert.equal(result.body.data.ride.estimatedFare, 270);
+  assert.equal(result.body.data.ride.estimatedFare, 164);
   assert.equal(result.body.data.ride.deliveryDetails.receiverPhone, null);
   assert.equal(result.body.data.ride.deliveryDetails.foodOrder.items.length, 2);
   assert.equal(
@@ -478,12 +478,12 @@ test('returns map-ready road routes and caches geocoding provider results', asyn
   );
   assert.equal(preview.statusCode, 200);
   assert.equal(preview.body.data.routePreview.distanceKm, 0.75);
-  assert.equal(preview.body.data.routePreview.estimatedFare, 260);
+  assert.equal(preview.body.data.routePreview.estimatedFare, 145);
   assert.deepEqual(preview.body.data.routePreview.fareBreakdown, {
-    baseFare: 200,
-    distanceCharge: 60,
+    baseFare: 100,
+    distanceCharge: 45,
     handlingCharge: 0,
-    total: 260,
+    total: 145,
   });
   assert.equal(preview.body.data.routePreview.routeGeometry.type, 'LineString');
 });
@@ -1094,7 +1094,7 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
   );
   assert.equal(paymentResult.body.data.payment.paymentMethod, 'CASH');
   assert.equal(paymentResult.body.data.payment.paymentStatus, 'PAID');
-  assert.equal(paymentResult.body.data.payment.amount, 260);
+  assert.equal(paymentResult.body.data.payment.amount, 145);
   assert.equal(
     paymentResult.body.data.payment.confirmedBy,
     riderUserId.toString()
@@ -1103,7 +1103,7 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
   assert.ok(paymentResult.body.data.payment.paidAt);
 
   const storedPayment = await Payment.findOne({ ride_id: rideId }).lean();
-  assert.equal(storedPayment.amount, 260);
+  assert.equal(storedPayment.amount, 145);
   assert.ok(storedPayment.confirmed_by.equals(riderUserId));
   assert.ok(storedPayment.paid_at instanceof Date);
 
@@ -1112,7 +1112,7 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
     type: 'PAYMENT_CONFIRMED',
   }).lean();
   assert.ok(paymentNotification);
-  assert.match(paymentNotification.message, /LKR 260/);
+  assert.match(paymentNotification.message, /LKR 145/);
 
   await assert.rejects(
     invokeController(
@@ -1133,7 +1133,7 @@ test('completes the ordered ride lifecycle and releases the rider', async () => 
     })
   );
   assert.equal(customerPaymentResult.body.data.payment.paymentStatus, 'PAID');
-  assert.equal(customerPaymentResult.body.data.payment.amount, 260);
+  assert.equal(customerPaymentResult.body.data.payment.amount, 145);
   assert.equal(
     customerPaymentResult.body.data.payment.confirmedBy,
     riderUserId.toString()
@@ -2586,8 +2586,8 @@ test('completes the customer, rider, and administrator journey through HTTP APIs
     const riderEarnings = await request('GET', '/api/users/rider/earnings', riderToken);
     const statistics = await request('GET', '/api/admin/statistics', adminToken);
     assert.equal(customerHistory.body.data.history[0].ride.status, 'COMPLETED');
-    assert.equal(riderHistory.body.data.summary.payments.totalPaidAmount, 260);
-    assert.equal(riderEarnings.body.data.summary.totalEarnings, 260);
+    assert.equal(riderHistory.body.data.summary.payments.totalPaidAmount, 145);
+    assert.equal(riderEarnings.body.data.summary.totalEarnings, 145);
     assert.equal(statistics.body.data.statistics.rides.completed, 1);
     assert.equal(statistics.body.data.statistics.payments.paid, 1);
   } finally {

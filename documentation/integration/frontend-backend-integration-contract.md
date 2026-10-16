@@ -190,10 +190,11 @@ The backend validates item quantities, custom `OTHER` descriptions, parcel
 weight, and the resolved parcel receiver's Sri Lankan mobile format before
 calculating or saving the request.
 
-Delivery fare uses a LKR 150 base, LKR 60 per road-route kilometre, and a
-category handling charge: LKR 25 per food parcel, LKR 30 per water container,
-or LKR 15 per started kilogram for another parcel. The frontend must label this
-as the delivery charge and state that food/product purchase cost is separate.
+Delivery fare uses a LKR 100 base, LKR 45 per road-route kilometre, and a
+category handling charge: LKR 10 per food parcel, LKR 15 per water container,
+or LKR 10 per started kilogram for another parcel. Transport uses a LKR 100
+base and LKR 60 per road-route kilometre. The frontend must label the delivery
+fare as the delivery charge and state that food/product purchase cost is separate.
 
 ### 3.4 Stored ride data
 

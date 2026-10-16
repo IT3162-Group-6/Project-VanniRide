@@ -1,12 +1,12 @@
 const AppError = require('./appError');
 
 const BASE_FARES = Object.freeze({
-  TRANSPORT: 200,
-  DELIVERY: 150,
+  TRANSPORT: 100,
+  DELIVERY: 100,
 });
 const RATE_PER_KM = Object.freeze({
-  TRANSPORT: 80,
-  DELIVERY: 60,
+  TRANSPORT: 60,
+  DELIVERY: 45,
 });
 
 const calculateDeliveryHandlingCharge = (deliveryCategory, deliveryDetails) => {
@@ -17,7 +17,7 @@ const calculateDeliveryHandlingCharge = (deliveryCategory, deliveryDetails) => {
       (total, item) => total + item.quantity,
       0
     );
-    return parcelCount * 25;
+    return parcelCount * 10;
   }
 
   if (deliveryCategory === 'WATER') {
@@ -25,11 +25,11 @@ const calculateDeliveryHandlingCharge = (deliveryCategory, deliveryDetails) => {
       (total, item) => total + item.quantity,
       0
     );
-    return bottleCount * 30;
+    return bottleCount * 15;
   }
 
   if (deliveryCategory === 'PARCEL') {
-    return Math.ceil(deliveryDetails.parcel_order.weight_kg) * 15;
+    return Math.ceil(deliveryDetails.parcel_order.weight_kg) * 10;
   }
 
   return 0;

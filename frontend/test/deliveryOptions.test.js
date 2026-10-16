@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   FOOD_PICKUP_LOCATIONS,
-  WATER_PICKUP_LOCATIONS,
+  WATER_SOURCE_LOCATIONS,
   buildDeliveryPayload,
   createDefaultDeliveryDetails,
   validateDeliveryDetails,
@@ -35,7 +35,7 @@ test('offers every approved food pickup quick pick', () => {
 
 test('offers the approved drinking-water outlets as water quick picks', () => {
   assert.deepEqual(
-    WATER_PICKUP_LOCATIONS,
+    WATER_SOURCE_LOCATIONS,
     [
       { id: 'girls-hostel-water', displayName: 'Girls Hostel Water Outlet', latitude: 8.755949051450258, longitude: 80.39949256607096 },
       { id: 'bs-canteen-water', displayName: 'BS Canteen Water Outlet', latitude: 8.756834249378084, longitude: 80.41077647382527 },

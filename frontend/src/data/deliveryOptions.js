@@ -40,7 +40,7 @@ export const FOOD_PICKUP_LOCATIONS = Object.freeze([
   { id: 'business-studies-canteen', displayName: 'Business Studies Canteen', latitude: 8.756951361634316, longitude: 80.41078483844242 },
 ]);
 
-export const WATER_PICKUP_LOCATIONS = Object.freeze([
+export const WATER_SOURCE_LOCATIONS = Object.freeze([
   { id: 'girls-hostel-water', displayName: 'Girls Hostel Water Outlet', latitude: 8.755949051450258, longitude: 80.39949256607096 },
   { id: 'bs-canteen-water', displayName: 'BS Canteen Water Outlet', latitude: 8.756834249378084, longitude: 80.41077647382527 },
 ]);

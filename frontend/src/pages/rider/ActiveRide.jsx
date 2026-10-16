@@ -9,6 +9,7 @@ import { useAppState } from '../../context/appStateStore';
 import { useRealtimeEvent, useRideRoom } from '../../context/realtimeHooks';
 import { ridesApi, RIDE_STATUS } from '../../services/api';
 import { riderNavigation } from '../../utils/googleMaps';
+import { getLocationLabels } from '../../utils/locationLabels';
 
 const nextStep = (status, isDelivery) => ({
   [RIDE_STATUS.ACCEPTED]: { to: RIDE_STATUS.ONTHEWAY, label: 'I have arrived at pickup' },
@@ -119,6 +120,7 @@ export default function ActiveRide() {
   if (!ride) return <div className="card">{error && <div className="alert alert-error">{error}</div>}<div className="empty"><div className="fi"><Icon name="route" /></div><b>You are not handling a request</b><p>Open Available Requests to accept a ride or delivery. It will then appear here with navigation and status controls.</p><button className="btn btn-primary" onClick={() => navigate('/rider/requests')}>View available requests</button></div></div>;
 
   const isDelivery = ride.type === 'delivery';
+  const locationLabels = getLocationLabels(ride.type, ride.deliveryCategory);
   const step = nextStep(ride.status, isDelivery);
   const canCancel = ['ACCEPTED', 'STARTED'].includes(ride.apiStatus);
   const mustRespond = request?.respondingUserId === user.id;
@@ -127,7 +129,7 @@ export default function ActiveRide() {
     <div className="request-layout"><div className="card">
       <div className="card-head"><h3>Active {isDelivery ? 'Delivery' : 'Ride'} · #{ride.id.slice(-6)}</h3><StatusBadge status={ride.status} /></div>
       {error && <div className="alert alert-error">{error}</div>}
-      <div className="route-block"><div className="route-point"><span className="dot dot-start"/><div><b>{ride.pickup}</b><span>Pickup</span></div></div><div className="route-point"><span className="dot dot-end"/><div><b>{ride.dropoff}</b><span>Drop-off</span></div></div></div>
+      <div className="route-block"><div className="route-point"><span className="dot dot-start"/><div><b>{ride.pickup}</b><span>{locationLabels.pickup}</span></div></div><div className="route-point"><span className="dot dot-end"/><div><b>{ride.dropoff}</b><span>{locationLabels.destination}</span></div></div></div>
       {navigation && (
         <div className="external-navigation">
           <div><Icon name="route" /><span><b>{navigation.label}</b><small>Opens turn-by-turn directions in Google Maps</small></span></div>
@@ -141,6 +143,6 @@ export default function ActiveRide() {
       {step && <button className="btn btn-primary btn-block" disabled={busy || Boolean(request)} onClick={advance}>{step.label}</button>}
       {ride.status === RIDE_STATUS.COMPLETED && payment?.status !== 'paid' && <button className="btn btn-primary btn-block" disabled={busy} onClick={confirmCash}>Confirm cash received</button>}
       {request ? <div className="cancellation-panel"><b>Cancellation confirmation pending</b><p>{request.reason}</p>{mustRespond ? <div className="cancellation-actions"><button className="btn btn-primary btn-sm" disabled={busy} onClick={() => respond('CANCEL')}>Cancel trip</button><button className="btn btn-outline btn-sm" disabled={busy} onClick={() => respond('RESUME')}>Resume trip</button></div> : <span>Waiting for the customer; auto-cancels after 15 minutes.</span>}</div> : canCancel && <div className="cancellation-panel"><div className="field"><label>Cancellation reason</label><input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500}/></div><button className="btn btn-ghost btn-block" disabled={busy || allowance?.remaining === 0} onClick={cancel}>Request cancellation</button><span>{allowance ? `${allowance.remaining} of ${allowance.limit} remaining this hour` : ''}</span></div>}
-    </div><div className="map-box" aria-label="Pickup and destination map"><ActiveRequestMap pickup={ride.pickupLocation} destination={ride.destination}/></div></div>
+    </div><div className="map-box" aria-label={`${locationLabels.pickup} and ${locationLabels.destination} map`}><ActiveRequestMap pickup={ride.pickupLocation} destination={ride.destination}/></div></div>
   );
 }

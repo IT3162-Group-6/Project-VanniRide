@@ -7,6 +7,7 @@ import StatusBadge from '../../components/StatusBadge';
 import { useAppState } from '../../context/appStateStore';
 import { useAuth } from '../../context/authStore';
 import { ridesApi } from '../../services/api';
+import { getLocationLabels } from '../../utils/locationLabels';
 
 export default function RequestDetails() {
   const { id } = useParams();
@@ -43,6 +44,7 @@ export default function RequestDetails() {
     </div>
   );
   if (!ride) return <p className="muted">Loading…</p>;
+  const locationLabels = getLocationLabels(ride.type, ride.deliveryCategory);
 
   return (
     <div className="request-layout">
@@ -53,9 +55,9 @@ export default function RequestDetails() {
         </div>
 
         <div className="route-block">
-          <div className="route-point"><span className="dot dot-start" /><div><b>{ride.pickup}</b><span>Pickup</span></div></div>
+          <div className="route-point"><span className="dot dot-start" /><div><b>{ride.pickup}</b><span>{locationLabels.pickup}</span></div></div>
           {ride.via && <div className="route-point"><span className="dot" /><div><b>{ride.via}</b><span>Via</span></div></div>}
-          <div className="route-point"><span className="dot dot-end" /><div><b>{ride.dropoff}</b><span>Drop-off</span></div></div>
+          <div className="route-point"><span className="dot dot-end" /><div><b>{ride.dropoff}</b><span>{locationLabels.destination}</span></div></div>
         </div>
 
         <div className="kv">
@@ -78,7 +80,7 @@ export default function RequestDetails() {
           </button>
         </div>
       </div>
-      <div className="map-box" aria-label="Pickup and destination map"><ActiveRequestMap pickup={ride.pickupLocation} destination={ride.destination} /></div>
+      <div className="map-box" aria-label={`${locationLabels.pickup} and ${locationLabels.destination} map`}><ActiveRequestMap pickup={ride.pickupLocation} destination={ride.destination} /></div>
     </div>
   );
 }

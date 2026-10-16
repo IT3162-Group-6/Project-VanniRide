@@ -7,12 +7,13 @@ import { useAppState } from '../../context/appStateStore';
 import { QUICK_PICK_LOCATIONS } from '../../data/quickPickLocations';
 import {
   FOOD_PICKUP_LOCATIONS,
-  WATER_PICKUP_LOCATIONS,
+  WATER_SOURCE_LOCATIONS,
   buildDeliveryPayload,
   createDefaultDeliveryDetails,
   validateDeliveryDetails,
 } from '../../data/deliveryOptions';
 import { mapApi, ridesApi } from '../../services/api';
+import { getLocationLabels } from '../../utils/locationLabels';
 
 const coordinateLabel = ({ latitude, longitude }) =>
   `${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}`;
@@ -67,7 +68,12 @@ function RequestRideForm({ requestedRideType }) {
 
   const setDeliveryCategory = (deliveryCategory) => {
     if (deliveryCategory === form.deliveryCategory) return;
-    setForm((current) => ({ ...current, deliveryCategory, pickupLocation: null }));
+    setForm((current) => ({
+      ...current,
+      deliveryCategory,
+      pickupLocation: null,
+      destination: null,
+    }));
     setActiveLocation('pickup');
     setSearchQuery('');
     setSearchResults([]);
@@ -172,13 +178,13 @@ function RequestRideForm({ requestedRideType }) {
     setError('');
   }
 
-  function chooseWaterPickup(place) {
-    setLocation('pickup', {
+  function chooseWaterSource(place) {
+    setLocation('destination', {
       address: place.displayName,
       latitude: place.latitude,
       longitude: place.longitude,
     });
-    setActiveLocation('destination');
+    setActiveLocation('pickup');
     setSearchQuery('');
     setSearchResults([]);
     setPreview(null);
@@ -194,11 +200,10 @@ function RequestRideForm({ requestedRideType }) {
     setLocationBusy(true);
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        void resolvePoint('pickup', {
+        void resolvePoint(activeLocation, {
           latitude: coords.latitude,
           longitude: coords.longitude,
-        });
-        setActiveLocation('destination');
+        }, true);
       },
       () => {
         setLocationBusy(false);
@@ -228,7 +233,7 @@ function RequestRideForm({ requestedRideType }) {
       }
     }
     if (!form.pickupLocation || !form.destination) {
-      setError('Select both pickup and destination before continuing.');
+      setError(`Select both ${locationLabels.pickup.toLowerCase()} and ${locationLabels.destination.toLowerCase()} before continuing.`);
       return;
     }
     setPreviewBusy(true);
@@ -258,6 +263,13 @@ function RequestRideForm({ requestedRideType }) {
     }
   }
 
+  const locationLabels = getLocationLabels(form.rideType, form.deliveryCategory);
+  const activeLocationLabel = locationLabels[activeLocation];
+  const showGeneralQuickPicks = form.rideType === 'TRANSPORT'
+    || form.deliveryCategory === 'PARCEL'
+    || (form.deliveryCategory === 'FOOD' && activeLocation === 'destination')
+    || (form.deliveryCategory === 'WATER' && activeLocation === 'pickup');
+
   const map = (
     <div className="map-box map-box-live">
       <LocationMap
@@ -269,7 +281,7 @@ function RequestRideForm({ requestedRideType }) {
         onMoveDestination={(point) => void resolvePoint('destination', point)}
       />
       <div className="map-help">
-        Click the map to set the {activeLocation}. Drag a marker to correct it.
+        Click the map to set the {activeLocationLabel.toLowerCase()}. Drag a marker to correct it.
       </div>
     </div>
   );
@@ -277,15 +289,15 @@ function RequestRideForm({ requestedRideType }) {
   const locationPicker = (
     <div className="location-picker">
       <div className="location-toggle" role="group" aria-label="Location being selected">
-        <button type="button" className={activeLocation === 'pickup' ? 'active' : ''} onClick={() => setActiveLocation('pickup')}>Pickup</button>
-        <button type="button" className={activeLocation === 'destination' ? 'active' : ''} onClick={() => setActiveLocation('destination')}>Destination</button>
+        <button type="button" className={activeLocation === 'pickup' ? 'active' : ''} onClick={() => setActiveLocation('pickup')}>{locationLabels.pickup}</button>
+        <button type="button" className={activeLocation === 'destination' ? 'active' : ''} onClick={() => setActiveLocation('destination')}>{locationLabels.destination}</button>
       </div>
 
-      <LocationSummary label="Pickup" location={form.pickupLocation} selected={activeLocation === 'pickup'} onSelect={() => setActiveLocation('pickup')} />
-      <LocationSummary label="Destination" location={form.destination} selected={activeLocation === 'destination'} onSelect={() => setActiveLocation('destination')} />
+      <LocationSummary label={locationLabels.pickup} location={form.pickupLocation} selected={activeLocation === 'pickup'} onSelect={() => setActiveLocation('pickup')} />
+      <LocationSummary label={locationLabels.destination} location={form.destination} selected={activeLocation === 'destination'} onSelect={() => setActiveLocation('destination')} />
 
       <div className="location-search">
-        <input type="search" placeholder={`Search ${activeLocation} in Northern Province`} value={searchQuery} onChange={updateSearchQuery} />
+        <input type="search" placeholder={`Search ${activeLocationLabel.toLowerCase()} in Northern Province`} value={searchQuery} onChange={updateSearchQuery} />
         {searchBusy && <span role="status">Searching…</span>}
       </div>
       {searchResults.length > 0 && (
@@ -298,9 +310,9 @@ function RequestRideForm({ requestedRideType }) {
         </div>
       )}
 
-      {form.rideType === 'TRANSPORT' && (
+      {showGeneralQuickPicks && (
         <div className="quick-picks" aria-label="Frequently used locations">
-          <span>Frequently used locations</span>
+          <span>{activeLocationLabel} quick picks</span>
           <div>
             {QUICK_PICK_LOCATIONS.map((place) => (
               <button type="button" key={place.id} onClick={() => chooseSearchResult(place)}>
@@ -312,7 +324,7 @@ function RequestRideForm({ requestedRideType }) {
       )}
 
       <button type="button" className="btn btn-ghost btn-block btn-sm" onClick={useCurrentLocation} disabled={locationBusy}>
-        <Icon name="pin" size={16} /> Use my current location as pickup
+        <Icon name="pin" size={16} /> Use my current location as {activeLocationLabel.toLowerCase()}
       </button>
     </div>
   );
@@ -363,10 +375,10 @@ function RequestRideForm({ requestedRideType }) {
                 category={form.deliveryCategory}
                 details={deliveryDetails}
                 foodPickupLocations={FOOD_PICKUP_LOCATIONS}
-                waterPickupLocations={WATER_PICKUP_LOCATIONS}
+                waterPickupLocations={WATER_SOURCE_LOCATIONS}
                 onChooseFoodPickup={chooseFoodPickup}
-                onChooseWaterPickup={chooseWaterPickup}
-                selectedPickup={form.pickupLocation}
+                onChooseWaterPickup={chooseWaterSource}
+                selectedPickup={form.destination}
                 setDetails={(updater) => {
                   setDeliveryDetails(updater);
                   setPreview(null);
@@ -395,8 +407,8 @@ function RequestRideForm({ requestedRideType }) {
             </div>
 
             <label className="field-label" style={{ marginTop: 18 }}>Route</label>
-            <div className="fare-row"><span>Pickup</span><span>{form.pickupLocation.address}</span></div>
-            <div className="fare-row"><span>Destination</span><span>{form.destination.address}</span></div>
+            <div className="fare-row"><span>{locationLabels.pickup}</span><span>{form.pickupLocation.address}</span></div>
+            <div className="fare-row"><span>{locationLabels.destination}</span><span>{form.destination.address}</span></div>
             {form.rideType === 'DELIVERY' && <>
               {form.deliveryCategory === 'PARCEL' && (
                 <div className="delivery-review-contact">

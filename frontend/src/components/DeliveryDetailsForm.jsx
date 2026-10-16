@@ -119,8 +119,8 @@ function WaterForm({ details, setDetails, pickupLocations = [], onChoosePickup, 
   return (
     <div className="delivery-section">
       {pickupLocations.length > 0 && (
-        <div className="quick-picks" aria-label="Water pickup locations">
-          <span>Water pickup quick picks</span>
+        <div className="quick-picks" aria-label="Water filling sources">
+          <span>Water source quick picks</span>
           <div>
             {pickupLocations.map((place) => {
               const selected = Number(selectedPickup?.latitude) === place.latitude
@@ -132,7 +132,7 @@ function WaterForm({ details, setDetails, pickupLocations = [], onChoosePickup, 
               );
             })}
           </div>
-          <small>The pickup marker is placed automatically. You can still adjust it on the map.</small>
+          <small>The rider collects the bottles at the collection point, fills them here, and returns them to the same collection point.</small>
         </div>
       )}
       <div className="delivery-section-head"><div><b>Water containers</b><span>Add each bottle size separately</span></div><button type="button" className="btn btn-outline btn-sm" onClick={addItem}>+ Add water</button></div>

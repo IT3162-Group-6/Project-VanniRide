@@ -398,12 +398,12 @@ participant allowance, and cannot alter a completed or cancelled ride.
 Fare calculation:
 
 ```text
-TRANSPORT = LKR 200 base fare + LKR 80 per road-route kilometre
-DELIVERY  = LKR 150 base fare + LKR 60 per road-route kilometre + handling
+TRANSPORT = LKR 100 base fare + LKR 60 per road-route kilometre
+DELIVERY  = LKR 100 base fare + LKR 45 per road-route kilometre + handling
 ```
 
-Delivery handling is LKR 25 per food parcel, LKR 30 per water container, or
-LKR 15 per started kilogram for another parcel. The estimate is the rider's
+Delivery handling is LKR 10 per food parcel, LKR 15 per water container, or
+LKR 10 per started kilogram for another parcel. The estimate is the rider's
 delivery charge only; food and product purchase costs are separate.
 
 The final estimate is rounded to the nearest whole LKR and stored in both the
