@@ -53,14 +53,10 @@ app.get('/', (req, res) => {
 // Health Check Route
 app.get('/health', (req, res) => {
   const databaseReady = mongoose.connection.readyState === 1;
-  const dataResetReport = req.app.get('dataResetReport');
   res.status(databaseReady ? 200 : 503).json({
     success: databaseReady,
     message: databaseReady ? 'Server is ready' : 'Server is not ready',
-    data: {
-      database: databaseReady ? 'connected' : 'disconnected',
-      ...(dataResetReport ? { dataReset: dataResetReport } : {}),
-    },
+    data: { database: databaseReady ? 'connected' : 'disconnected' },
   });
 });
 
