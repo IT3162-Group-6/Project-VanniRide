@@ -96,7 +96,10 @@ export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMen
         <button className="icon-btn" aria-label="Toggle navigation sidebar" title="Toggle navigation sidebar" onClick={onMenu}>
           <Icon name="menu" />
         </button>
-        <h1>{title}</h1>
+        <div className="app-page-heading">
+          <span>{user?.role === 'admin' ? 'Administration' : user?.role === 'rider' ? 'Rider workspace' : 'Customer workspace'}</span>
+          <h1>{title}</h1>
+        </div>
         <div className="app-topbar-actions">
           <div className="notification-menu" ref={notificationMenu}>
             <button
@@ -147,7 +150,7 @@ export default function Navbar({ variant = 'public', title = 'Vanni Ride', onMen
               </section>
             )}
           </div>
-          <Link to={`/${user?.role}/profile`} className="avatar">
+          <Link to={`/${user?.role}/profile`} className="avatar topbar-avatar" aria-label="Open profile">
             {user?.name?.[0]?.toUpperCase() || 'U'}
           </Link>
         </div>

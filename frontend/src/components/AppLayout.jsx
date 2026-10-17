@@ -61,7 +61,9 @@ export default function AppLayout() {
       <div className="app-main">
         <Navbar variant="app" title={title} onMenu={toggleSidebar} />
         <section className="app-content">
-          <Outlet />
+          <div className="app-content-inner">
+            <Outlet />
+          </div>
         </section>
       </div>
       <BottomNav />

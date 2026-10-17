@@ -27,7 +27,7 @@ export default function BottomNav() {
   const { user } = useAuth();
   const links = LINKS[user?.role] || [];
   return (
-    <nav className="bottom-nav">
+    <nav className="bottom-nav" aria-label="Primary mobile navigation">
       {links.map((l) => (
         <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? 'active' : '')}>
           <Icon name={l.icon} />
