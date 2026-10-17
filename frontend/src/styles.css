@@ -1140,6 +1140,9 @@ button,input,select,textarea{font:inherit}
 button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
 :focus-visible{outline:3px solid rgba(31,138,72,.32);outline-offset:3px}
 ::selection{background:#c8edd3;color:var(--green-950)}
+.skip-link{position:fixed;z-index:250;top:10px;left:10px;padding:10px 14px;border-radius:10px;background:var(--green-950);color:#fff;font-size:.82rem;font-weight:800;box-shadow:var(--shadow-lg);transform:translateY(-160%);transition:transform .15s ease}
+.skip-link:focus{outline:3px solid #a4efba;outline-offset:2px;transform:translateY(0)}
+#app-content:focus,#public-content:focus{outline:0}
 
 .btn{
   min-height:44px;padding:11px 18px;border-radius:12px;font-weight:750;

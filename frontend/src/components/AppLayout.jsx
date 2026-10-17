@@ -52,6 +52,7 @@ export default function AppLayout() {
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <a className="skip-link" href="#app-content">Skip to main content</a>
       <Sidebar
         open={sidebarOpen}
         collapsed={sidebarCollapsed}
@@ -60,11 +61,11 @@ export default function AppLayout() {
       {sidebarOpen && <div className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
       <div className="app-main">
         <Navbar variant="app" title={title} onMenu={toggleSidebar} />
-        <section className="app-content">
+        <main className="app-content" id="app-content" tabIndex="-1">
           <div className="app-content-inner">
             <Outlet />
           </div>
-        </section>
+        </main>
       </div>
       <BottomNav />
     </div>
