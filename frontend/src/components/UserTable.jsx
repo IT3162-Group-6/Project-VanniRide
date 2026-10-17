@@ -21,17 +21,17 @@ export default function UserTable({ users, columns = [], onToggleStatus }) {
         <tbody>
           {users.map((u) => (
             <tr key={u.id}>
-              <td>
+              <td data-label="Name">
                 <div className="cell-user">
                   <span className="avatar avatar-sm">{u.name[0]}</span>
                   <div><b>{u.name}</b><span>{u.phone || '—'}</span></div>
                 </div>
               </td>
-              <td>{u.email}</td>
-              {columns.map((c) => <td key={c.key}>{c.render ? c.render(u) : (u[c.key] ?? '—')}</td>)}
-              <td><StatusBadge status={u.status} /></td>
+              <td data-label="Email">{u.email}</td>
+              {columns.map((c) => <td data-label={c.label} key={c.key}>{c.render ? c.render(u) : (u[c.key] ?? '—')}</td>)}
+              <td data-label="Status"><StatusBadge status={u.status} /></td>
               {onToggleStatus && (
-                <td>
+                <td data-label="Account action">
                   <button className="btn btn-outline btn-sm" onClick={() => onToggleStatus(u)}>
                     {u.status === 'active' ? 'Suspend' : 'Activate'}
                   </button>

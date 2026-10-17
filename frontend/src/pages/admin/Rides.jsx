@@ -41,15 +41,23 @@ export default function Rides() {
           </thead>
           <tbody>
             {shown.map((r) => (
-              <tr key={r.id} className="row-link" onClick={() => navigate(`/admin/rides/${r.id}`)}>
-                <td><b>{r.code}</b></td>
-                <td>{r.pickup} → {r.dropoff}</td>
-                <td>{r.customer?.name || '—'}</td>
-                <td>{r.rider?.name || <span className="muted">Unassigned</span>}</td>
-                <td style={{ textTransform: 'capitalize' }}>{r.type}</td>
-                <td>LKR {r.fare.toFixed(2)}</td>
-                <td><StatusBadge status={r.status} /></td>
-                <td>{when(r.createdAt)}</td>
+              <tr
+                key={r.id}
+                className="row-link"
+                onClick={() => navigate(`/admin/rides/${r.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') navigate(`/admin/rides/${r.id}`);
+                }}
+                tabIndex="0"
+              >
+                <td data-label="Code"><b>{r.code}</b></td>
+                <td data-label="Route">{r.pickup} → {r.dropoff}</td>
+                <td data-label="Customer">{r.customer?.name || '—'}</td>
+                <td data-label="Rider">{r.rider?.name || <span className="muted">Unassigned</span>}</td>
+                <td data-label="Type" style={{ textTransform: 'capitalize' }}>{r.type}</td>
+                <td data-label="Fare">LKR {r.fare.toFixed(2)}</td>
+                <td data-label="Status"><StatusBadge status={r.status} /></td>
+                <td data-label="Created">{when(r.createdAt)}</td>
               </tr>
             ))}
           </tbody>

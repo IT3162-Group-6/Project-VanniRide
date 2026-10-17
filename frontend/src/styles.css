@@ -1247,6 +1247,10 @@ button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
 .location-toggle button{min-height:40px;border-radius:9px;background:transparent}
 .location-toggle button+button{border-left:0}
 .location-toggle button.active{background:#fff;box-shadow:0 2px 8px rgba(13,43,26,.08)}
+.stepper{max-width:520px;margin:0 auto 5px}
+.stepper-labels{display:grid;grid-template-columns:repeat(3,1fr);max-width:570px;margin:0 auto 22px;color:var(--ink-soft);font-size:.69rem;font-weight:750;text-align:center}
+.stepper-labels span.active{color:var(--green-700)}
+.request-review-actions{display:flex;gap:12px;margin-top:18px}
 .tabs{padding:4px;border:1px solid var(--line);border-radius:13px;background:#f7faf8;width:max-content;max-width:100%}
 .tab{min-height:36px;border:0;border-radius:9px;background:transparent}
 .tab.active{background:#fff;color:var(--green-700);box-shadow:0 2px 8px rgba(13,43,26,.1)}
@@ -1355,7 +1359,19 @@ button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
   .pay-card{align-items:flex-start;flex-wrap:wrap}
   .pay-card>.btn{width:100%}
   .table-wrap{margin:0 -4px;box-shadow:inset -12px 0 18px -20px rgba(13,43,26,.8)}
-  .data-table{font-size:.8rem}
+  .data-table{min-width:0;font-size:.8rem}
+  .data-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .data-table,.data-table tbody,.data-table tr,.data-table td{display:block;width:100%}
+  .data-table tbody{display:grid;gap:10px;padding:10px}
+  .data-table tr{overflow:hidden;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:var(--shadow-sm)}
+  .data-table td{display:grid;grid-template-columns:minmax(92px,.42fr) minmax(0,1fr);gap:10px;align-items:start;padding:10px 12px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+  .data-table td:last-child{border-bottom:0}
+  .data-table td::before{content:attr(data-label);color:var(--ink-soft);font-size:.68rem;font-weight:750;letter-spacing:.03em;text-transform:uppercase}
+  .data-table td[data-label="Name"] .cell-user{align-items:flex-start}
+  .data-table td[data-label="Account action"] .btn{width:100%}
+  .data-table .row-link{cursor:pointer}
+  .request-review-actions{display:grid;grid-template-columns:auto 1fr}
+  .request-review-actions .btn{margin:0}
   .notification-toolbar{align-items:stretch;flex-direction:column}
   .notification-filters{width:100%}.notification-filters button{flex:1}
   .settings-intro{align-items:flex-start;flex-direction:column;gap:6px}

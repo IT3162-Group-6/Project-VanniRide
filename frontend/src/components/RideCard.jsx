@@ -17,11 +17,25 @@ function when(iso) {
 export default function RideCard({ ride, to, person = null, actions = null, muted = false }) {
   const navigate = useNavigate();
   const other = person === 'rider' ? ride.rider : person === 'customer' ? ride.customer : null;
+  const openRide = () => {
+    if (to) navigate(to);
+  };
+
+  const handleKeyDown = (event) => {
+    if (to && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      openRide();
+    }
+  };
 
   return (
     <div
       className={`req-row ${to ? 'req-row-link' : ''} ${muted ? 'req-row-muted' : ''}`}
-      onClick={to ? () => navigate(to) : undefined}
+      onClick={to ? openRide : undefined}
+      onKeyDown={handleKeyDown}
+      role={to ? 'link' : undefined}
+      tabIndex={to ? 0 : undefined}
+      aria-label={to ? `Open ${ride.type} ${ride.code || ''} from ${ride.pickup} to ${ride.dropoff}` : undefined}
     >
       <div className="req-icon"><Icon name={ride.type === 'delivery' ? 'package' : 'car'} /></div>
       <div className="req-meta">

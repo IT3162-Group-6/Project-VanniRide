@@ -123,10 +123,10 @@ export default function Users() {
               <tbody>
                 {resetRequests.map((request) => (
                   <tr key={request.id}>
-                    <td><b>{request.user.name}</b></td>
-                    <td>{request.user.email}</td>
-                    <td>{new Date(request.requestedAt).toLocaleString()}</td>
-                    <td><button className="btn btn-outline btn-sm" onClick={() => { setSelectedRequest(request); setResetForm({ reason: '' }); setApprovedReset(null); }}>Review</button></td>
+                    <td data-label="User"><b>{request.user.name}</b></td>
+                    <td data-label="Email">{request.user.email}</td>
+                    <td data-label="Requested">{new Date(request.requestedAt).toLocaleString()}</td>
+                    <td data-label="Action"><button className="btn btn-outline btn-sm" onClick={() => { setSelectedRequest(request); setResetForm({ reason: '' }); setApprovedReset(null); }}>Review</button></td>
                   </tr>
                 ))}
               </tbody>

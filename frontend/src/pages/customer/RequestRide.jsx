@@ -281,7 +281,7 @@ function RequestRideForm({ requestedRideType }) {
         onMoveDestination={(point) => void resolvePoint('destination', point)}
       />
       <div className="map-help">
-        Click the map to set the {activeLocationLabel.toLowerCase()}. Drag a marker to correct it.
+        Tap or click the map to set the {activeLocationLabel.toLowerCase()}. Drag a marker to correct it.
       </div>
     </div>
   );
@@ -337,6 +337,11 @@ function RequestRideForm({ requestedRideType }) {
         <StepDot n={2} current={step} />
         <div className={`step-line ${step > 2 ? 'done' : ''}`}></div>
         <StepDot n={3} current={step} />
+      </div>
+      <div className="stepper-labels" aria-hidden="true">
+        <span className={step === 1 ? 'active' : ''}>Details</span>
+        <span className={step === 2 ? 'active' : ''}>Review</span>
+        <span className={step === 3 ? 'active' : ''}>Confirmed</span>
       </div>
 
       {step === 1 && (
@@ -435,7 +440,7 @@ function RequestRideForm({ requestedRideType }) {
               <div><b>Cash</b><span>Pay the rider after completion</span></div>
             </div>
 
-            <div style={{ display: 'flex', gap: 12, marginTop: 18 }}>
+            <div className="form-actions request-review-actions">
               <button className="btn btn-ghost" onClick={() => setStep(1)}><Icon name="back" /> Back</button>
               <button className="btn btn-primary btn-block" onClick={confirm} disabled={busy}>{busy ? 'Sending…' : 'Confirm Request'}</button>
             </div>
