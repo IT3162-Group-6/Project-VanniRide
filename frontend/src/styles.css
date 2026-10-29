@@ -1134,8 +1134,10 @@ h1,h2,h3,h4{letter-spacing:-.015em}
   --shadow-lg:0 28px 70px -38px rgba(13,43,26,.48);
 }
 
-html{scroll-behavior:smooth;background:var(--bg)}
-body{min-width:320px;min-height:100vh;background:linear-gradient(180deg,#f8faf8 0,#f3f6f4 380px);line-height:1.5}
+html{scroll-behavior:smooth;background:var(--bg);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body,#root{width:100%;min-width:0;max-width:100%}
+body{min-height:100vh;overflow-x:hidden;background:linear-gradient(180deg,#f8faf8 0,#f3f6f4 380px);line-height:1.5}
+#root,#public-content,.app-shell,.app-main,.app-content,.app-content-inner{min-width:0;max-width:100%}
 button,input,select,textarea{font:inherit}
 button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
 :focus-visible{outline:3px solid rgba(31,138,72,.32);outline-offset:3px}
@@ -1188,7 +1190,7 @@ button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
 .role-opt:hover,.vehicle-type-grid button:hover,.receiver-mode-grid button:hover{transform:translateY(-1px);border-color:#b8cec0}
 
 /* Application shell */
-.app-shell{grid-template-columns:264px minmax(0,1fr);background:var(--bg)}
+.app-shell{width:100%;grid-template-columns:264px minmax(0,1fr);background:var(--bg)}
 .app-shell.sidebar-collapsed{grid-template-columns:84px minmax(0,1fr)}
 .sidebar{padding:24px 14px 18px;background:linear-gradient(180deg,#0d2b1a 0%,#123c24 100%);box-shadow:8px 0 28px rgba(7,28,17,.08)}
 .sidebar-brand{min-height:44px;padding:0 10px;font-size:1.12rem}
@@ -1314,14 +1316,16 @@ button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
   .field{margin-bottom:18px}
   .field input,.field select,.field textarea{font-size:16px}
 
-  .app-topbar{min-height:66px;padding:9px 14px}
+  .app-shell{width:100%;overflow-x:hidden}
+  .app-main,.app-content,.app-content-inner{width:100%}
+  .app-topbar{width:100%;min-width:0;min-height:66px;padding:9px max(14px,env(safe-area-inset-right,0px)) 9px max(14px,env(safe-area-inset-left,0px))}
   .app-page-heading>span{font-size:.58rem}
   .app-page-heading h1{max-width:42vw;font-size:1.05rem}
   .app-topbar-actions{margin-left:auto}
   .icon-btn{min-width:42px}
   .topbar-avatar{width:40px;height:40px}
-  .app-content{padding:16px 14px calc(100px + env(safe-area-inset-bottom))}
-  .bottom-nav{gap:3px;padding:7px 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 -10px 28px -22px rgba(13,43,26,.55)}
+  .app-content{padding:16px max(14px,env(safe-area-inset-right,0px)) calc(100px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
+  .bottom-nav{width:100%;gap:3px;padding:7px max(8px,env(safe-area-inset-right,0px)) calc(7px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));box-shadow:0 -10px 28px -22px rgba(13,43,26,.55)}
   .bottom-nav a{min-height:54px;justify-content:center;padding:5px 2px;border-radius:12px;font-size:.65rem}
   .bottom-nav a svg{width:20px;height:20px}
   .bottom-nav a.active{background:var(--mint-50);color:var(--green-700)}
@@ -1383,6 +1387,7 @@ button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
   .rating-modal{padding:24px 18px 18px;border-radius:19px}
   .rating-modal-actions{display:grid;grid-template-columns:1fr 1fr}.rating-modal-actions .btn{width:100%}
   .pwa-banner{left:12px;right:12px;bottom:calc(82px + env(safe-area-inset-bottom));width:auto}
+  .sidebar.open{max-width:calc(100% - env(safe-area-inset-right,0px));padding-left:max(14px,env(safe-area-inset-left,0px))}
 }
 
 @media (max-width:390px){
